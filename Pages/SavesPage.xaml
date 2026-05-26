@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="LSMA.Pages.SavesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Padding="30,16,30,24" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+            <CommandBar Grid.Row="0" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
+                <AppBarButton Label="扫描存档" Command="{Binding ScanCommand}">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="备份全部" Command="{Binding BackupAllCommand}">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE74E;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="打开备份目录" Command="{Binding OpenBackupsCommand}">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE838;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+
+            <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="存档功能暂不可用" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="连接游戏目录后即可读取本机存档并创建备份。" Style="{StaticResource BodyTextStyle}" />
+                </StackPanel>
+            </Border>
+
+                <InfoBar Grid.Row="1" IsOpen="True" IsClosable="False" Severity="Warning" Title="游戏正在运行"
+                         Message="当前可以查看存档，但恢复操作已暂停。" Visibility="{Binding RunningVisibility}" />
+                <Grid Grid.Row="2" ColumnSpacing="14" Visibility="{Binding AvailableVisibility}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="310" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CardStyle}" Padding="8">
+                        <ListView ItemsSource="{Binding Saves}" SelectedItem="{Binding SelectedSave, Mode=TwoWay}">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Padding="10,8" Spacing="4">
+                                        <TextBlock Text="{Binding FarmerName}" FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding FarmName}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding DateDisplay}" Foreground="{StaticResource AccentBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                        <ScrollViewer Visibility="{Binding DetailVisibility}">
+                            <StackPanel Spacing="16">
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding SelectedSave.FarmerName}" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{Binding SelectedSave.FarmName}" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBlock Text="{Binding SelectedSave.ProgressDisplay}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
+                                        <TextBlock Text="{Binding SelectedSave.ParseError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="10">
+                                        <Button Content="备份当前存档" Command="{Binding BackupCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource CardStyle}" Padding="12">
+                                        <StackPanel><TextBlock Text="游戏日期" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.DateDisplay}" FontWeight="SemiBold" /></StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                                        <StackPanel><TextBlock Text="当前金币" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.MoneyDisplay}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" /></StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                                        <StackPanel><TextBlock Text="总收入" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.TotalIncomeDisplay}" FontWeight="SemiBold" /></StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                                        <StackPanel><TextBlock Text="游戏时间" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.PlayTimeDisplay}" FontWeight="SemiBold" /></StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
+                                        <StackPanel><TextBlock Text="本季剩余" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.RemainingDaysInSeason}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" /></StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource CardStyle}" Padding="12"><StackPanel><TextBlock Text="日均收入" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.AverageMoneyDisplay}" /></StackPanel></Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12"><StackPanel><TextBlock Text="季度估算" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.SeasonEstimateDisplay}" /></StackPanel></Border>
+                                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12"><StackPanel><TextBlock Text="社区中心" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.CommunityCenterDisplay}" /></StackPanel></Border>
+                                    <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12"><StackPanel><TextBlock Text="全收集参考" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedSave.CollectionDisplay}" /></StackPanel></Border>
+                                </Grid>
+
+                                <TextBlock Text="{Binding SelectedSave.HouseholdDisplay}" Style="{StaticResource BodyTextStyle}" />
+                                <TextBlock Text="{Binding SelectedSave.ExplorationDisplay}" Style="{StaticResource BodyTextStyle}" />
+
+                                <Grid ColumnSpacing="20">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="技能等级" Style="{StaticResource SectionTitleStyle}" />
+                                        <ItemsControl ItemsSource="{Binding SelectedSave.Skills}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,5">
+                                                        <Grid><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Level}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" /></Grid>
+                                                        <ProgressBar Value="{Binding Percent}" Maximum="100" Height="7" Margin="0,5,0,0" Foreground="{StaticResource AccentBrush}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="10">
+                                        <TextBlock Text="好感 Top 10" Style="{StaticResource SectionTitleStyle}" />
+                                        <ItemsControl ItemsSource="{Binding SelectedSave.Friendships}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,5">
+                                                        <Grid><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding HeartsDisplay}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" /></Grid>
+                                                        <ProgressBar Value="{Binding Percent}" Maximum="100" Height="7" Margin="0,5,0,0" Foreground="{StaticResource AccentBrush}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="{Binding BackupStatus}" Style="{StaticResource BodyTextStyle}" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding BackupEntries}" SelectedItem="{Binding SelectedBackup, Mode=TwoWay}" DisplayMemberPath="DisplayName" PlaceholderText="选择要恢复的备份" />
+                                    <Button Grid.Column="1" Content="恢复备份" Command="{Binding RestoreCommand}" Style="{StaticResource DangerButtonStyle}" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+                <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="16,12" Visibility="{Binding AvailableVisibility}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
+                        <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" />
+                    </StackPanel>
+                </Border>
+    </Grid>
+</Page>

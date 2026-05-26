@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="LSMA.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+        <StackPanel Padding="30,22,30,30" Spacing="18" HorizontalAlignment="Stretch">
+            <Border Style="{StaticResource CardStyle}" Background="{ThemeResource AccentSoftBrush}">
+                <Grid ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="184" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="7" VerticalAlignment="Center">
+                        <TextBlock Text="LSMA" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="L " Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="S" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="tardew " Style="{StaticResource BodyTextStyle}" />
+                            <TextBlock Text="M" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="od " Style="{StaticResource BodyTextStyle}" />
+                            <TextBlock Text="A" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="ssistant" Style="{StaticResource BodyTextStyle}" />
+                        </StackPanel>
+                        <TextBlock Text="星露谷物语启动前助手与模组管理器。" Style="{StaticResource BodyTextStyle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" Spacing="9">
+                        <TextBlock Text="{Binding VersionDisplay}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
+                        <Grid Height="80">
+                            <Border
+                                x:Name="UpdateNoticeBubble"
+                                Height="40"
+                                VerticalAlignment="Top"
+                                Visibility="Collapsed"
+                                Opacity="0"
+                                Background="{ThemeResource CardBackgroundBrush}"
+                                BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="UpdateNoticeTransform" Y="40" />
+                                </Border.RenderTransform>
+                                <TextBlock Text="当前版本暂未启用在线检查" Foreground="{StaticResource AccentBrush}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Button
+                                Height="40"
+                                VerticalAlignment="Bottom"
+                                Content="检查更新"
+                                Click="CheckUpdates_Click"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                HorizontalAlignment="Stretch" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="游戏目录" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="{Binding DirectoryStatus}" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="{Binding DirectoryPath}" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="重新选择" Command="{Binding ChooseDirectoryCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        <Button Content="打开目录" Command="{Binding OpenGameDirectoryCommand}" Visibility="{Binding CanOpenDirectoryVisibility}" Style="{StaticResource SubtleButtonStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Nexus 授权码" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="授权码仅保存在 Windows 凭据中，不会写入设置文件、日志或上传到其他服务器。" Style="{StaticResource BodyTextStyle}" />
+                    <Border Visibility="{Binding NexusTutorialVisibility}" Background="{ThemeResource AccentSoftBrush}" CornerRadius="10" Padding="14">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="获取个人授权码" FontWeight="SemiBold" />
+                            <TextBlock Text="1. 请先在浏览器中登录 Nexus Mods 账号。&#x0a;2. 点击下方“打开 API 页面”。&#x0a;3. 页面打开后滑到最底部，在 “Personal API key” 区域生成并复制授权码。&#x0a;4. 粘贴到下方并点击“保存授权码”；若连接报错，可点击“测试连接”确认。" Style="{StaticResource BodyTextStyle}" />
+                            <Button Content="打开 API 页面" Command="{Binding OpenNexusPageCommand}" Style="{StaticResource SubtleButtonStyle}" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding NexusStatus}" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="{Binding NexusRateLimitStatus}" Style="{StaticResource MutedTextStyle}" />
+                    <PasswordBox Password="{Binding NexusKeyInput, Mode=TwoWay}" PlaceholderText="粘贴 Nexus 个人授权码" PasswordRevealMode="Peek" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="保存授权码" Command="{Binding SaveNexusKeyCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        <Button Content="测试连接" Command="{Binding TestNexusConnectionCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                        <Button Content="清除" Command="{Binding ClearNexusKeyCommand}" Style="{StaticResource DangerButtonStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="启动设置" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="默认启动程序" Style="{StaticResource MutedTextStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <RadioButton GroupName="LaunchTargetOptions" Content="SMAPI" IsChecked="{Binding IsSmapiSelected, Mode=OneWay}" Command="{Binding UseSmapiCommand}" Style="{StaticResource ChoiceRadioStyle}" />
+                        <RadioButton GroupName="LaunchTargetOptions" Content="原版" IsChecked="{Binding IsVanillaSelected, Mode=OneWay}" Command="{Binding UseVanillaCommand}" Style="{StaticResource ChoiceRadioStyle}" />
+                    </StackPanel>
+                    <TextBlock Text="默认检查模式" Style="{StaticResource MutedTextStyle}" Margin="0,6,0,0" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <RadioButton GroupName="LaunchModeOptions" Content="快速" IsChecked="{Binding IsQuickModeSelected, Mode=OneWay}" Command="{Binding UseQuickModeCommand}" Style="{StaticResource ChoiceRadioStyle}" />
+                        <RadioButton GroupName="LaunchModeOptions" Content="安全" IsChecked="{Binding IsSafeModeSelected, Mode=OneWay}" Command="{Binding UseSafeModeCommand}" Style="{StaticResource ChoiceRadioStyle}" />
+                        <RadioButton GroupName="LaunchModeOptions" Content="诊断" IsChecked="{Binding IsDiagnosticModeSelected, Mode=OneWay}" Command="{Binding UseDiagnosticModeCommand}" Style="{StaticResource ChoiceRadioStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="13">
+                    <TextBlock Text="备份设置" Style="{StaticResource SectionTitleStyle}" />
+                    <ToggleSwitch Header="启动前自动备份当前存档" IsOn="{Binding BackupSaveBeforeLaunch, Mode=TwoWay}" />
+                    <ToggleSwitch Header="更新前自动备份存档" IsOn="{Binding BackupSaveBeforeUpdate, Mode=TwoWay}" />
+                    <StackPanel Orientation="Horizontal" Spacing="24">
+                        <NumberBox Header="模组备份保留数量" Value="{Binding ModBackupRetention, Mode=TwoWay}" Minimum="1" Maximum="200" SpinButtonPlacementMode="Compact" Width="190" />
+                        <NumberBox Header="存档备份保留数量" Value="{Binding SaveBackupRetention, Mode=TwoWay}" Minimum="1" Maximum="200" SpinButtonPlacementMode="Compact" Width="190" />
+                    </StackPanel>
+                    <Button Content="保存设置" Command="{Binding SaveBackupSettingsCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="外观" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="显示模式" Style="{StaticResource MutedTextStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="DarkThemeOption" Content="深色" Click="DarkThemeOption_Click" Style="{StaticResource ChoiceButtonStyle}" />
+                        <Button x:Name="LightThemeOption" Content="浅色" Click="LightThemeOption_Click" Style="{StaticResource ChoiceButtonStyle}" />
+                        <Button x:Name="SystemThemeOption" Content="跟随系统" Click="SystemThemeOption_Click" Style="{StaticResource ChoiceButtonStyle}" Margin="14,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="配色方案" Style="{StaticResource MutedTextStyle}" Margin="0,10,0,0" />
+                    <TextBlock Text="每种方案会同时调整背景、卡片、边框、标题栏与强调色。" Style="{StaticResource MutedTextStyle}" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <RadioButton GroupName="PaletteOptions" IsChecked="{Binding IsStardropPaletteSelected, Mode=OneWay}" Command="{Binding StardropPaletteCommand}" Style="{StaticResource PaletteRadioStyle}">
+                            <StackPanel Spacing="7">
+                                <Border Height="8" CornerRadius="4" Background="#F2C94C" />
+                                <TextBlock Text="星之果实金黄" />
+                                <TextBlock Text="温暖收获" Style="{StaticResource PaletteDescriptionTextStyle}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Grid.Column="1" GroupName="PaletteOptions" IsChecked="{Binding IsJunimoPaletteSelected, Mode=OneWay}" Command="{Binding JunimoPaletteCommand}" Style="{StaticResource PaletteRadioStyle}">
+                            <StackPanel Spacing="7">
+                                <Border Height="8" CornerRadius="4" Background="#78C850" />
+                                <TextBlock Text="祝尼魔森林" />
+                                <TextBlock Text="清新草木" Style="{StaticResource PaletteDescriptionTextStyle}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Grid.Column="2" GroupName="PaletteOptions" IsChecked="{Binding IsMoonlightPaletteSelected, Mode=OneWay}" Command="{Binding MoonlightPaletteCommand}" Style="{StaticResource PaletteRadioStyle}">
+                            <StackPanel Spacing="7">
+                                <Border Height="8" CornerRadius="4" Background="#69B4E0" />
+                                <TextBlock Text="月光海岸" />
+                                <TextBlock Text="夜海蓝调" Style="{StaticResource PaletteDescriptionTextStyle}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Grid.Column="3" GroupName="PaletteOptions" IsChecked="{Binding IsCranberryPaletteSelected, Mode=OneWay}" Command="{Binding CranberryPaletteCommand}" Style="{StaticResource PaletteRadioStyle}">
+                            <StackPanel Spacing="7">
+                                <Border Height="8" CornerRadius="4" Background="#DF7086" />
+                                <TextBlock Text="蔓越莓果酒" />
+                                <TextBlock Text="秋日莓红" Style="{StaticResource PaletteDescriptionTextStyle}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="高级" Style="{StaticResource SectionTitleStyle}" />
+                    <ToggleSwitch Header="启用本地素材缓存" OffContent="关闭" OnContent="开启" IsOn="{Binding LocalAssetCacheEnabled, Mode=TwoWay}" />
+                    <TextBlock Text="默认关闭。仅从已验证的本机游戏目录复制到临时目录后处理；不会修改、上传或分发游戏素材。" Style="{StaticResource BodyTextStyle}" />
+                    <TextBlock Text="7z / RAR 解压工具路径" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                    <TextBox Text="{Binding ExternalArchiveToolPath, Mode=TwoWay}" PlaceholderText="例如 C:\Program Files\7-Zip\7z.exe" />
+                    <TextBlock Text="ZIP 可直接安装；7z 与 RAR 会使用此工具读取并进入同一预检流程。" Style="{StaticResource BodyTextStyle}" />
+                    <TextBlock Text="XNB 解包工具路径" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                    <TextBox Text="{Binding XnbToolPath, Mode=TwoWay}" PlaceholderText="配置 XNB 解包工具可执行文件" />
+                    <TextBlock Text="XNB 参数模板" Style="{StaticResource MutedTextStyle}" />
+                    <TextBox Text="{Binding XnbArgumentsTemplate, Mode=TwoWay}" PlaceholderText="&quot;{input}&quot; &quot;{output}&quot;" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="生成 / 重建素材缓存" Command="{Binding BuildAssetCacheCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                        <Button Content="清除素材缓存" Command="{Binding ClearAssetCacheCommand}" Style="{StaticResource DangerButtonStyle}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="打开设置目录" Command="{Binding OpenSettingsDirectoryCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                        <Button Content="打开备份目录" Command="{Binding OpenBackupDirectoryCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                        <Button Content="打开日志目录" Command="{Binding OpenLogDirectoryCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                        <Button Content="清空缓存" Command="{Binding ClearCacheCommand}" Style="{StaticResource DangerButtonStyle}" />
+                        <Button Content="导出诊断信息" Command="{Binding ExportDiagnosticsCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <ProgressRing IsActive="{Binding IsBusy}" Width="22" Height="22" HorizontalAlignment="Left" />
+            <TextBlock Text="{Binding ProgressText}" Style="{StaticResource BodyTextStyle}" />
+            <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

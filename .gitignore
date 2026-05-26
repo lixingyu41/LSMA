@@ -1,0 +1,26 @@
+# Visual Studio local state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET / WinUI build outputs
+[Bb]in/
+[Oo]bj/
+[Aa]pp[Pp]ackages/
+[Bb]undle[Aa]rtifacts/
+[Gg]enerated [Ff]iles/
+
+# Build and packaging artifacts
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.cer
+*.pfx
+
+# Local tooling
+.vscode/
+.idea/
+

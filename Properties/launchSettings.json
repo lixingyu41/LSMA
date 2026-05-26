@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "LSMA (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "LSMA (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
