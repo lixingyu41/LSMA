@@ -76,7 +76,7 @@ public sealed partial class ModsPage : Page
     private void UpdateButtonColors(int selectedIndex)
     {
         if (_filterButtons is null) return;
-        var selectedFg = new SolidColorBrush(Colors.Black);
+        var selectedFg = new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
         var unselectedFg = (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
 
         for (int i = 0; i < _filterButtons.Length; i++)
