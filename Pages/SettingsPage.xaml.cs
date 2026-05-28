@@ -28,6 +28,7 @@ public sealed partial class SettingsPage : Page
 
     private void SettingsPage_Loaded(object sender, RoutedEventArgs e)
     {
+        ViewModel.Refresh();
         ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         SyncAppearanceSelection();

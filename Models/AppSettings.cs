@@ -53,4 +53,8 @@ public sealed class AppSettings
     public bool LocalAssetCacheEnabled { get; set; }
 
     public Dictionary<string, long> NexusBindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public int WindowWidth { get; set; }
+    public int WindowHeight { get; set; }
+    public bool LaunchViaSteam { get; set; }
 }

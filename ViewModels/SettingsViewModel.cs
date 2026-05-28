@@ -168,6 +168,19 @@ public sealed class SettingsViewModel : ViewModelBase
     public bool IsQuickModeSelected => _settings.Current.DefaultLaunchMode == LaunchMode.Quick;
     public bool IsSafeModeSelected => _settings.Current.DefaultLaunchMode == LaunchMode.Safe;
     public bool IsDiagnosticModeSelected => _settings.Current.DefaultLaunchMode == LaunchMode.Diagnostic;
+    private bool _launchViaSteam;
+
+    public bool LaunchViaSteam
+    {
+        get => _launchViaSteam;
+        set
+        {
+            if (SetProperty(ref _launchViaSteam, value))
+            {
+                _ = _settings.UpdateAsync(s => s.LaunchViaSteam = value);
+            }
+        }
+    }
     public bool IsDarkThemeSelected => CurrentDisplayTheme == AppTheme.Dark;
     public bool IsLightThemeSelected => CurrentDisplayTheme == AppTheme.Light;
     public bool IsSystemThemeSelected => IsFollowingSystem;
@@ -187,6 +200,7 @@ public sealed class SettingsViewModel : ViewModelBase
         LocalAssetCacheEnabled = _settings.Current.LocalAssetCacheEnabled;
         ModBackupRetention = _settings.Current.ModBackupRetention;
         SaveBackupRetention = _settings.Current.SaveBackupRetention;
+        LaunchViaSteam = _settings.Current.LaunchViaSteam;
         OnPropertyChanged(nameof(DirectoryStatus));
         OnPropertyChanged(nameof(DirectoryPath));
         OnPropertyChanged(nameof(CanOpenDirectoryVisibility));

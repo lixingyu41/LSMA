@@ -102,6 +102,7 @@
                         <RadioButton GroupName="LaunchModeOptions" Content="安全" IsChecked="{Binding IsSafeModeSelected, Mode=OneWay}" Command="{Binding UseSafeModeCommand}" Style="{StaticResource ChoiceRadioStyle}" />
                         <RadioButton GroupName="LaunchModeOptions" Content="诊断" IsChecked="{Binding IsDiagnosticModeSelected, Mode=OneWay}" Command="{Binding UseDiagnosticModeCommand}" Style="{StaticResource ChoiceRadioStyle}" />
                     </StackPanel>
+                    <ToggleSwitch Header="通过 Steam 启动游戏" IsOn="{Binding LaunchViaSteam, Mode=TwoWay}" Margin="0,6,0,0" />
                 </StackPanel>
             </Border>
 

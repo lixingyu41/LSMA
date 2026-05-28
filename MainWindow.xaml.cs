@@ -139,6 +139,29 @@ public sealed partial class MainWindow : Window
     {
         RootLayout.Loaded -= RootLayout_Loaded;
         _layoutLoaded = true;
+
+        // Restore window size
+        var settings = App.Current.Services.Settings.Current;
+        if (settings.WindowWidth > 0 && settings.WindowHeight > 0)
+        {
+            AppWindow.Resize(new SizeInt32(settings.WindowWidth, settings.WindowHeight));
+        }
+        else
+        {
+            AppWindow.Resize(new SizeInt32(500, 380));
+        }
+
+        // Save on resize
+        AppWindow.Changed += (_, _) =>
+        {
+            var size = AppWindow.Size;
+            if (size.Width > 0 && size.Height > 0)
+            {
+                App.Current.Services.Settings.Current.WindowWidth = size.Width;
+                App.Current.Services.Settings.Current.WindowHeight = size.Height;
+            }
+        };
+
         App.Current.Services.Dialogs.AttachRoot(RootLayout);
         App.Current.Services.RunLock.AttachDispatcher(RootLayout.DispatcherQueue);
         App.Current.Services.UiDispatcher.Attach(RootLayout.DispatcherQueue);
