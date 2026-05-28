@@ -8,7 +8,7 @@
             <Grid ColumnSpacing="18">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="320" /></Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding SaveContext}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
-                <AutoSuggestBox Grid.Column="1" PlaceholderText="搜索建议与攻略模块" QuerySubmitted="Search_QuerySubmitted" VerticalAlignment="Center" />
+                <AutoSuggestBox Grid.Column="1" PlaceholderText="搜索物品、鱼类、人物和节日" QuerySubmitted="Search_QuerySubmitted" VerticalAlignment="Center" />
             </Grid>
 
             <Border Style="{StaticResource CardStyle}" Visibility="{Binding EmptyVisibility}">
@@ -28,9 +28,10 @@
                         <DataTemplate>
                             <Border Style="{StaticResource CardStyle}" Padding="17">
                                 <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="75" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                                    <StackPanel Grid.Column="1" Spacing="4">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="75" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="{Binding IconGlyph}" FontSize="25" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <StackPanel Grid.Column="2" Spacing="4">
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" />
                                         <TextBlock Text="{Binding Description}" Style="{StaticResource BodyTextStyle}" />
                                     </StackPanel>
@@ -47,26 +48,64 @@
                 </Border>
             </StackPanel>
 
+            <StackPanel Visibility="{Binding SearchVisibility}" Spacing="12">
+                <TextBlock Text="{Binding SearchSummary}" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
+                <ItemsControl ItemsSource="{Binding SearchResults}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CardStyle}" Padding="12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="{Binding IconGlyph}" Visibility="{Binding GlyphVisibility}" FontSize="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                    <Image Source="{Binding IconUri}" Visibility="{Binding ImageVisibility}" Width="32" Height="32" Stretch="Uniform" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Visibility="{Binding StructuredVisibility}" Spacing="12">
             <TextBlock Text="结构化查询" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
             <Grid ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel Spacing="9">
-                        <TextBlock Text="送礼与生日" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding Birthdays}">
+                        <TextBlock Text="最近节日" Style="{StaticResource SectionTitleStyle}" />
+                        <ItemsControl ItemsSource="{Binding Festivals}">
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <Grid Margin="0,4"><TextBlock Text="{Binding Npc}" /><TextBlock Text="{Binding DateText}" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" /><TextBlock Text="{Binding LovedGiftHint}" HorizontalAlignment="Right" Style="{StaticResource MutedTextStyle}" /></Grid>
+                                <Grid Margin="0,4" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Name}" />
+                                        <TextBlock Text="{Binding DateText}" Style="{StaticResource MutedTextStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding CountdownText}" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                </Grid>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CardStyle}">
                     <StackPanel Spacing="9">
-                        <TextBlock Text="钓鱼" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="{Binding FishHeading}" Style="{StaticResource SectionTitleStyle}" />
                         <ItemsControl ItemsSource="{Binding Fish}">
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <StackPanel Margin="0,4"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
+                                <Grid Margin="0,4" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
+                                    <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
+                                </Grid>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
@@ -76,33 +115,38 @@
                         <TextBlock Text="作物收益" Style="{StaticResource SectionTitleStyle}" />
                         <ItemsControl ItemsSource="{Binding Crops}">
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <StackPanel Margin="0,4"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
+                                <Grid Margin="0,4" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Name}" />
+                                        <TextBlock Text="{Binding GrowthText}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding RawPriceText}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding ArtisanPriceText}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <TextBlock Text="农耕人：农作产品价值 +10%；工匠：精工制品价值 +40%。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
-                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardStyle}">
+                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardStyle}" Visibility="{Binding BundleVisibility}">
                     <StackPanel Spacing="9">
                         <TextBlock Text="社区中心" Style="{StaticResource SectionTitleStyle}" />
                         <ItemsControl ItemsSource="{Binding Bundles}">
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <StackPanel Margin="0,4"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
+                                <Grid Margin="0,4" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
+                                    <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
+                                </Grid>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </StackPanel>
-                </Border>
-                <Border Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource CardStyle}">
-                    <StackPanel Spacing="9">
-                        <TextBlock Text="食谱 / 制作" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding Recipes}">
-                            <ItemsControl.ItemTemplate><DataTemplate>
-                                <StackPanel Margin="0,4"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
-                            </DataTemplate></ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Text="基础结构化资料来源：Stardew Valley Wiki（CC BY-NC-SA 3.0），目标游戏版本 1.6；不包含游戏图片或原文复制。" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" />
                     </StackPanel>
                 </Border>
             </Grid>
+            <TextBlock Text="资料与图标由本机游戏内容生成，鱼类按当前季节与天气筛选。" Style="{StaticResource MutedTextStyle}" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

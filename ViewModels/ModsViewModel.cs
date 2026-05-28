@@ -22,6 +22,7 @@ public sealed class ModsViewModel : ViewModelBase
     private readonly NexusDownloadService _downloadsService;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
+    private readonly AutomaticScanMonitor _automaticScanMonitor;
     private List<ModInfo> _allMods = [];
     private ModInfo? _selectedMod;
     private string _filter = "全部";
@@ -32,12 +33,14 @@ public sealed class ModsViewModel : ViewModelBase
     private string _onlinePanelTitle = "发现";
     private bool _onlinePanelVisible;
     private string _nexusModIdInput = string.Empty;
+    private bool _isEditingNexusBinding;
     private List<NexusModInfo> _loadedOnlineMods = [];
     private List<NexusFavorite> _favoriteValues = [];
     private string _onlineSort = "默认";
     private NexusCategory? _selectedCategory;
     private CancellationTokenSource? _downloadCancellation;
     private bool _isDownloading;
+    private bool _automaticScanningStarted;
 
     public ModsViewModel(
         AppStateService state,
@@ -52,7 +55,8 @@ public sealed class ModsViewModel : ViewModelBase
         NexusFavoriteService favoritesService,
         NexusDownloadService downloadsService,
         PlatformService platform,
-        DialogService dialogs)
+        DialogService dialogs,
+        UiDispatcherService dispatcher)
     {
         _state = state;
         _runLock = runLock;
@@ -67,7 +71,7 @@ public sealed class ModsViewModel : ViewModelBase
         _downloadsService = downloadsService;
         _platform = platform;
         _dialogs = dialogs;
-        ScanCommand = new AsyncRelayCommand(() => ScanAsync(true), CanScan);
+        _automaticScanMonitor = new AutomaticScanMonitor(dispatcher, ScanAutomaticallyAsync);
         FilterCommand = new RelayCommand<string>(ApplyFilter);
         EnableCommand = new AsyncRelayCommand(() => ChangeEnabledAsync(true), CanEnable);
         DisableCommand = new AsyncRelayCommand(() => ChangeEnabledAsync(false), CanDisable);
@@ -93,6 +97,7 @@ public sealed class ModsViewModel : ViewModelBase
         CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, CanUseOnlineNow);
         BindNexusIdCommand = new AsyncRelayCommand(BindNexusIdAsync, () => SelectedMod is not null);
+        EditNexusBindingCommand = new RelayCommand(ToggleNexusBindingEditor, () => SelectedMod is not null);
         PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, () => SelectedMod?.NexusModId is not null && !IsBusy);
         ImportFavoritesCommand = new AsyncRelayCommand(ImportFavoritesAsync);
         ExportFavoritesCommand = new AsyncRelayCommand(ExportFavoritesAsync);
@@ -101,6 +106,12 @@ public sealed class ModsViewModel : ViewModelBase
             if (args.PropertyName is nameof(AppStateService.IsGameRunning) or nameof(AppStateService.GameDirectory))
             {
                 Refresh();
+            }
+
+            if (args.PropertyName == nameof(AppStateService.GameDirectory) && _automaticScanningStarted)
+            {
+                ConfigureAutomaticWatchers();
+                _automaticScanMonitor.RequestRefresh();
             }
         };
     }
@@ -111,7 +122,6 @@ public sealed class ModsViewModel : ViewModelBase
     public ObservableCollection<NexusFavorite> Favorites { get; } = [];
     public ObservableCollection<DownloadQueueItem> DownloadQueue { get; } = [];
     public ObservableCollection<NexusCategory> Categories { get; } = [];
-    public IAsyncRelayCommand ScanCommand { get; }
     public IRelayCommand<string> FilterCommand { get; }
     public IAsyncRelayCommand EnableCommand { get; }
     public IAsyncRelayCommand DisableCommand { get; }
@@ -137,6 +147,7 @@ public sealed class ModsViewModel : ViewModelBase
     public IRelayCommand CancelDownloadCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public IAsyncRelayCommand BindNexusIdCommand { get; }
+    public IRelayCommand EditNexusBindingCommand { get; }
     public IAsyncRelayCommand PrepareSelectedUpdateCommand { get; }
     public IAsyncRelayCommand ImportFavoritesCommand { get; }
     public IAsyncRelayCommand ExportFavoritesCommand { get; }
@@ -148,7 +159,17 @@ public sealed class ModsViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedMod, value))
             {
+                NexusModIdInput = value?.NexusModId?.ToString() ?? string.Empty;
+                _isEditingNexusBinding = value?.NexusModId is null;
                 OnPropertyChanged(nameof(DetailVisibility));
+                OnPropertyChanged(nameof(NexusBindingEditorVisibility));
+                OnPropertyChanged(nameof(NexusBoundVisibility));
+                OnPropertyChanged(nameof(CancelNexusBindingVisibility));
+                OnPropertyChanged(nameof(NexusBindingText));
+                OnPropertyChanged(nameof(EnableVisibility));
+                OnPropertyChanged(nameof(DisableVisibility));
+                OnPropertyChanged(nameof(ArchiveVisibility));
+                OnPropertyChanged(nameof(RestoreArchivedVisibility));
                 NotifyCommands();
             }
         }
@@ -219,6 +240,20 @@ public sealed class ModsViewModel : ViewModelBase
     public Visibility AvailableVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DetailVisibility => SelectedMod is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility NexusBindingEditorVisibility => SelectedMod is not null && (SelectedMod.NexusModId is null || _isEditingNexusBinding)
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+    public Visibility NexusBoundVisibility => SelectedMod?.NexusModId is not null && !_isEditingNexusBinding
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+    public Visibility CancelNexusBindingVisibility => SelectedMod?.NexusModId is not null && _isEditingNexusBinding
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+    public Visibility EnableVisibility => SelectedMod is { IsEnabled: false, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility DisableVisibility => SelectedMod is { IsEnabled: true, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ArchiveVisibility => SelectedMod is { IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility RestoreArchivedVisibility => SelectedMod is { IsArchived: true } ? Visibility.Visible : Visibility.Collapsed;
+    public string NexusBindingText => SelectedMod?.NexusModId is { } id ? $"Nexus Mod ID：{id}" : "未绑定 Nexus Mod ID";
     public string InstalledCount => _allMods.Count.ToString();
     public string HealthyCount => _allMods.Count(mod => mod.IsEnabled && mod.Issues.Count == 0).ToString();
     public string ProblemCount => _allMods.Count(mod => mod.Issues.Count > 0).ToString();
@@ -256,10 +291,14 @@ public sealed class ModsViewModel : ViewModelBase
         NotifyCommands();
     }
 
-    public async Task ScanForLaunchAsync()
+    public async Task StartAutomaticScanningAsync()
     {
-        await ScanAsync(false);
+        _automaticScanningStarted = true;
+        ConfigureAutomaticWatchers();
+        await ScanAsync();
     }
+
+    public Task ScanForLaunchAsync() => ScanAsync();
 
     public async Task InspectPackageAsync(string packagePath)
     {
@@ -270,7 +309,7 @@ public sealed class ModsViewModel : ViewModelBase
 
         if (_allMods.Count == 0)
         {
-            await ScanAsync(false);
+            await ScanAsync();
         }
 
         IsBusy = true;
@@ -343,14 +382,14 @@ public sealed class ModsViewModel : ViewModelBase
         {
             IsBusy = false;
             ProgressText = string.Empty;
-            await ScanAsync(false);
+            await ScanAsync();
             Refresh();
         }
 
         return completed;
     }
 
-    private async Task ScanAsync(bool showFeedback)
+    private async Task ScanAsync()
     {
         if (!_state.IsGameConfigured || IsBusy)
         {
@@ -358,25 +397,22 @@ public sealed class ModsViewModel : ViewModelBase
         }
 
         IsBusy = true;
-        ProgressText = "正在扫描本地模组...";
+        ProgressText = "正在自动刷新本地模组...";
         Refresh();
         try
         {
+            var selectedPath = SelectedMod?.FolderPath;
             _runLock.Refresh();
             _allMods = _analyzer.Analyze(await _scanner.ScanAsync()).ToList();
             _state.Mods = _allMods;
             ApplyFilter(_filter);
-            SelectedMod = Mods.FirstOrDefault();
-            if (showFeedback)
-            {
-                FeedbackMessage = $"扫描完成，共发现 {_allMods.Count} 个模组。";
-            }
-
+            SelectedMod = Mods.FirstOrDefault(mod => string.Equals(mod.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
+                ?? Mods.FirstOrDefault();
             App.Current.Services.Home.Refresh();
         }
         catch (Exception exception)
         {
-            await _dialogs.ShowMessageAsync("扫描失败", exception.Message);
+            await _dialogs.ShowMessageAsync("自动刷新失败", exception.Message);
         }
         finally
         {
@@ -384,6 +420,44 @@ public sealed class ModsViewModel : ViewModelBase
             ProgressText = string.Empty;
             Refresh();
         }
+    }
+
+    private async Task ScanAutomaticallyAsync()
+    {
+        if (IsBusy)
+        {
+            _automaticScanMonitor.RequestRefresh();
+            return;
+        }
+
+        ConfigureAutomaticWatchers();
+        await ScanAsync();
+    }
+
+    private void ConfigureAutomaticWatchers()
+    {
+        if (!_automaticScanningStarted || _state.GameDirectory is not { } game)
+        {
+            _automaticScanMonitor.ReplaceWatchers();
+            return;
+        }
+
+        var modsPath = Path.Combine(game.Path, "Mods");
+        var disabledPath = Path.Combine(game.Path, "Mods.Disabled");
+        _automaticScanMonitor.ReplaceWatchers(
+            new AutomaticScanWatchTarget(
+                game.Path,
+                true,
+                path => IsWithinDirectory(path, modsPath) || IsWithinDirectory(path, disabledPath)),
+            new AutomaticScanWatchTarget(AppPaths.ArchivedMods, true));
+    }
+
+    private static bool IsWithinDirectory(string path, string directory)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var fullDirectory = Path.GetFullPath(directory);
+        return fullPath.Equals(fullDirectory, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(fullDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     private void ApplyFilter(string? filter)
@@ -520,7 +594,7 @@ public sealed class ModsViewModel : ViewModelBase
             FeedbackMessage = $"安装完成：成功 {result.InstalledCount}，失败 {result.FailedCount}。";
             PendingPlan = null;
             IsBusy = false;
-            await ScanAsync(false);
+            await ScanAsync();
         }
         catch (Exception exception)
         {
@@ -703,7 +777,7 @@ public sealed class ModsViewModel : ViewModelBase
             ModId = mod.ModId,
             FileId = file.FileId,
             ModName = mod.Name,
-            FileName = file.FileName
+            FileName = file.FileName ?? string.Empty
         };
         DownloadQueue.Add(item);
         _downloadCancellation = new CancellationTokenSource();
@@ -845,8 +919,22 @@ public sealed class ModsViewModel : ViewModelBase
         }
 
         FeedbackMessage = "更新来源绑定已保存。";
+        _isEditingNexusBinding = false;
         OnPropertyChanged(nameof(FeedbackMessage));
         OnPropertyChanged(nameof(SelectedMod));
+        OnPropertyChanged(nameof(NexusBindingEditorVisibility));
+        OnPropertyChanged(nameof(NexusBoundVisibility));
+        OnPropertyChanged(nameof(CancelNexusBindingVisibility));
+        OnPropertyChanged(nameof(NexusBindingText));
+    }
+
+    private void ToggleNexusBindingEditor()
+    {
+        _isEditingNexusBinding = !_isEditingNexusBinding;
+        NexusModIdInput = SelectedMod?.NexusModId?.ToString() ?? string.Empty;
+        OnPropertyChanged(nameof(NexusBindingEditorVisibility));
+        OnPropertyChanged(nameof(NexusBoundVisibility));
+        OnPropertyChanged(nameof(CancelNexusBindingVisibility));
     }
 
     private async Task ExportFavoritesAsync()
@@ -905,7 +993,7 @@ public sealed class ModsViewModel : ViewModelBase
             await action();
             FeedbackMessage = successText;
             IsBusy = false;
-            await ScanAsync(false);
+            await ScanAsync();
         }
         catch (Exception exception)
         {
@@ -921,7 +1009,6 @@ public sealed class ModsViewModel : ViewModelBase
 
     private void NotifyCommands()
     {
-        ScanCommand.NotifyCanExecuteChanged();
         EnableCommand.NotifyCanExecuteChanged();
         DisableCommand.NotifyCanExecuteChanged();
         ArchiveCommand.NotifyCanExecuteChanged();
@@ -938,10 +1025,10 @@ public sealed class ModsViewModel : ViewModelBase
         CancelDownloadCommand.NotifyCanExecuteChanged();
         CheckUpdatesCommand.NotifyCanExecuteChanged();
         BindNexusIdCommand.NotifyCanExecuteChanged();
+        EditNexusBindingCommand.NotifyCanExecuteChanged();
         PrepareSelectedUpdateCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanScan() => _state.IsGameConfigured && !IsBusy;
     private bool CanModify() => _state.IsGameConfigured && !_state.IsGameRunning && !IsBusy;
     private bool CanInstallPackage() => CanModify() && PendingPlan is { CanInstall: true };
     private bool CanUseOnline(string? _) => !IsBusy;

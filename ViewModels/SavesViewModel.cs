@@ -12,29 +12,35 @@ public sealed class SavesViewModel : ViewModelBase
     private readonly AppStateService _state;
     private readonly SaveLocatorService _locator;
     private readonly SaveParserService _parser;
+    private readonly GameIconService _icons;
     private readonly SaveBackupService _backups;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
+    private readonly AutomaticScanMonitor _automaticScanMonitor;
     private SaveInfo? _selectedSave;
     private SaveBackupEntry? _selectedBackup;
+    private bool _automaticScanningStarted;
 
     public SavesViewModel(
         AppStateService state,
         SaveLocatorService locator,
         SaveParserService parser,
+        GameIconService icons,
         SaveBackupService backups,
         PlatformService platform,
-        DialogService dialogs)
+        DialogService dialogs,
+        UiDispatcherService dispatcher)
     {
         _state = state;
         _locator = locator;
         _parser = parser;
+        _icons = icons;
         _backups = backups;
         _platform = platform;
         _dialogs = dialogs;
-        ScanCommand = new AsyncRelayCommand(() => ScanAsync(true), CanScan);
+        _automaticScanMonitor = new AutomaticScanMonitor(dispatcher, ScanAutomaticallyAsync);
         BackupCommand = new AsyncRelayCommand(BackupSelectedAsync, CanBackup);
-        BackupAllCommand = new AsyncRelayCommand(BackupAllAsync, CanScan);
+        BackupAllCommand = new AsyncRelayCommand(BackupAllAsync, CanBackupAll);
         RestoreCommand = new AsyncRelayCommand(RestoreSelectedAsync, CanRestore);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.SaveBackups));
         _state.PropertyChanged += (_, args) =>
@@ -43,12 +49,17 @@ public sealed class SavesViewModel : ViewModelBase
             {
                 Refresh();
             }
+
+            if (args.PropertyName == nameof(AppStateService.GameDirectory) && _automaticScanningStarted)
+            {
+                ConfigureAutomaticWatchers();
+                _automaticScanMonitor.RequestRefresh();
+            }
         };
     }
 
     public ObservableCollection<SaveInfo> Saves { get; } = [];
     public ObservableCollection<SaveBackupEntry> BackupEntries { get; } = [];
-    public IAsyncRelayCommand ScanCommand { get; }
     public IAsyncRelayCommand BackupCommand { get; }
     public IAsyncRelayCommand BackupAllCommand { get; }
     public IAsyncRelayCommand RestoreCommand { get; }
@@ -66,7 +77,7 @@ public sealed class SavesViewModel : ViewModelBase
                 OnPropertyChanged(nameof(BackupStatus));
                 LoadBackupEntries();
                 Refresh();
-                App.Current.Services.Guide.Refresh();
+                _ = App.Current.Services.Guide.RefreshAsync();
                 App.Current.Services.Home.Refresh();
             }
         }
@@ -97,19 +108,25 @@ public sealed class SavesViewModel : ViewModelBase
         OnPropertyChanged(nameof(AvailableVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
         OnPropertyChanged(nameof(TaskStatus));
-        ScanCommand.NotifyCanExecuteChanged();
         BackupCommand.NotifyCanExecuteChanged();
         BackupAllCommand.NotifyCanExecuteChanged();
         RestoreCommand.NotifyCanExecuteChanged();
     }
 
-    public Task ScanForLaunchAsync() => ScanAsync(false);
+    public async Task StartAutomaticScanningAsync()
+    {
+        _automaticScanningStarted = true;
+        ConfigureAutomaticWatchers();
+        await ScanAsync();
+    }
+
+    public Task ScanForLaunchAsync() => ScanAsync();
 
     public async Task BackupForLaunchAsync()
     {
         if (SelectedSave is null)
         {
-            await ScanAsync(false);
+            await ScanAsync();
         }
 
         if (SelectedSave is null || SelectedSave.ParseError is not null)
@@ -123,7 +140,7 @@ public sealed class SavesViewModel : ViewModelBase
         LoadBackupEntries();
     }
 
-    private async Task ScanAsync(bool showFeedback)
+    private async Task ScanAsync()
     {
         if (!_state.IsGameConfigured || IsBusy)
         {
@@ -131,16 +148,18 @@ public sealed class SavesViewModel : ViewModelBase
         }
 
         IsBusy = true;
-        ProgressText = "正在读取本机存档...";
+        ProgressText = "正在自动读取本机存档...";
         Refresh();
         try
         {
+            var selectedPath = SelectedSave?.FolderPath;
             var results = new List<SaveInfo>();
             foreach (var source in await _locator.LocateAsync())
             {
                 var save = await _parser.ParseAsync(source);
                 if (save is not null)
                 {
+                    _icons.ApplySaveIcons(save);
                     save.LatestBackup = _backups.GetLatestBackup(save.FolderName);
                     results.Add(save);
                 }
@@ -152,15 +171,12 @@ public sealed class SavesViewModel : ViewModelBase
                 Saves.Add(save);
             }
 
-            SelectedSave = Saves.FirstOrDefault();
-            if (showFeedback)
-            {
-                FeedbackMessage = $"存档扫描完成，共读取 {Saves.Count} 个存档。";
-            }
+            SelectedSave = Saves.FirstOrDefault(save => string.Equals(save.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
+                ?? Saves.FirstOrDefault();
         }
         catch (Exception exception)
         {
-            await _dialogs.ShowMessageAsync("存档扫描失败", exception.Message);
+            await _dialogs.ShowMessageAsync("自动读取存档失败", exception.Message);
         }
         finally
         {
@@ -168,6 +184,54 @@ public sealed class SavesViewModel : ViewModelBase
             ProgressText = string.Empty;
             Refresh();
         }
+    }
+
+    private async Task ScanAutomaticallyAsync()
+    {
+        if (IsBusy)
+        {
+            _automaticScanMonitor.RequestRefresh();
+            return;
+        }
+
+        ConfigureAutomaticWatchers();
+        await ScanAsync();
+        ConfigureAutomaticWatchers();
+    }
+
+    private void ConfigureAutomaticWatchers()
+    {
+        if (!_automaticScanningStarted || !_state.IsGameConfigured)
+        {
+            _automaticScanMonitor.ReplaceWatchers();
+            return;
+        }
+
+        if (Directory.Exists(AppPaths.SaveSource))
+        {
+            _automaticScanMonitor.ReplaceWatchers(new AutomaticScanWatchTarget(AppPaths.SaveSource, true));
+            return;
+        }
+
+        var parent = Path.GetDirectoryName(AppPaths.SaveSource)!;
+        if (Directory.Exists(parent))
+        {
+            _automaticScanMonitor.ReplaceWatchers(
+                new AutomaticScanWatchTarget(parent, true, path => IsWithinDirectory(path, AppPaths.SaveSource)));
+            return;
+        }
+
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        _automaticScanMonitor.ReplaceWatchers(
+            new AutomaticScanWatchTarget(appData, false, path => string.Equals(path, parent, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static bool IsWithinDirectory(string path, string directory)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var fullDirectory = Path.GetFullPath(directory);
+        return fullPath.Equals(fullDirectory, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(fullDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task BackupSelectedAsync()
@@ -184,7 +248,7 @@ public sealed class SavesViewModel : ViewModelBase
             FeedbackMessage = "存档备份已创建。";
             OnPropertyChanged(nameof(BackupStatus));
             LoadBackupEntries();
-            App.Current.Services.Guide.Refresh();
+            await App.Current.Services.Guide.RefreshAsync();
         }, "备份失败");
     }
 
@@ -211,7 +275,7 @@ public sealed class SavesViewModel : ViewModelBase
             await _backups.RestoreAsync(save, backup);
             FeedbackMessage = "存档已安全恢复。";
             IsBusy = false;
-            await ScanAsync(false);
+            await ScanAsync();
             App.Current.Services.Home.Refresh();
         }, "恢复未完成");
     }
@@ -251,7 +315,7 @@ public sealed class SavesViewModel : ViewModelBase
         SelectedBackup = BackupEntries.FirstOrDefault();
     }
 
-    private bool CanScan() => _state.IsGameConfigured && !IsBusy;
+    private bool CanBackupAll() => _state.IsGameConfigured && !IsBusy;
     private bool CanBackup() => SelectedSave is { ParseError: null } && !IsBusy;
     private bool CanRestore() => SelectedSave is not null && SelectedBackup is not null && !_state.IsGameRunning && !IsBusy;
 }

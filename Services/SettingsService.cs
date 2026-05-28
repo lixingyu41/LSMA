@@ -23,23 +23,11 @@ public sealed class SettingsService(LoggingService logging)
         try
         {
             Current = await JsonHelper.ReadAsync<AppSettings>(AppPaths.SettingsFile) ?? new AppSettings();
-            var needsSave = Current.SchemaVersion < 3;
-            Current.SchemaVersion = 3;
+            var needsSave = Current.SchemaVersion < 4;
+            Current.SchemaVersion = 4;
             if (Current.NexusBindings is null)
             {
                 Current.NexusBindings = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-                needsSave = true;
-            }
-
-            if (string.IsNullOrWhiteSpace(Current.ExternalArchiveArgumentsTemplate))
-            {
-                Current.ExternalArchiveArgumentsTemplate = "x -y -o\"{output}\" \"{input}\"";
-                needsSave = true;
-            }
-
-            if (string.IsNullOrWhiteSpace(Current.XnbArgumentsTemplate))
-            {
-                Current.XnbArgumentsTemplate = "\"{input}\" \"{output}\"";
                 needsSave = true;
             }
 

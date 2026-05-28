@@ -17,6 +17,7 @@ public sealed class AppServices
         Dialogs = new DialogService();
         Platform = new PlatformService(Logging);
         GameLocator = new GameLocatorService(State, Settings, Logging);
+        GuideCatalog = new GameContentCatalogService(State, Logging);
         RunLock = new GameRunLockService(State, Logging);
         SmapiLogs = new SmapiLogService(Logging);
         Launcher = new GameLaunchService(State, RunLock, Logging);
@@ -24,10 +25,13 @@ public sealed class AppServices
         ModAnalyzer = new ModAnalyzerService(Settings);
         ModBackups = new ModBackupService(Settings, Files, Logging);
         ModTransactions = new ModTransactionService(State, RunLock, ModBackups, ModScanner, Files, Logging);
-        ExternalArchives = new ExternalArchiveReader(Settings, Logging);
+        ExternalArchives = new ExternalArchiveReader(Logging);
         ModPackages = new ModPackageService(State, RunLock, ModScanner, ModBackups, ExternalArchives, Files, Logging);
         SaveLocator = new SaveLocatorService(Logging);
-        SaveParser = new SaveParserService(Logging);
+        NpcNames = new NpcLocalizationService(Logging);
+        XnbTextures = new XnbTextureService();
+        GameIcons = new GameIconService(State, XnbTextures, NpcNames, Logging);
+        SaveParser = new SaveParserService(Logging, NpcNames);
         SaveBackups = new SaveBackupService(State, RunLock, Settings, Files, Logging);
         GuideData = new GuideDataService();
         GuideRecommendations = new GuideRecommendationService(GuideData);
@@ -36,14 +40,14 @@ public sealed class AppServices
         NexusFavorites = new NexusFavoriteService(Logging);
         NexusDownloads = new NexusDownloadService(Nexus, Logging);
         Cache = new CacheService(Files, Logging);
-        AssetCache = new AssetCacheService(State, Settings, Files, Logging);
+        AssetCache = new AssetCacheService(State, Settings, Files, XnbTextures, Logging);
         LastKnownGood = new LastKnownGoodService(State, RunLock, ModScanner, SaveBackups, Files, Logging);
 
-        Home = new HomeViewModel(State, Settings, GameLocator, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
-        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Platform, Dialogs);
-        Guide = new GuideViewModel(State, GuideRecommendations, GuideData);
-        Saves = new SavesViewModel(State, SaveLocator, SaveParser, SaveBackups, Platform, Dialogs);
-        SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache);
+        Home = new HomeViewModel(State, Settings, GameLocator, GameIcons, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
+        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Platform, Dialogs, UiDispatcher);
+        Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
+        Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
+        SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
     }
 
     public LoggingService Logging { get; }
@@ -55,6 +59,7 @@ public sealed class AppServices
     public DialogService Dialogs { get; }
     public PlatformService Platform { get; }
     public GameLocatorService GameLocator { get; }
+    public GameContentCatalogService GuideCatalog { get; }
     public GameRunLockService RunLock { get; }
     public SmapiLogService SmapiLogs { get; }
     public GameLaunchService Launcher { get; }
@@ -65,6 +70,7 @@ public sealed class AppServices
     public ModPackageService ModPackages { get; }
     public ExternalArchiveReader ExternalArchives { get; }
     public SaveLocatorService SaveLocator { get; }
+    public NpcLocalizationService NpcNames { get; }
     public SaveParserService SaveParser { get; }
     public SaveBackupService SaveBackups { get; }
     public GuideRecommendationService GuideRecommendations { get; }
@@ -74,6 +80,8 @@ public sealed class AppServices
     public NexusFavoriteService NexusFavorites { get; }
     public NexusDownloadService NexusDownloads { get; }
     public CacheService Cache { get; }
+    public XnbTextureService XnbTextures { get; }
+    public GameIconService GameIcons { get; }
     public AssetCacheService AssetCache { get; }
     public LastKnownGoodService LastKnownGood { get; }
     public HomeViewModel Home { get; }
@@ -97,11 +105,14 @@ public sealed class AppServices
     {
         await InitializeAppearanceAsync();
         await GameLocator.DetectAsync();
+        await NpcNames.PrepareAsync(State.GameDirectory?.Path);
+        await GuideCatalog.PrepareAsync();
+        await GameIcons.PrepareAsync();
         RunLock.Refresh();
         Home.Refresh();
-        Mods.Refresh();
-        Guide.Refresh();
-        Saves.Refresh();
+        await Mods.StartAutomaticScanningAsync();
+        await Guide.RefreshAsync();
+        await Saves.StartAutomaticScanningAsync();
         SettingsPage.Refresh();
     }
 }

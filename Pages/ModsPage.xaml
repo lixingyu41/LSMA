@@ -30,9 +30,6 @@
                 <AppBarButton Label="下载" Command="{Binding ShowDownloadsCommand}">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE896;" /></AppBarButton.Icon>
                 </AppBarButton>
-                <AppBarButton Label="扫描" Command="{Binding ScanCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
-                </AppBarButton>
             </CommandBar>
 
             <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
@@ -257,22 +254,29 @@
                                 <Expander Header="文件位置">
                                     <TextBlock Text="{Binding SelectedMod.FolderPath}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
                                 </Expander>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{Binding NexusBoundVisibility}">
+                                    <TextBlock Text="{Binding NexusBindingText}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                                    <Button Content="修改" Command="{Binding EditNexusBindingCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{Binding NexusBindingEditorVisibility}">
                                     <TextBox Text="{Binding NexusModIdInput, Mode=TwoWay}" PlaceholderText="绑定 Nexus Mod ID" Width="180" />
                                     <Button Content="保存绑定" Command="{Binding BindNexusIdCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="取消" Command="{Binding EditNexusBindingCommand}" Style="{StaticResource SubtleButtonStyle}" Visibility="{Binding CancelNexusBindingVisibility}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="9" Margin="0,10,0,0">
-                                    <Button Content="启用" Command="{Binding EnableCommand}" Style="{StaticResource AccentButtonStyle}" />
-                                    <Button Content="禁用" Command="{Binding DisableCommand}" Style="{StaticResource DangerButtonStyle}" />
-                                    <Button Content="备份" Command="{Binding BackupCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                    <Button Content="归档" Command="{Binding ArchiveCommand}" Style="{StaticResource DangerButtonStyle}" />
-                                    <Button Content="恢复归档" Command="{Binding RestoreArchivedCommand}" Style="{StaticResource DangerButtonStyle}" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="9">
-                                    <Button Content="打开文件夹" Command="{Binding OpenModFolderCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                    <Button Content="复制摘要" Command="{Binding CopyModInfoCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="启用" Command="{Binding EnableCommand}" Style="{StaticResource AccentButtonStyle}" Visibility="{Binding EnableVisibility}" />
+                                    <Button Content="禁用" Command="{Binding DisableCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding DisableVisibility}" />
                                     <Button Content="获取更新文件" Command="{Binding PrepareSelectedUpdateCommand}" Style="{StaticResource SubtleButtonStyle}" />
                                 </StackPanel>
+                                <Expander Header="更多操作">
+                                    <StackPanel Orientation="Horizontal" Spacing="9" Margin="0,8,0,0">
+                                        <Button Content="备份" Command="{Binding BackupCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                        <Button Content="归档" Command="{Binding ArchiveCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding ArchiveVisibility}" />
+                                        <Button Content="恢复归档" Command="{Binding RestoreArchivedCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding RestoreArchivedVisibility}" />
+                                        <Button Content="打开文件夹" Command="{Binding OpenModFolderCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                        <Button Content="复制摘要" Command="{Binding CopyModInfoCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>

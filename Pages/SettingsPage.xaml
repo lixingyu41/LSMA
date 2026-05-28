@@ -172,14 +172,7 @@
                 <StackPanel Spacing="12">
                     <TextBlock Text="高级" Style="{StaticResource SectionTitleStyle}" />
                     <ToggleSwitch Header="启用本地素材缓存" OffContent="关闭" OnContent="开启" IsOn="{Binding LocalAssetCacheEnabled, Mode=TwoWay}" />
-                    <TextBlock Text="默认关闭。仅从已验证的本机游戏目录复制到临时目录后处理；不会修改、上传或分发游戏素材。" Style="{StaticResource BodyTextStyle}" />
-                    <TextBlock Text="7z / RAR 解压工具路径" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
-                    <TextBox Text="{Binding ExternalArchiveToolPath, Mode=TwoWay}" PlaceholderText="例如 C:\Program Files\7-Zip\7z.exe" />
-                    <TextBlock Text="ZIP 可直接安装；7z 与 RAR 会使用此工具读取并进入同一预检流程。" Style="{StaticResource BodyTextStyle}" />
-                    <TextBlock Text="XNB 解包工具路径" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
-                    <TextBox Text="{Binding XnbToolPath, Mode=TwoWay}" PlaceholderText="配置 XNB 解包工具可执行文件" />
-                    <TextBlock Text="XNB 参数模板" Style="{StaticResource MutedTextStyle}" />
-                    <TextBox Text="{Binding XnbArgumentsTemplate, Mode=TwoWay}" PlaceholderText="&quot;{input}&quot; &quot;{output}&quot;" />
+                    <TextBlock Text="默认关闭。素材缓存由 LSMA 自动读取游戏 XNB 并生成图片；模组安装中的 ZIP / 7z / RAR 也由 LSMA 直接读取。" Style="{StaticResource BodyTextStyle}" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="生成 / 重建素材缓存" Command="{Binding BuildAssetCacheCommand}" Style="{StaticResource SubtleButtonStyle}" />
                         <Button Content="清除素材缓存" Command="{Binding ClearAssetCacheCommand}" Style="{StaticResource DangerButtonStyle}" />

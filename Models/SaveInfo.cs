@@ -25,6 +25,7 @@ public sealed class SaveInfo
     public double CollectionProgress { get; set; }
     public string? ParseError { get; set; }
     public DateTime? LatestBackup { get; set; }
+    public string? SeasonIconUri { get; set; }
     public List<SaveSkillInfo> Skills { get; } = [];
     public List<SaveFriendshipInfo> Friendships { get; } = [];
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
@@ -48,16 +49,55 @@ public sealed class SaveInfo
 
 public sealed class SaveSkillInfo
 {
+    private static readonly int[] ExperienceThresholds = [0, 100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000, 15000];
+
+    public string Key { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public int Level { get; init; }
-    public double Percent => Math.Clamp(Level / 10d * 100, 0, 100);
+    public int Experience { get; init; }
+    public string? IconUri { get; set; }
+    public bool IsMaxLevel => Level >= 10;
+    public int CurrentThreshold => ExperienceThresholds[Math.Clamp(Level, 0, 10)];
+    public int NextThreshold => ExperienceThresholds[Math.Clamp(Level + 1, 0, 10)];
+    public int ExperienceIntoLevel => Math.Max(0, Experience - CurrentThreshold);
+    public int ExperienceForLevel => Math.Max(0, NextThreshold - CurrentThreshold);
+    public int ExperienceRemaining => IsMaxLevel ? 0 : Math.Max(0, NextThreshold - Experience);
+    public double Percent => IsMaxLevel || ExperienceForLevel == 0
+        ? 100
+        : Math.Clamp(ExperienceIntoLevel / (double)ExperienceForLevel * 100, 0, 100);
+    public string LevelText => $"{Level} 级";
+    public string ExperienceText => IsMaxLevel
+        ? $"{Experience:N0} 经验 · 已满级"
+        : $"{ExperienceIntoLevel:N0} / {ExperienceForLevel:N0} 经验 · 距下级 {ExperienceRemaining:N0}";
 }
 
 public sealed class SaveFriendshipInfo
 {
+    public string NpcId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public int Points { get; init; }
-    public int Hearts => Math.Min(14, Points / 250);
-    public string HeartsDisplay => $"{Hearts} 心";
-    public double Percent => Math.Clamp(Points / 3500d * 100, 0, 100);
+    public string Status { get; init; } = "Friendly";
+    public bool IsDatable { get; init; }
+    public string? IconUri { get; set; }
+    public List<SaveFriendshipHeart> HeartSlots { get; } = [];
+    public bool IsPartner => Status is "Dating" or "Engaged" or "Married" or "Roommate";
+    public bool IsSpouse => Status is "Married" or "Roommate";
+    public int MaximumHearts => IsSpouse ? 14 : IsDatable && !IsPartner ? 8 : 10;
+    public int Hearts => Math.Min(MaximumHearts, Points / 250);
+    public string RelationshipText => Status switch
+    {
+        "Dating" => "恋爱中",
+        "Engaged" => "订婚",
+        "Married" => "配偶",
+        "Roommate" => "室友",
+        _ when IsDatable => "单身",
+        _ => string.Empty
+    };
+    public string HeartsDisplay => $"{Hearts} / {MaximumHearts}";
+}
+
+public sealed class SaveFriendshipHeart
+{
+    public string? IconUri { get; init; }
+    public bool IsLocked { get; init; }
 }

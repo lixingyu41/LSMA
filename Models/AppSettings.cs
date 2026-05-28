@@ -30,7 +30,7 @@ public enum LaunchMode
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 3;
+    public int SchemaVersion { get; set; } = 4;
 
     public string? GameDirectory { get; set; }
 
@@ -51,14 +51,6 @@ public sealed class AppSettings
     public int SaveBackupRetention { get; set; } = 20;
 
     public bool LocalAssetCacheEnabled { get; set; }
-
-    public string? ExternalArchiveToolPath { get; set; }
-
-    public string ExternalArchiveArgumentsTemplate { get; set; } = "x -y -o\"{output}\" \"{input}\"";
-
-    public string? XnbToolPath { get; set; }
-
-    public string XnbArgumentsTemplate { get; set; } = "\"{input}\" \"{output}\"";
 
     public Dictionary<string, long> NexusBindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

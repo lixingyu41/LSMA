@@ -3,7 +3,7 @@ using LSMA.Models;
 
 namespace LSMA.Services;
 
-public sealed class SaveParserService(LoggingService logging)
+public sealed class SaveParserService(LoggingService logging, NpcLocalizationService npcNames)
 {
     public async Task<SaveInfo?> ParseAsync(SaveSource source)
     {
@@ -23,11 +23,14 @@ public sealed class SaveParserService(LoggingService logging)
         }
     }
 
-    private static SaveInfo Parse(SaveSource source)
+    private SaveInfo Parse(SaveSource source)
     {
         var document = XDocument.Load(source.FilePath, LoadOptions.None);
         var root = document.Root ?? throw new InvalidDataException("存档 XML 为空。");
         var player = First(root, "player") ?? root;
+        var year = Integer(root, "year");
+        var season = SeasonName(Value(root, "currentSeason"));
+        var day = Integer(root, "dayOfMonth");
         var save = new SaveInfo
         {
             FolderPath = source.DirectoryPath,
@@ -36,15 +39,15 @@ public sealed class SaveParserService(LoggingService logging)
             FarmName = Value(player, "farmName") ?? "未知农场",
             FarmType = FarmTypeName(Integer(root, "whichFarm")),
             GameVersion = Value(root, "gameVersion") ?? Value(root, "version") ?? "-",
-            Year = Integer(root, "year"),
-            Season = SeasonName(Value(root, "currentSeason")),
-            Day = Integer(root, "dayOfMonth"),
-            TotalDays = Integer(root, "daysPlayed", "stats"),
+            Year = year,
+            Season = season,
+            Day = day,
+            TotalDays = StatisticsInteger(root, "daysPlayed", CalculateElapsedDays(year, season, day)),
             Money = Integer(player, "money"),
             TotalMoneyEarned = Long(player, "totalMoneyEarned"),
             PlayTimeMilliseconds = Integer(player, "millisecondsPlayed"),
             Weather = WeatherText(root),
-            Spouse = Value(player, "spouse") is { Length: > 0 } spouse ? spouse : "无",
+            Spouse = Value(player, "spouse") is { Length: > 0 } spouse ? npcNames.Translate(spouse) : "无",
             Pet = bool.TryParse(Value(player, "catPerson"), out var hasCat) ? (hasCat ? "猫" : "狗") : "未识别",
             MineLevel = Integer(player, "deepestMineLevel"),
             SkullCavernLevel = Integer(root, "skullCavesDifficulty"),
@@ -53,13 +56,17 @@ public sealed class SaveParserService(LoggingService logging)
             CollectionProgress = CalculateCollectionProgress(player)
         };
 
+        var experience = First(player, "experiencePoints")?.Elements()
+            .Where(element => element.Name.LocalName.Equals("int", StringComparison.OrdinalIgnoreCase))
+            .Select(element => int.TryParse(element.Value, out var value) ? value : 0)
+            .ToList() ?? [];
         save.Skills.AddRange(
         [
-            new SaveSkillInfo { Name = "耕种", Level = Integer(player, "farmingLevel") },
-            new SaveSkillInfo { Name = "采矿", Level = Integer(player, "miningLevel") },
-            new SaveSkillInfo { Name = "采集", Level = Integer(player, "foragingLevel") },
-            new SaveSkillInfo { Name = "钓鱼", Level = Integer(player, "fishingLevel") },
-            new SaveSkillInfo { Name = "战斗", Level = Integer(player, "combatLevel") }
+            new SaveSkillInfo { Key = "Farming", Name = "耕种", Level = Integer(player, "farmingLevel"), Experience = ExperienceAt(experience, 0) },
+            new SaveSkillInfo { Key = "Mining", Name = "采矿", Level = Integer(player, "miningLevel"), Experience = ExperienceAt(experience, 3) },
+            new SaveSkillInfo { Key = "Foraging", Name = "采集", Level = Integer(player, "foragingLevel"), Experience = ExperienceAt(experience, 2) },
+            new SaveSkillInfo { Key = "Fishing", Name = "钓鱼", Level = Integer(player, "fishingLevel"), Experience = ExperienceAt(experience, 1) },
+            new SaveSkillInfo { Key = "Combat", Name = "战斗", Level = Integer(player, "combatLevel"), Experience = ExperienceAt(experience, 4) }
         ]);
 
         var friendshipData = First(player, "friendshipData");
@@ -71,7 +78,14 @@ public sealed class SaveParserService(LoggingService logging)
                 var pointsElement = item.Descendants().FirstOrDefault(element => element.Name.LocalName.Equals("Points", StringComparison.OrdinalIgnoreCase));
                 if (!string.IsNullOrWhiteSpace(name) && int.TryParse(pointsElement?.Value, out var points))
                 {
-                    save.Friendships.Add(new SaveFriendshipInfo { Name = name, Points = points });
+                    save.Friendships.Add(new SaveFriendshipInfo
+                    {
+                        NpcId = name,
+                        Name = npcNames.Translate(name),
+                        Points = points,
+                        Status = item.Descendants().FirstOrDefault(element => element.Name.LocalName.Equals("Status", StringComparison.OrdinalIgnoreCase))?.Value ?? "Friendly",
+                        IsDatable = npcNames.IsRomanceable(name)
+                    });
                 }
             }
         }
@@ -102,6 +116,36 @@ public sealed class SaveParserService(LoggingService logging)
     {
         return long.TryParse(Value(root, name), out var value) ? value : 0;
     }
+
+    private static int StatisticsInteger(XElement root, string name, int fallback)
+    {
+        var stats = First(root, "stats");
+        var item = stats?.Descendants()
+            .FirstOrDefault(element =>
+            {
+                var key = element.Elements().FirstOrDefault(child => child.Name.LocalName == "key");
+                return element.Name.LocalName == "item"
+                    && key?.Descendants().Any(value => value.Value.Equals(name, StringComparison.OrdinalIgnoreCase)) == true;
+            });
+        var value = item?.Elements().FirstOrDefault(element => element.Name.LocalName == "value")?
+            .Descendants().FirstOrDefault()?.Value;
+        return int.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static int CalculateElapsedDays(int year, string season, int day)
+    {
+        var seasonOffset = season switch
+        {
+            "夏季" => 28,
+            "秋季" => 56,
+            "冬季" => 84,
+            _ => 0
+        };
+        return Math.Max(0, (year - 1) * 112 + seasonOffset + day - 1);
+    }
+
+    private static int ExperienceAt(IReadOnlyList<int> values, int index)
+        => index >= 0 && index < values.Count ? values[index] : 0;
 
     private static string SeasonName(string? season)
     {
@@ -166,6 +210,15 @@ public sealed class SaveParserService(LoggingService logging)
 
     private static double CalculateBundleProgress(XElement root)
     {
+        var mailReceived = First(root, "mailReceived");
+        var isComplete = mailReceived?.Descendants()
+            .Any(element => element.Name.LocalName.Equals("string", StringComparison.OrdinalIgnoreCase)
+                && element.Value.Equals("ccIsComplete", StringComparison.OrdinalIgnoreCase)) == true;
+        if (isComplete)
+        {
+            return 100;
+        }
+
         var bundles = First(root, "bundles");
         if (bundles is null)
         {

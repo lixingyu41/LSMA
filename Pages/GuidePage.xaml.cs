@@ -10,8 +10,8 @@ public sealed partial class GuidePage : Page
         DataContext = App.Current.Services.Guide;
     }
 
-    private void Search_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    private async void Search_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
     {
-        App.Current.Services.Guide.Search(args.QueryText);
+        await App.Current.Services.Guide.SearchAsync(args.QueryText);
     }
 }

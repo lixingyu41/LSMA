@@ -11,6 +11,7 @@ public sealed class HomeViewModel : ViewModelBase
     private readonly AppStateService _state;
     private readonly SettingsService _settings;
     private readonly GameLocatorService _locator;
+    private readonly GameIconService _icons;
     private readonly GameLaunchService _launcher;
     private readonly GameRunLockService _runLock;
     private readonly SmapiLogService _logs;
@@ -23,6 +24,7 @@ public sealed class HomeViewModel : ViewModelBase
         AppStateService state,
         SettingsService settings,
         GameLocatorService locator,
+        GameIconService icons,
         GameLaunchService launcher,
         GameRunLockService runLock,
         SmapiLogService logs,
@@ -33,6 +35,7 @@ public sealed class HomeViewModel : ViewModelBase
         _state = state;
         _settings = settings;
         _locator = locator;
+        _icons = icons;
         _launcher = launcher;
         _runLock = runLock;
         _logs = logs;
@@ -110,13 +113,13 @@ public sealed class HomeViewModel : ViewModelBase
         _ => "安全"
     };
     public string ModSummaryText => _state.Mods.Count == 0
-        ? "尚未扫描"
+        ? "未发现本地模组"
         : $"正常 {_state.Mods.Count(mod => mod.IsEnabled && mod.Issues.Count == 0)} · 问题 {_state.Mods.Count(mod => mod.Issues.Count > 0)} · 更新待检查";
     public string SaveSummaryText => _state.CurrentSave is null
-        ? "尚未选择存档"
+        ? "未发现本机存档"
         : $"{_state.CurrentSave.FarmerName} · {_state.CurrentSave.DateDisplay}\n{(_state.CurrentSave.LatestBackup is null ? "尚无备份" : $"备份 {_state.CurrentSave.LatestBackup:MM-dd HH:mm}")}";
     public string SuggestionSummaryText => _state.CurrentSave is null
-        ? "扫描存档后生成建议"
+        ? "未发现可分析的存档"
         : App.Current.Services.Guide.Suggestions.FirstOrDefault()?.Title ?? "今日没有特别提醒";
     public string LogSummaryText => _state.LogSummary.DisplaySummary;
     public IReadOnlyList<LogIssue> LogIssues => _state.LogSummary.Issues;
@@ -212,10 +215,14 @@ public sealed class HomeViewModel : ViewModelBase
                 return;
             }
 
+            await App.Current.Services.NpcNames.PrepareAsync(_state.GameDirectory?.Path);
+            await App.Current.Services.GuideCatalog.PrepareAsync();
+            await _icons.PrepareAsync();
             FeedbackMessage = "游戏目录已连接。";
             App.Current.Services.SettingsPage.Refresh();
             App.Current.Services.Mods.Refresh();
             App.Current.Services.Saves.Refresh();
+            await App.Current.Services.Guide.RefreshAsync();
             await CheckAsync(false);
         }
         finally

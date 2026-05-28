@@ -60,7 +60,10 @@ public sealed class NexusClient(LoggingService logging)
     public async Task<IReadOnlyList<NexusFileInfo>> GetFilesAsync(long modId, string apiKey)
     {
         var value = await GetAsync<NexusFilesResponse>($"games/{GameDomain}/mods/{modId}/files.json", apiKey);
-        return value.Files.OrderByDescending(file => file.CategoryName.Equals("MAIN", StringComparison.OrdinalIgnoreCase))
+        return (value.Files ?? [])
+            .OfType<NexusFileInfo>()
+            .Where(file => file.FileId > 0)
+            .OrderByDescending(file => string.Equals(file.CategoryName, "MAIN", StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(file => file.FileId)
             .ToList();
     }

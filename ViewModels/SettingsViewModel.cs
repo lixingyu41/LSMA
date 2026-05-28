@@ -18,16 +18,14 @@ public sealed class SettingsViewModel : ViewModelBase
     private readonly SmapiLogService _diagnostics;
     private readonly CacheService _cache;
     private readonly AssetCacheService _assetCache;
+    private readonly GameIconService _gameIcons;
     private string _nexusKeyInput = string.Empty;
     private bool _backupSaveBeforeLaunch;
     private bool _backupSaveBeforeUpdate;
     private bool _localAssetCacheEnabled;
     private double _modBackupRetention = 20;
     private double _saveBackupRetention = 20;
-    private string _externalArchiveToolPath = string.Empty;
     private string? _nexusConnectionStatus;
-    private string _xnbToolPath = string.Empty;
-    private string _xnbArgumentsTemplate = "\"{input}\" \"{output}\"";
 
     public SettingsViewModel(
         AppStateService state,
@@ -39,7 +37,8 @@ public sealed class SettingsViewModel : ViewModelBase
         NexusClient nexus,
         SmapiLogService diagnostics,
         CacheService cache,
-        AssetCacheService assetCache)
+        AssetCacheService assetCache,
+        GameIconService gameIcons)
     {
         _state = state;
         _settings = settings;
@@ -51,6 +50,7 @@ public sealed class SettingsViewModel : ViewModelBase
         _diagnostics = diagnostics;
         _cache = cache;
         _assetCache = assetCache;
+        _gameIcons = gameIcons;
         ChooseDirectoryCommand = new AsyncRelayCommand(ChooseDirectoryAsync, CanInteract);
         OpenGameDirectoryCommand = new AsyncRelayCommand(OpenGameDirectoryAsync, () => _state.IsGameConfigured);
         DarkThemeCommand = new AsyncRelayCommand(() => SelectDisplayThemeAsync(AppTheme.Dark));
@@ -148,24 +148,6 @@ public sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _saveBackupRetention, value);
     }
 
-    public string ExternalArchiveToolPath
-    {
-        get => _externalArchiveToolPath;
-        set => SetProperty(ref _externalArchiveToolPath, value);
-    }
-
-    public string XnbToolPath
-    {
-        get => _xnbToolPath;
-        set => SetProperty(ref _xnbToolPath, value);
-    }
-
-    public string XnbArgumentsTemplate
-    {
-        get => _xnbArgumentsTemplate;
-        set => SetProperty(ref _xnbArgumentsTemplate, value);
-    }
-
     public string DirectoryStatus => _state.IsGameConfigured ? "已连接游戏" : "未配置游戏目录";
     public string DirectoryPath => _state.GameDirectory?.Path ?? "尚未选择";
     public Visibility CanOpenDirectoryVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
@@ -205,9 +187,6 @@ public sealed class SettingsViewModel : ViewModelBase
         LocalAssetCacheEnabled = _settings.Current.LocalAssetCacheEnabled;
         ModBackupRetention = _settings.Current.ModBackupRetention;
         SaveBackupRetention = _settings.Current.SaveBackupRetention;
-        ExternalArchiveToolPath = _settings.Current.ExternalArchiveToolPath ?? string.Empty;
-        XnbToolPath = _settings.Current.XnbToolPath ?? string.Empty;
-        XnbArgumentsTemplate = _settings.Current.XnbArgumentsTemplate;
         OnPropertyChanged(nameof(DirectoryStatus));
         OnPropertyChanged(nameof(DirectoryPath));
         OnPropertyChanged(nameof(CanOpenDirectoryVisibility));
@@ -250,10 +229,14 @@ public sealed class SettingsViewModel : ViewModelBase
                 return;
             }
 
+            await App.Current.Services.NpcNames.PrepareAsync(_state.GameDirectory?.Path);
+            await App.Current.Services.GuideCatalog.PrepareAsync();
+            await _gameIcons.PrepareAsync();
             Refresh();
             App.Current.Services.Home.Refresh();
             App.Current.Services.Mods.Refresh();
             App.Current.Services.Saves.Refresh();
+            await App.Current.Services.Guide.RefreshAsync();
         }
         finally
         {
@@ -334,6 +317,8 @@ public sealed class SettingsViewModel : ViewModelBase
         {
             await SaveBackupSettingsAsync();
             var count = await _assetCache.BuildAsync();
+            await _gameIcons.PrepareAsync();
+            await App.Current.Services.Guide.RefreshAsync();
             FeedbackMessage = $"本地素材缓存已生成，共处理 {count} 项。";
         }
         catch (Exception exception)
@@ -356,6 +341,8 @@ public sealed class SettingsViewModel : ViewModelBase
         }
 
         await _assetCache.ClearAsync();
+        await _gameIcons.PrepareAsync();
+        await App.Current.Services.Guide.RefreshAsync();
         FeedbackMessage = "本地素材缓存已清空。";
         OnPropertyChanged(nameof(FeedbackMessage));
     }
@@ -417,11 +404,6 @@ public sealed class SettingsViewModel : ViewModelBase
             settings.ModBackupRetention = Math.Clamp((int)ModBackupRetention, 1, 200);
             settings.SaveBackupRetention = Math.Clamp((int)SaveBackupRetention, 1, 200);
             settings.LocalAssetCacheEnabled = LocalAssetCacheEnabled;
-            settings.ExternalArchiveToolPath = string.IsNullOrWhiteSpace(ExternalArchiveToolPath) ? null : ExternalArchiveToolPath.Trim();
-            settings.XnbToolPath = string.IsNullOrWhiteSpace(XnbToolPath) ? null : XnbToolPath.Trim();
-            settings.XnbArgumentsTemplate = string.IsNullOrWhiteSpace(XnbArgumentsTemplate)
-                ? "\"{input}\" \"{output}\""
-                : XnbArgumentsTemplate.Trim();
         });
         FeedbackMessage = "备份与高级选项已保存。";
         Refresh();
