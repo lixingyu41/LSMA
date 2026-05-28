@@ -14,10 +14,16 @@
         </Grid.RowDefinitions>
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <CommandBar Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
+                    <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                    <Button Content="打开备份目录" Command="{Binding OpenBackupsCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                </StackPanel>
+                <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True" HorizontalAlignment="Right">
                     <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
                     </AppBarButton>
@@ -34,12 +40,6 @@
                         <AppBarButton.Icon><FontIcon Glyph="&#xE896;" /></AppBarButton.Icon>
                     </AppBarButton>
                 </CommandBar>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="0,0,0,0">
-                    <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
-                    <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                    <Button Content="打开备份目录" Command="{Binding OpenBackupsCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                </StackPanel>
             </Grid>
 
             <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
@@ -179,49 +179,49 @@
                     </Grid.ColumnDefinitions>
                     <Button x:Name="AllFilterButton" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="全部">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="NormalFilterButton" Grid.Column="1" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="正常">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="UpdateFilterButton" Grid.Column="2" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="可更新">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="ProblemFilterButton" Grid.Column="3" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="有问题">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock x:Name="ProblemCountText" Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="DisabledFilterButton" Grid.Column="4" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="已禁用">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="FavoriteFilterButton" Grid.Column="5" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="收藏">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="收藏" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="ArchivedFilterButton" Grid.Column="6" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="已归档">
-                        <StackPanel HorizontalAlignment="Center">
+                        <StackPanel>
                             <TextBlock Text="已归档" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding ArchivedCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
@@ -306,7 +306,7 @@
                                                 <TextBlock x:Name="NexusIdText"
                                                            Text="{Binding NexusIdDisplayText}"
                                                            Style="{StaticResource MutedTextStyle}"
-                                                           VerticalAlignment="Center"
+                                                           VerticalAlignment="Center" MinHeight="24"
                                                            ToolTipService.ToolTip="点击复制"
                                                            Tapped="NexusIdText_Tapped" />
                                             </StackPanel>
