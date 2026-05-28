@@ -156,7 +156,7 @@ public sealed class ModsViewModel : ViewModelBase
             if (SetProperty(ref _selectedMod, value))
             {
                 NexusModIdInput = value?.NexusModId?.ToString() ?? string.Empty;
-                _isEditingNexusBinding = value?.NexusModId is null;
+                _isEditingNexusBinding = false;
                 OnPropertyChanged(nameof(DetailVisibility));
                 OnPropertyChanged(nameof(NexusBindingEditorVisibility));
                 OnPropertyChanged(nameof(NexusBoundVisibility));
@@ -166,6 +166,8 @@ public sealed class ModsViewModel : ViewModelBase
                 OnPropertyChanged(nameof(DisableVisibility));
                 OnPropertyChanged(nameof(NexusIdDisplayText));
                 OnPropertyChanged(nameof(DependencySectionVisibility));
+                OnPropertyChanged(nameof(IssuesSectionVisibility));
+                OnPropertyChanged(nameof(NoNexusIdMessageVisibility));
                 NotifyCommands();
             }
         }
@@ -236,7 +238,7 @@ public sealed class ModsViewModel : ViewModelBase
     public Visibility AvailableVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DetailVisibility => SelectedMod is null ? Visibility.Collapsed : Visibility.Visible;
-    public Visibility NexusBindingEditorVisibility => SelectedMod is not null && (SelectedMod.NexusModId is null || _isEditingNexusBinding)
+    public Visibility NexusBindingEditorVisibility => SelectedMod is not null && _isEditingNexusBinding
         ? Visibility.Visible
         : Visibility.Collapsed;
     public Visibility NexusBoundVisibility => SelectedMod?.NexusModId is not null && !_isEditingNexusBinding
@@ -245,6 +247,8 @@ public sealed class ModsViewModel : ViewModelBase
     public Visibility CancelNexusBindingVisibility => SelectedMod?.NexusModId is not null && _isEditingNexusBinding
         ? Visibility.Visible
         : Visibility.Collapsed;
+    public Visibility IssuesSectionVisibility => SelectedMod?.Issues.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility NoNexusIdMessageVisibility => SelectedMod?.NexusModId is null ? Visibility.Visible : Visibility.Collapsed;
     public Visibility EnableVisibility => SelectedMod is { IsEnabled: false, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DisableVisibility => SelectedMod is { IsEnabled: true, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
     public string NexusBindingText => SelectedMod?.NexusModId is { } id ? $"Nexus Mod ID：{id}" : "未绑定 Nexus Mod ID";
@@ -913,6 +917,7 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(CancelNexusBindingVisibility));
         OnPropertyChanged(nameof(NexusBindingText));
         OnPropertyChanged(nameof(NexusIdDisplayText));
+        OnPropertyChanged(nameof(NoNexusIdMessageVisibility));
     }
 
     private void ToggleNexusBindingEditor()

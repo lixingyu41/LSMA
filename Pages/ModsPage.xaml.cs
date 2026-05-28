@@ -88,17 +88,27 @@ public sealed partial class ModsPage : Page
         }
     }
 
-    private void NexusIdText_PointerEntered(object sender, PointerRoutedEventArgs e)
+    private CancellationTokenSource? _hideEditButtonCts;
+
+    private void NexusIdContainer_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
+        _hideEditButtonCts?.Cancel();
         if (_vm.SelectedMod?.NexusModId is not null)
         {
             NexusIdEditButton.Visibility = Visibility.Visible;
         }
     }
 
-    private void NexusIdText_PointerExited(object sender, PointerRoutedEventArgs e)
+    private async void NexusIdContainer_PointerExited(object sender, PointerRoutedEventArgs e)
     {
-        NexusIdEditButton.Visibility = Visibility.Collapsed;
+        _hideEditButtonCts?.Cancel();
+        _hideEditButtonCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(800, _hideEditButtonCts.Token);
+            NexusIdEditButton.Visibility = Visibility.Collapsed;
+        }
+        catch (TaskCanceledException) { }
     }
 
     private void NexusIdText_Tapped(object sender, TappedRoutedEventArgs e)

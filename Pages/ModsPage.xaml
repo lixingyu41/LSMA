@@ -11,25 +11,36 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-            <CommandBar Grid.Row="0" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
-                <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton Label="发现" Command="{Binding BrowseCommand}" CommandParameter="趋势">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE721;" /></AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton Label="收藏" Command="{Binding ShowFavoritesCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton Label="下载" Command="{Binding ShowDownloadsCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE896;" /></AppBarButton.Icon>
-                </AppBarButton>
-            </CommandBar>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CommandBar Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
+                    <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="发现" Command="{Binding BrowseCommand}" CommandParameter="趋势">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE721;" /></AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="收藏" Command="{Binding ShowFavoritesCommand}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="下载" Command="{Binding ShowDownloadsCommand}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE896;" /></AppBarButton.Icon>
+                    </AppBarButton>
+                </CommandBar>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="0,0,0,0">
+                    <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
+                    <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                    <Button Content="打开备份目录" Command="{Binding OpenBackupsCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                </StackPanel>
+            </Grid>
 
             <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
                 <StackPanel Spacing="10">
@@ -281,22 +292,24 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding SelectedMod.Version}" VerticalAlignment="Center" />
-                                            <TextBlock x:Name="NexusIdText" Grid.Column="1"
-                                                       Text="{Binding NexusIdDisplayText}"
-                                                       Style="{StaticResource MutedTextStyle}"
-                                                       HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                       ToolTipService.ToolTip="点击复制"
-                                                       PointerEntered="NexusIdText_PointerEntered"
-                                                       PointerExited="NexusIdText_PointerExited"
-                                                       Tapped="NexusIdText_Tapped" />
-                                            <Button x:Name="NexusIdEditButton" Grid.Column="2"
-                                                    Content="修改" Command="{Binding EditNexusBindingCommand}"
-                                                    Style="{StaticResource SubtleButtonStyle}"
-                                                    Visibility="Collapsed"
-                                                    MinWidth="40" MinHeight="24" Padding="8,2" Margin="4,0,0,0" />
+                                            <StackPanel x:Name="NexusIdContainer" Grid.Column="1" Orientation="Horizontal"
+                                                        HorizontalAlignment="Right" Spacing="4"
+                                                        PointerEntered="NexusIdContainer_PointerEntered"
+                                                        PointerExited="NexusIdContainer_PointerExited">
+                                                <Button x:Name="NexusIdEditButton"
+                                                        Content="修改" Command="{Binding EditNexusBindingCommand}"
+                                                        Style="{StaticResource SubtleButtonStyle}"
+                                                        Visibility="Collapsed"
+                                                        MinWidth="40" MinHeight="24" Padding="8,2" />
+                                                <TextBlock x:Name="NexusIdText"
+                                                           Text="{Binding NexusIdDisplayText}"
+                                                           Style="{StaticResource MutedTextStyle}"
+                                                           VerticalAlignment="Center"
+                                                           ToolTipService.ToolTip="点击复制"
+                                                           Tapped="NexusIdText_Tapped" />
+                                            </StackPanel>
                                         </Grid>
                                         <TextBlock Text="状态" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.StatusText}" />
                                         <StackPanel Visibility="{Binding DependencySectionVisibility}">
@@ -320,14 +333,20 @@
                                 </StackPanel>
 
                                 <!-- Issues -->
-                                <TextBlock Text="发现的问题" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
-                                <ItemsControl ItemsSource="{Binding SelectedMod.Issues}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Message}" Foreground="{StaticResource DangerBrush}" Margin="0,4" TextWrapping="Wrap" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <StackPanel Visibility="{Binding IssuesSectionVisibility}">
+                                    <TextBlock Text="发现的问题" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
+                                    <ItemsControl ItemsSource="{Binding SelectedMod.Issues}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Message}" Foreground="{StaticResource DangerBrush}" Margin="0,4" TextWrapping="Wrap" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                                <TextBlock Visibility="{Binding NoNexusIdMessageVisibility}"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           TextWrapping="Wrap"
+                                           Text="未绑定 Nexus Mod ID，点击右上角「手动匹配ID」进行绑定。" />
 
                                 <!-- Nexus binding editor -->
                                 <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{Binding NexusBindingEditorVisibility}">
@@ -339,16 +358,5 @@
                         </ScrollViewer>
                     </Border>
                 </Grid>
-
-                <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="16,12" Visibility="{Binding AvailableVisibility}">
-                    <Grid>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
-                            <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <Button Content="打开备份目录" Command="{Binding OpenBackupsCommand}" Style="{StaticResource SubtleButtonStyle}" HorizontalAlignment="Right" />
-                    </Grid>
-                </Border>
     </Grid>
 </Page>
