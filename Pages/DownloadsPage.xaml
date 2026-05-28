@@ -48,8 +48,8 @@
                                     <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Nexus" VerticalAlignment="Center"
-                                        Command="{Binding ElementName=DownloadsPageRoot, Path=DataContext.OpenNexusCommand}"
-                                        CommandParameter="{Binding}"
+                                        Tag="{Binding}"
+                                        Click="NexusButton_Click"
                                         Style="{StaticResource SubtleButtonStyle}" />
                             </Grid>
                         </DataTemplate>
@@ -70,15 +70,15 @@
                                           Style="{StaticResource ChoiceToggleStyle}" />
                         </StackPanel>
 
-                        <Grid Height="32">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}"
-                                      DisplayMemberPath="DisplayText" PlaceholderText="选择文件" VerticalAlignment="Stretch" />
+                                      DisplayMemberPath="DisplayText" PlaceholderText="选择文件" MinHeight="32" />
                             <Button Grid.Column="1" Content="刷新" Command="{Binding LoadFilesCommand}"
-                                    Style="{StaticResource SubtleButtonStyle}" VerticalAlignment="Stretch" Padding="12,0" />
+                                    Style="{StaticResource SubtleButtonStyle}" MinHeight="32" Padding="12,0" />
                         </Grid>
 
                         <Button Content="下载并预检" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
