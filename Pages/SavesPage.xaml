@@ -8,157 +8,297 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-            <CommandBar Grid.Row="0" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
-                <AppBarButton Label="备份全部" Command="{Binding BackupAllCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE74E;" /></AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton Label="打开备份目录" Command="{Binding OpenBackupsCommand}">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE838;" /></AppBarButton.Icon>
-                </AppBarButton>
-            </CommandBar>
 
-            <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="存档功能暂不可用" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="连接游戏目录后即可读取本机存档并创建备份。" Style="{StaticResource BodyTextStyle}" />
-                </StackPanel>
-            </Border>
+        <!-- Row 0: 存档选择下拉 + 计数 + 信息 + 操作按钮 -->
+        <Grid Grid.Row="0" ColumnSpacing="12" Visibility="{Binding AvailableVisibility}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-                <InfoBar Grid.Row="1" IsOpen="True" IsClosable="False" Severity="Warning" Title="游戏正在运行"
-                         Message="当前可以查看存档，但恢复操作已暂停。" Visibility="{Binding RunningVisibility}" />
-                <Grid Grid.Row="2" ColumnSpacing="14" Visibility="{Binding AvailableVisibility}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="310" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource CardStyle}" Padding="8">
-                        <ListView ItemsSource="{Binding Saves}" SelectedItem="{Binding SelectedSave, Mode=TwoWay}">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="10,8" ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                        <Image Source="{Binding SeasonIconUri}" Width="30" Height="30" Stretch="Uniform" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Spacing="4">
-                                            <TextBlock Text="{Binding FarmerName}" FontSize="16" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding FarmName}" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Text="{Binding DateDisplay}" Foreground="{StaticResource AccentBrush}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </Border>
+            <ComboBox
+                ItemsSource="{Binding Saves}"
+                SelectedItem="{Binding SelectedSave, Mode=TwoWay}"
+                VerticalAlignment="Center">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Image Source="{Binding SeasonIconUri}" Width="20" Height="20" Stretch="Uniform" />
+                            <TextBlock Text="{Binding ListDisplay}" VerticalAlignment="Center" FontSize="14" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
 
-                    <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-                        <ScrollViewer Visibility="{Binding DetailVisibility}">
-                            <StackPanel Spacing="16">
-                                <Grid>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding SelectedSave.FarmerName}" Style="{StaticResource SectionTitleStyle}" />
-                                        <TextBlock Text="{Binding SelectedSave.FarmName}" Style="{StaticResource BodyTextStyle}" />
-                                        <TextBlock Text="{Binding SelectedSave.ProgressDisplay}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
-                                        <TextBlock Text="{Binding SelectedSave.ParseError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
-                                    </StackPanel>
-                                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="10">
-                                        <Button Content="备份当前存档" Command="{Binding BackupCommand}" Style="{StaticResource AccentButtonStyle}" />
-                                    </StackPanel>
-                                </Grid>
+            <TextBlock
+                Grid.Column="1"
+                Text="{Binding SavesCountDisplay}"
+                VerticalAlignment="Center"
+                Style="{StaticResource MutedTextStyle}" />
 
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <Border Style="{StaticResource CardStyle}" Padding="12">
-                                        <StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="6"><Image Source="{Binding SelectedSave.SeasonIconUri}" Width="20" Height="20" /><TextBlock Text="游戏日期" Style="{StaticResource MutedTextStyle}" /></StackPanel>
-                                            <TextBlock Text="{Binding SelectedSave.DateDisplay}" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
-                                        <StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8C7;" FontSize="14" /><TextBlock Text="当前金币" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.MoneyDisplay}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" /></StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
-                                        <StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9D2;" FontSize="14" /><TextBlock Text="总收入" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.TotalIncomeDisplay}" FontWeight="SemiBold" /></StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
-                                        <StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE823;" FontSize="14" /><TextBlock Text="游戏时间" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.PlayTimeDisplay}" FontWeight="SemiBold" /></StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
-                                        <StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE787;" FontSize="14" /><TextBlock Text="本季剩余" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.RemainingDaysInSeason}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" /></StackPanel>
-                                    </Border>
-                                </Grid>
+            <StackPanel
+                Grid.Column="2"
+                Orientation="Horizontal"
+                Spacing="10"
+                VerticalAlignment="Center"
+                Margin="8,0,0,0">
+                <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
+                <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" />
+                <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" />
+            </StackPanel>
 
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <Border Style="{StaticResource CardStyle}" Padding="12"><StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8C7;" FontSize="14" /><TextBlock Text="日均收入" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.AverageMoneyDisplay}" /></StackPanel></Border>
-                                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12"><StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9D2;" FontSize="14" /><TextBlock Text="季度估算" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.SeasonEstimateDisplay}" /></StackPanel></Border>
-                                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12"><StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE73E;" FontSize="14" /><TextBlock Text="社区中心" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.CommunityCenterDisplay}" /></StackPanel></Border>
-                                    <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12"><StackPanel><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8FD;" FontSize="14" /><TextBlock Text="全收集参考" Style="{StaticResource MutedTextStyle}" /></StackPanel><TextBlock Text="{Binding SelectedSave.CollectionDisplay}" /></StackPanel></Border>
-                                </Grid>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10">
+                <Button Content="备份当前存档" Command="{Binding BackupCommand}" Style="{StaticResource AccentButtonStyle}" />
+                <Button Content="备份全部" Command="{Binding BackupAllCommand}" />
+            </StackPanel>
+        </Grid>
 
-                                <TextBlock Text="{Binding SelectedSave.HouseholdDisplay}" Style="{StaticResource BodyTextStyle}" />
-                                <TextBlock Text="{Binding SelectedSave.ExplorationDisplay}" Style="{StaticResource BodyTextStyle}" />
+        <!-- Row 1: 提示信息 -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="存档功能暂不可用" Style="{StaticResource SectionTitleStyle}" />
+                <TextBlock Text="连接游戏目录后即可读取本机存档并创建备份。" Style="{StaticResource BodyTextStyle}" />
+            </StackPanel>
+        </Border>
 
-                                <Grid ColumnSpacing="20">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="10">
-                                        <TextBlock Text="技能" Style="{StaticResource SectionTitleStyle}" />
-                                        <ItemsControl ItemsSource="{Binding SelectedSave.Skills}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid Margin="0,5" ColumnSpacing="10">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                        <Image Source="{Binding IconUri}" Width="28" Height="28" Stretch="Uniform" VerticalAlignment="Center" />
-                                                        <StackPanel Grid.Column="1">
-                                                            <Grid><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding LevelText}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" /></Grid>
-                                                            <ProgressBar Value="{Binding Percent}" Maximum="100" Height="7" Margin="0,5,0,0" Foreground="{StaticResource AccentBrush}" />
-                                                            <TextBlock Text="{Binding ExperienceText}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Spacing="10">
-                                        <TextBlock Text="好感" Style="{StaticResource SectionTitleStyle}" />
-                                        <ItemsControl ItemsSource="{Binding SelectedSave.Friendships}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid Margin="0,5" ColumnSpacing="10">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                        <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="UniformToFill" VerticalAlignment="Center" />
-                                                        <StackPanel Grid.Column="1">
-                                                            <Grid>
-                                                                <StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" /></StackPanel>
-                                                                <TextBlock Text="{Binding HeartsDisplay}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" />
-                                                            </Grid>
-                                                            <ItemsControl ItemsSource="{Binding HeartSlots}" Margin="0,5,0,0">
-                                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                                                <ItemsControl.ItemTemplate><DataTemplate><Image Source="{Binding IconUri}" Width="14" Height="12" Stretch="Fill" /></DataTemplate></ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Grid>
-                                <TextBlock Text="{Binding BackupStatus}" Style="{StaticResource BodyTextStyle}" />
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <ComboBox ItemsSource="{Binding BackupEntries}" SelectedItem="{Binding SelectedBackup, Mode=TwoWay}" DisplayMemberPath="DisplayName" PlaceholderText="选择要恢复的备份" />
-                                    <Button Grid.Column="1" Content="恢复备份" Command="{Binding RestoreCommand}" Style="{StaticResource DangerButtonStyle}" />
-                                </Grid>
+        <InfoBar Grid.Row="1" IsOpen="True" IsClosable="False" Severity="Warning" Title="游戏正在运行"
+                 Message="当前可以查看存档，但恢复操作已暂停。" Visibility="{Binding RunningVisibility}" />
+
+        <!-- Row 2: 详情面板（全宽） -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Visibility="{Binding AvailableVisibility}">
+            <ScrollViewer Visibility="{Binding DetailVisibility}">
+                <StackPanel Spacing="16">
+                    <!-- 标题 -->
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedSave.FarmerName}" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="{Binding SelectedSave.FarmName}" Style="{StaticResource BodyTextStyle}" />
+                            <TextBlock Text="{Binding SelectedSave.ProgressDisplay}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
+                            <TextBlock Text="{Binding SelectedSave.ParseError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 卡片行 1：游戏日期 · 当前金币 · 总收入 · 总天数 · 游戏时间 -->
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><Image Source="{Binding SelectedSave.SeasonIconUri}" Width="18" Height="18" /><TextBlock Text="游戏日期" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.DateDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
-                        </ScrollViewer>
-                    </Border>
-                </Grid>
-                <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="16,12" Visibility="{Binding AvailableVisibility}">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
-                        <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" />
-                        <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" />
-                    </StackPanel>
-                </Border>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8C7;" FontSize="14" /><TextBlock Text="当前金币" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.MoneyDisplay}" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource AccentBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9D2;" FontSize="14" /><TextBlock Text="总收入" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.TotalIncomeDisplay}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE787;" FontSize="14" /><TextBlock Text="总天数" FontSize="13" /></StackPanel>
+                                <TextBlock FontWeight="SemiBold" FontSize="15"><Run Text="{Binding SelectedSave.TotalDays}" /><Run Text=" 天" /></TextBlock>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE823;" FontSize="14" /><TextBlock Text="游戏时间" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.PlayTimeDisplay}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- 卡片行 2：日均收入 · 季度估算 · 社区中心 · 全收集参考 -->
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8C7;" FontSize="14" /><TextBlock Text="日均收入" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.AverageMoneyDisplay}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9D2;" FontSize="14" /><TextBlock Text="季度估算" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.SeasonEstimateDisplay}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE73E;" FontSize="14" /><TextBlock Text="社区中心" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.CommunityCenterDisplay}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8FD;" FontSize="14" /><TextBlock Text="全收集" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.CollectionDisplay}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- 卡片行 3：农场类型 · 配偶 · 宠物 · 矿洞 · 沙漠矿洞 · Qi宝石 -->
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE81E;" FontSize="14" /><TextBlock Text="农场类型" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.FarmType}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE716;" FontSize="14" /><TextBlock Text="配偶" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.Spouse}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE76E;" FontSize="14" /><TextBlock Text="宠物" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.Pet}" FontWeight="SemiBold" FontSize="15" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE81C;" FontSize="14" /><TextBlock Text="矿洞" FontSize="13" /></StackPanel>
+                                <TextBlock FontWeight="SemiBold" FontSize="15"><Run Text="{Binding SelectedSave.MineLevel}" /><Run Text=" 层" /></TextBlock>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7AC;" FontSize="14" /><TextBlock Text="沙漠矿洞" FontSize="13" /></StackPanel>
+                                <TextBlock FontWeight="SemiBold" FontSize="15"><Run Text="{Binding SelectedSave.SkullCavernLevel}" /><Run Text=" 层" /></TextBlock>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="5" Style="{StaticResource CardStyle}" Padding="12">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE970;" FontSize="14" /><TextBlock Text="Qi宝石" FontSize="13" /></StackPanel>
+                                <TextBlock Text="{Binding SelectedSave.QiGems}" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource AccentBrush}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Grid ColumnSpacing="20">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="技能" Style="{StaticResource SectionTitleStyle}" />
+                            <ItemsControl ItemsSource="{Binding SelectedSave.Skills}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,5" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <Image Source="{Binding IconUri}" Width="28" Height="28" Stretch="Uniform" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1">
+                                                <Grid><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding LevelText}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" /></Grid>
+                                                <ProgressBar Value="{Binding Percent}" Maximum="100" Height="7" Margin="0,5,0,0" Foreground="{StaticResource AccentBrush}" />
+                                                <TextBlock Text="{Binding ExperienceText}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="好感" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                                <Button
+                                    Content="{Binding FriendshipsToggleText}"
+                                    Command="{Binding ToggleFriendshipsCommand}"
+                                    Visibility="{Binding FriendshipsToggleVisibility}"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    FontSize="12"
+                                    Padding="8,4" />
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding SelectedSave.TopFriendships}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,5" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="UniformToFill" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1">
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" /></StackPanel>
+                                                    <TextBlock Text="{Binding HeartsDisplay}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" />
+                                                </Grid>
+                                                <ItemsControl ItemsSource="{Binding HeartSlots}" Margin="0,5,0,0">
+                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Width="24" Height="20">
+                                                                <Image Source="{Binding IconUri}" Width="24" Height="20" Stretch="Fill" Opacity="{Binding HeartOpacity}" />
+                                                                <Image Source="{Binding FullIconUri}" Width="24" Height="20" Stretch="Fill" Visibility="{Binding PartialVisibility}">
+                                                                    <Image.Clip>
+                                                                        <RectangleGeometry Rect="0,0,24,20">
+                                                                            <RectangleGeometry.Transform>
+                                                                                <ScaleTransform ScaleX="{Binding FillPercent}" CenterX="0" />
+                                                                            </RectangleGeometry.Transform>
+                                                                        </RectangleGeometry>
+                                                                    </Image.Clip>
+                                                                </Image>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding SelectedSave.RestFriendships}" Visibility="{Binding RestFriendshipsVisibility}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,5" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="UniformToFill" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1">
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" /></StackPanel>
+                                                    <TextBlock Text="{Binding HeartsDisplay}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" />
+                                                </Grid>
+                                                <ItemsControl ItemsSource="{Binding HeartSlots}" Margin="0,5,0,0">
+                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Width="24" Height="20">
+                                                                <Image Source="{Binding IconUri}" Width="24" Height="20" Stretch="Fill" Opacity="{Binding HeartOpacity}" />
+                                                                <Image Source="{Binding FullIconUri}" Width="24" Height="20" Stretch="Fill" Visibility="{Binding PartialVisibility}">
+                                                                    <Image.Clip>
+                                                                        <RectangleGeometry Rect="0,0,24,20">
+                                                                            <RectangleGeometry.Transform>
+                                                                                <ScaleTransform ScaleX="{Binding FillPercent}" CenterX="0" />
+                                                                            </RectangleGeometry.Transform>
+                                                                        </RectangleGeometry>
+                                                                    </Image.Clip>
+                                                                </Image>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="{Binding BackupStatus}" Style="{StaticResource BodyTextStyle}" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <ComboBox ItemsSource="{Binding BackupEntries}" SelectedItem="{Binding SelectedBackup, Mode=TwoWay}" DisplayMemberPath="DisplayName" PlaceholderText="选择要恢复的备份" />
+                        <Button Grid.Column="1" Content="恢复备份" Command="{Binding RestoreCommand}" Style="{StaticResource DangerButtonStyle}" />
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
     </Grid>
 </Page>

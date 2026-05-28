@@ -31,6 +31,7 @@ public sealed class SaveParserService(LoggingService logging, NpcLocalizationSer
         var year = Integer(root, "year");
         var season = SeasonName(Value(root, "currentSeason"));
         var day = Integer(root, "dayOfMonth");
+        var deepest = Integer(player, "deepestMineLevel");
         var save = new SaveInfo
         {
             FolderPath = source.DirectoryPath,
@@ -48,9 +49,9 @@ public sealed class SaveParserService(LoggingService logging, NpcLocalizationSer
             PlayTimeMilliseconds = Integer(player, "millisecondsPlayed"),
             Weather = WeatherText(root),
             Spouse = Value(player, "spouse") is { Length: > 0 } spouse ? npcNames.Translate(spouse) : "无",
-            Pet = bool.TryParse(Value(player, "catPerson"), out var hasCat) ? (hasCat ? "猫" : "狗") : "未识别",
-            MineLevel = Integer(player, "deepestMineLevel"),
-            SkullCavernLevel = Integer(root, "skullCavesDifficulty"),
+            Pet = DetectPet(player, root),
+            MineLevel = Math.Min(deepest, 120),
+            SkullCavernLevel = Math.Max(0, deepest - 120),
             QiGems = CountInventoryItem(player, "(O)858"),
             CommunityCenterProgress = CalculateBundleProgress(root),
             CollectionProgress = CalculateCollectionProgress(player)
@@ -90,15 +91,65 @@ public sealed class SaveParserService(LoggingService logging, NpcLocalizationSer
             }
         }
 
-        var ordered = save.Friendships.OrderByDescending(value => value.Points).Take(10).ToList();
+        var ordered = save.Friendships.OrderByDescending(value => value.Points).ToList();
         save.Friendships.Clear();
         save.Friendships.AddRange(ordered);
         return save;
     }
 
+    private static string DetectPet(XElement player, XElement root)
+    {
+        // Try catPerson from player and root (direct children)
+        foreach (var scope in new[] { player, root })
+        {
+            var catPerson = scope.Elements()
+                .FirstOrDefault(element => element.Name.LocalName.Equals("catPerson", StringComparison.OrdinalIgnoreCase))
+                ?.Value;
+            if (bool.TryParse(catPerson, out var isCat))
+            {
+                return isCat ? "猫" : "狗";
+            }
+        }
+
+        // Fallback: search descendants (1.6+ possibly nested)
+        var catPersonDesc = player.Descendants()
+            .FirstOrDefault(element => element.Name.LocalName.Equals("catPerson", StringComparison.OrdinalIgnoreCase))
+            ?.Value
+            ?? root.Descendants()
+                .FirstOrDefault(element => element.Name.LocalName.Equals("catPerson", StringComparison.OrdinalIgnoreCase))
+                ?.Value;
+        if (bool.TryParse(catPersonDesc, out var isCatDesc))
+        {
+            return isCatDesc ? "猫" : "狗";
+        }
+
+        // Try pets list (1.6+ may have multiple pets)
+        var petsElement = player.Elements()
+            .FirstOrDefault(element => element.Name.LocalName.Equals("pets", StringComparison.OrdinalIgnoreCase))
+            ?? root.Elements()
+                .FirstOrDefault(element => element.Name.LocalName.Equals("pets", StringComparison.OrdinalIgnoreCase));
+        if (petsElement is not null)
+        {
+            var types = petsElement.Elements()
+                .Select(pet => pet.Element("petType")?.Value ?? pet.Element("type")?.Value ?? string.Empty)
+                .Where(t => t.Length > 0)
+                .Select(t => t.Contains("Cat", StringComparison.OrdinalIgnoreCase) ? "猫"
+                    : t.Contains("Dog", StringComparison.OrdinalIgnoreCase) ? "狗" : null)
+                .Where(t => t is not null)
+                .Distinct()
+                .ToList();
+            if (types.Count > 0)
+            {
+                return string.Join("+", types);
+            }
+        }
+
+        return "未识别";
+    }
+
     private static XElement? First(XElement root, string name)
     {
-        return root.Descendants().FirstOrDefault(element => element.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return root.Elements().FirstOrDefault(element => element.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string? Value(XElement root, string name)
@@ -211,25 +262,51 @@ public sealed class SaveParserService(LoggingService logging, NpcLocalizationSer
     private static double CalculateBundleProgress(XElement root)
     {
         var mailReceived = First(root, "mailReceived");
-        var isComplete = mailReceived?.Descendants()
-            .Any(element => element.Name.LocalName.Equals("string", StringComparison.OrdinalIgnoreCase)
-                && element.Value.Equals("ccIsComplete", StringComparison.OrdinalIgnoreCase)) == true;
-        if (isComplete)
+
+        // Community center fully complete
+        if (HasMailFlag(mailReceived, "ccIsComplete"))
         {
             return 100;
         }
 
-        var bundles = First(root, "bundles");
+        // Joja route completed
+        if (HasMailFlag(mailReceived, "jojaMember"))
+        {
+            return 100;
+        }
+
+        // Bundles may be nested inside locations in 1.6+, use Descendants
+        var bundles = root.Descendants()
+            .FirstOrDefault(element => element.Name.LocalName.Equals("bundles", StringComparison.OrdinalIgnoreCase));
         if (bundles is null)
         {
             return 0;
         }
 
-        var flags = bundles.Descendants()
-            .Where(element => bool.TryParse(element.Value, out _))
-            .Select(element => bool.Parse(element.Value))
-            .ToList();
-        return flags.Count == 0 ? 0 : flags.Count(value => value) / (double)flags.Count * 100;
+        var totalSlots = 0;
+        var completedSlots = 0;
+        foreach (var array in bundles.Descendants()
+            .Where(element => element.Name.LocalName.Equals("ArrayOfBoolean", StringComparison.OrdinalIgnoreCase)))
+        {
+            foreach (var boolean in array.Elements()
+                .Where(element => element.Name.LocalName.Equals("boolean", StringComparison.OrdinalIgnoreCase)))
+            {
+                totalSlots++;
+                if (bool.TryParse(boolean.Value, out var isDone) && isDone)
+                {
+                    completedSlots++;
+                }
+            }
+        }
+
+        return totalSlots == 0 ? 0 : completedSlots / (double)totalSlots * 100;
+    }
+
+    private static bool HasMailFlag(XElement? mailReceived, string flag)
+    {
+        return mailReceived?.Descendants()
+            .Any(element => element.Name.LocalName.Equals("string", StringComparison.OrdinalIgnoreCase)
+                && element.Value.Equals(flag, StringComparison.OrdinalIgnoreCase)) == true;
     }
 
     private static double CalculateCollectionProgress(XElement player)

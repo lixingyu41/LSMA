@@ -20,6 +20,7 @@ public sealed class SavesViewModel : ViewModelBase
     private SaveInfo? _selectedSave;
     private SaveBackupEntry? _selectedBackup;
     private bool _automaticScanningStarted;
+    private bool _isFriendshipExpanded;
 
     public SavesViewModel(
         AppStateService state,
@@ -43,6 +44,7 @@ public sealed class SavesViewModel : ViewModelBase
         BackupAllCommand = new AsyncRelayCommand(BackupAllAsync, CanBackupAll);
         RestoreCommand = new AsyncRelayCommand(RestoreSelectedAsync, CanRestore);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.SaveBackups));
+        ToggleFriendshipsCommand = new RelayCommand(() => IsFriendshipExpanded = !IsFriendshipExpanded);
         _state.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(AppStateService.IsGameRunning) or nameof(AppStateService.GameDirectory))
@@ -64,6 +66,7 @@ public sealed class SavesViewModel : ViewModelBase
     public IAsyncRelayCommand BackupAllCommand { get; }
     public IAsyncRelayCommand RestoreCommand { get; }
     public IAsyncRelayCommand OpenBackupsCommand { get; }
+    public IRelayCommand ToggleFriendshipsCommand { get; }
 
     public SaveInfo? SelectedSave
     {
@@ -73,8 +76,11 @@ public sealed class SavesViewModel : ViewModelBase
             if (SetProperty(ref _selectedSave, value))
             {
                 _state.CurrentSave = value;
+                IsFriendshipExpanded = false;
                 OnPropertyChanged(nameof(DetailVisibility));
                 OnPropertyChanged(nameof(BackupStatus));
+                OnPropertyChanged(nameof(SelectedSaveStats));
+                OnPropertyChanged(nameof(FriendshipsToggleVisibility));
                 LoadBackupEntries();
                 Refresh();
                 _ = App.Current.Services.Guide.RefreshAsync();
@@ -100,7 +106,37 @@ public sealed class SavesViewModel : ViewModelBase
     public Visibility DetailVisibility => SelectedSave is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
     public string BackupStatus => SelectedSave?.LatestBackup is { } date ? $"最近备份：{date:yyyy-MM-dd HH:mm}" : "尚无备份";
-    public string TaskStatus => IsBusy ? ProgressText : $"共发现 {Saves.Count} 个存档";
+    public string TaskStatus => IsBusy ? ProgressText : "就绪";
+    public string SavesCountDisplay => $"共发现 {Saves.Count} 个存档";
+    public string SelectedSaveStats => SelectedSave is null
+        ? string.Empty
+        : $"{SelectedSave.DateDisplay} · {SelectedSave.MoneyDisplay} · 总收入 {SelectedSave.TotalIncomeDisplay} · {SelectedSave.PlayTimeDisplay} · 剩余 {SelectedSave.RemainingDaysInSeason} 天";
+
+    public bool IsFriendshipExpanded
+    {
+        get => _isFriendshipExpanded;
+        set
+        {
+            if (SetProperty(ref _isFriendshipExpanded, value))
+            {
+                OnPropertyChanged(nameof(RestFriendshipsVisibility));
+                OnPropertyChanged(nameof(FriendshipsToggleText));
+                OnPropertyChanged(nameof(FriendshipsToggleVisibility));
+            }
+        }
+    }
+
+    public Visibility RestFriendshipsVisibility => IsFriendshipExpanded ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility FriendshipsToggleVisibility => SelectedSave is { HasMoreFriendships: true }
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public string FriendshipsToggleText => IsFriendshipExpanded
+        ? "收起"
+        : SelectedSave is { HasMoreFriendships: true }
+            ? $"展开全部（+{SelectedSave.RestFriendships.Count()} 人）"
+            : "展开全部";
 
     public void Refresh()
     {
@@ -108,6 +144,7 @@ public sealed class SavesViewModel : ViewModelBase
         OnPropertyChanged(nameof(AvailableVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
         OnPropertyChanged(nameof(TaskStatus));
+        OnPropertyChanged(nameof(SavesCountDisplay));
         BackupCommand.NotifyCanExecuteChanged();
         BackupAllCommand.NotifyCanExecuteChanged();
         RestoreCommand.NotifyCanExecuteChanged();

@@ -136,14 +136,25 @@ public sealed class GameIconService(
         {
             friendship.IconUri = GetPortraitUri(friendship.NpcId);
             friendship.HeartSlots.Clear();
+
             var slotCount = friendship.IsSpouse ? 14 : 10;
+            var accessibleHearts = friendship.IsDatable && !friendship.IsPartner ? 8 : slotCount;
+            var fullHearts = friendship.Points / 250;
+            var partialProgress = (friendship.Points % 250) / 250.0;
+
             for (var index = 0; index < slotCount; index++)
             {
-                var isLocked = friendship.IsDatable && !friendship.IsPartner && index >= 8;
+                var isLocked = index >= accessibleHearts;
+                var isFull = !isLocked && index < fullHearts;
+                var isPartial = !isLocked && !isFull && index == fullHearts && partialProgress > 0;
+
                 friendship.HeartSlots.Add(new SaveFriendshipHeart
                 {
-                    IconUri = !isLocked && index < friendship.Hearts ? _fullHeartIconUri : _emptyHeartIconUri,
-                    IsLocked = isLocked
+                    IconUri = isFull && !isPartial ? _fullHeartIconUri : _emptyHeartIconUri,
+                    FullIconUri = _fullHeartIconUri,
+                    IsLocked = isLocked,
+                    IsPartial = isPartial,
+                    FillPercent = isPartial ? partialProgress : (isFull ? 1.0 : 0.0)
                 });
             }
         }

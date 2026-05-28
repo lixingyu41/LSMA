@@ -1,3 +1,5 @@
+using Microsoft.UI.Xaml;
+
 namespace LSMA.Models;
 
 public sealed class SaveInfo
@@ -28,7 +30,11 @@ public sealed class SaveInfo
     public string? SeasonIconUri { get; set; }
     public List<SaveSkillInfo> Skills { get; } = [];
     public List<SaveFriendshipInfo> Friendships { get; } = [];
+    public IEnumerable<SaveFriendshipInfo> TopFriendships => Friendships.Take(5);
+    public IEnumerable<SaveFriendshipInfo> RestFriendships => Friendships.Skip(5);
+    public bool HasMoreFriendships => Friendships.Count > 5;
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
+    public string ListDisplay => $"{FarmName}-{FarmerName}-{Year}年{Season}{Day}日";
     public string MoneyDisplay => $"{Money:N0}g";
     public string TotalIncomeDisplay => $"{TotalMoneyEarned:N0}g";
     public string ProgressDisplay => $"版本 {GameVersion} · 总天数 {TotalDays}";
@@ -99,5 +105,10 @@ public sealed class SaveFriendshipInfo
 public sealed class SaveFriendshipHeart
 {
     public string? IconUri { get; init; }
+    public string? FullIconUri { get; init; }
     public bool IsLocked { get; init; }
+    public bool IsPartial { get; init; }
+    public double FillPercent { get; init; }
+    public double HeartOpacity => IsLocked ? 0.3 : 1.0;
+    public Visibility PartialVisibility => IsPartial ? Visibility.Visible : Visibility.Collapsed;
 }
