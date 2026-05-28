@@ -10,7 +10,6 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -165,39 +164,60 @@
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource CardStyle}">
-                        <StackPanel><TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" /></StackPanel>
-                    </Border>
-                    <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-                        <StackPanel><TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" /></StackPanel>
-                    </Border>
-                    <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-                        <StackPanel><TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" /></StackPanel>
-                    </Border>
-                    <Border Grid.Column="3" Style="{StaticResource CardStyle}">
-                        <StackPanel><TextBlock Text="缺前置" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding MissingDependencyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource WarningBrush}" /></StackPanel>
-                    </Border>
-                    <Border Grid.Column="4" Style="{StaticResource CardStyle}">
-                        <StackPanel><TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" /></StackPanel>
-                    </Border>
-                    <Border Grid.Column="5" Style="{StaticResource CardStyle}">
-                        <StackPanel><TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" /></StackPanel>
-                    </Border>
+                    <Button x:Name="AllFilterButton" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="全部">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="NormalFilterButton" Grid.Column="1" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="正常">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="UpdateFilterButton" Grid.Column="2" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="可更新">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ProblemFilterButton" Grid.Column="3" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="有问题">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="ProblemCountText" Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DisabledFilterButton" Grid.Column="4" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="已禁用">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="FavoriteFilterButton" Grid.Column="5" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="收藏">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="收藏" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ArchivedFilterButton" Grid.Column="6" Style="{StaticResource CardFilterButtonStyle}"
+                            Command="{Binding FilterCommand}" CommandParameter="已归档">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="已归档" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding ArchivedCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
 
-                <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" Visibility="{Binding AvailableVisibility}">
-                    <Button Content="全部" Command="{Binding FilterCommand}" CommandParameter="全部" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="正常" Command="{Binding FilterCommand}" CommandParameter="正常" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="可更新" Command="{Binding FilterCommand}" CommandParameter="可更新" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="缺少前置" Command="{Binding FilterCommand}" CommandParameter="缺少前置" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="有问题" Command="{Binding FilterCommand}" CommandParameter="有问题" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="已禁用" Command="{Binding FilterCommand}" CommandParameter="已禁用" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="收藏" Command="{Binding FilterCommand}" CommandParameter="收藏" Style="{StaticResource SubtleButtonStyle}" />
-                    <Button Content="已归档" Command="{Binding FilterCommand}" CommandParameter="已归档" Style="{StaticResource SubtleButtonStyle}" />
-                </StackPanel>
-
-                <Grid Grid.Row="6" ColumnSpacing="14" MinHeight="250" Visibility="{Binding AvailableVisibility}">
+                <Grid Grid.Row="5" ColumnSpacing="14" MinHeight="250" Visibility="{Binding AvailableVisibility}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="430" />
                         <ColumnDefinition Width="*" />
@@ -226,23 +246,80 @@
                     <Border Grid.Column="1" Style="{StaticResource CardStyle}">
                         <ScrollViewer Visibility="{Binding DetailVisibility}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="{Binding SelectedMod.Name}" Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="{Binding SelectedMod.Manifest.Description}" Style="{StaticResource BodyTextStyle}" />
+                                <!-- Title row: name + action buttons -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding SelectedMod.Name}" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{Binding SelectedMod.Manifest.Description}" Style="{StaticResource BodyTextStyle}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                        <Button Content="启用" Command="{Binding EnableCommand}" Style="{StaticResource AccentButtonStyle}" Visibility="{Binding EnableVisibility}" />
+                                        <Button Content="禁用" Command="{Binding DisableCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding DisableVisibility}" />
+                                        <Button Content="备份" Command="{Binding BackupCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                        <Button Content="获取更新" Command="{Binding PrepareSelectedUpdateCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Info grid -->
                                 <Grid ColumnSpacing="18">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <StackPanel Spacing="4">
                                         <TextBlock Text="作者" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedMod.Author}" />
                                         <TextBlock Text="模组识别名" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.UniqueId}" />
-                                        <TextBlock Text="前置模组" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.DependencyText}" TextWrapping="Wrap" />
+                                        <StackPanel Visibility="{Binding DependencySectionVisibility}">
+                                            <TextBlock Text="前置模组" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" />
+                                            <TextBlock Text="{Binding SelectedMod.DependencyText}" TextWrapping="Wrap" />
+                                        </StackPanel>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="版本" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedMod.Version}" />
+                                        <TextBlock Text="版本" Style="{StaticResource MutedTextStyle}" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding SelectedMod.Version}" VerticalAlignment="Center" />
+                                            <TextBlock x:Name="NexusIdText" Grid.Column="1"
+                                                       Text="{Binding NexusIdDisplayText}"
+                                                       Style="{StaticResource MutedTextStyle}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                       ToolTipService.ToolTip="点击复制"
+                                                       PointerEntered="NexusIdText_PointerEntered"
+                                                       PointerExited="NexusIdText_PointerExited"
+                                                       Tapped="NexusIdText_Tapped" />
+                                            <Button x:Name="NexusIdEditButton" Grid.Column="2"
+                                                    Content="修改" Command="{Binding EditNexusBindingCommand}"
+                                                    Style="{StaticResource SubtleButtonStyle}"
+                                                    Visibility="Collapsed"
+                                                    MinWidth="40" MinHeight="24" Padding="8,2" Margin="4,0,0,0" />
+                                        </Grid>
                                         <TextBlock Text="状态" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.StatusText}" />
-                                        <TextBlock Text="前置状态" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.DependencyStatus}" />
+                                        <StackPanel Visibility="{Binding DependencySectionVisibility}">
+                                            <TextBlock Text="前置状态" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.DependencyStatus}" />
+                                        </StackPanel>
                                         <TextBlock Text="更新来源" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.UpdateSourceText}" TextWrapping="Wrap" />
                                         <TextBlock Text="{Binding SelectedMod.UpdateStatus}" Foreground="{StaticResource AccentBrush}" Margin="0,5,0,0" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Grid>
+
+                                <!-- File path - full width -->
+                                <StackPanel>
+                                    <TextBlock Text="文件位置" Style="{StaticResource MutedTextStyle}" />
+                                    <TextBlock x:Name="FolderPathText"
+                                               Text="{Binding SelectedMod.FolderPath}"
+                                               Style="{StaticResource BodyTextStyle}"
+                                               TextWrapping="Wrap"
+                                               ToolTipService.ToolTip="点击复制路径，右键打开文件夹"
+                                               Tapped="FolderPathText_Tapped"
+                                               RightTapped="FolderPathText_RightTapped" />
+                                </StackPanel>
+
+                                <!-- Issues -->
                                 <TextBlock Text="发现的问题" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
                                 <ItemsControl ItemsSource="{Binding SelectedMod.Issues}">
                                     <ItemsControl.ItemTemplate>
@@ -251,38 +328,19 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <Expander Header="文件位置">
-                                    <TextBlock Text="{Binding SelectedMod.FolderPath}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
-                                </Expander>
-                                <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{Binding NexusBoundVisibility}">
-                                    <TextBlock Text="{Binding NexusBindingText}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                                    <Button Content="修改" Command="{Binding EditNexusBindingCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                </StackPanel>
+
+                                <!-- Nexus binding editor -->
                                 <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{Binding NexusBindingEditorVisibility}">
                                     <TextBox Text="{Binding NexusModIdInput, Mode=TwoWay}" PlaceholderText="绑定 Nexus Mod ID" Width="180" />
                                     <Button Content="保存绑定" Command="{Binding BindNexusIdCommand}" Style="{StaticResource SubtleButtonStyle}" />
                                     <Button Content="取消" Command="{Binding EditNexusBindingCommand}" Style="{StaticResource SubtleButtonStyle}" Visibility="{Binding CancelNexusBindingVisibility}" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="9" Margin="0,10,0,0">
-                                    <Button Content="启用" Command="{Binding EnableCommand}" Style="{StaticResource AccentButtonStyle}" Visibility="{Binding EnableVisibility}" />
-                                    <Button Content="禁用" Command="{Binding DisableCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding DisableVisibility}" />
-                                    <Button Content="获取更新文件" Command="{Binding PrepareSelectedUpdateCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                </StackPanel>
-                                <Expander Header="更多操作">
-                                    <StackPanel Orientation="Horizontal" Spacing="9" Margin="0,8,0,0">
-                                        <Button Content="备份" Command="{Binding BackupCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                        <Button Content="归档" Command="{Binding ArchiveCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding ArchiveVisibility}" />
-                                        <Button Content="恢复归档" Command="{Binding RestoreArchivedCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding RestoreArchivedVisibility}" />
-                                        <Button Content="打开文件夹" Command="{Binding OpenModFolderCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                        <Button Content="复制摘要" Command="{Binding CopyModInfoCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                    </StackPanel>
-                                </Expander>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
                 </Grid>
 
-                <Border Grid.Row="7" Style="{StaticResource CardStyle}" Padding="16,12" Visibility="{Binding AvailableVisibility}">
+                <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="16,12" Visibility="{Binding AvailableVisibility}">
                     <Grid>
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />

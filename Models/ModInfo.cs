@@ -42,6 +42,7 @@ public sealed class ModInfo
     public string StatusText => IsArchived ? "已归档" : Manifest is null ? "无效" : !IsEnabled ? "已禁用" : Issues.Any(i => i.Severity == IssueSeverity.Error) ? "有问题" : Issues.Count > 0 ? "注意" : "正常";
     public bool CanRepairNestedDirectory => !string.IsNullOrWhiteSpace(SuggestedNestedDirectory);
     public string IssueSummary => Issues.Count == 0 ? "未发现问题" : Issues[0].Message;
+    public bool HasRequiredDependencies => Manifest?.Dependencies?.Any(d => d.IsRequired) == true;
     public string DependencyText => Manifest?.Dependencies is { Count: > 0 } dependencies
         ? string.Join("、", dependencies.Select(item => item.UniqueID ?? "未指定"))
         : "无必需前置";

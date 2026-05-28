@@ -75,11 +75,8 @@ public sealed class ModsViewModel : ViewModelBase
         FilterCommand = new RelayCommand<string>(ApplyFilter);
         EnableCommand = new AsyncRelayCommand(() => ChangeEnabledAsync(true), CanEnable);
         DisableCommand = new AsyncRelayCommand(() => ChangeEnabledAsync(false), CanDisable);
-        ArchiveCommand = new AsyncRelayCommand(ArchiveAsync, CanModifySelected);
-        RestoreArchivedCommand = new AsyncRelayCommand(RestoreArchivedAsync, CanRestore);
         BackupCommand = new AsyncRelayCommand(BackupAsync, HasSelected);
         OpenModFolderCommand = new AsyncRelayCommand(OpenModFolderAsync, HasSelected);
-        CopyModInfoCommand = new RelayCommand(CopyModInfo, HasSelected);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.ModBackups));
         ChoosePackageCommand = new AsyncRelayCommand(ChoosePackageAsync, CanModify);
         InstallPackageCommand = new AsyncRelayCommand(InstallPackageAsync, CanInstallPackage);
@@ -98,6 +95,7 @@ public sealed class ModsViewModel : ViewModelBase
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, CanUseOnlineNow);
         BindNexusIdCommand = new AsyncRelayCommand(BindNexusIdAsync, () => SelectedMod is not null);
         EditNexusBindingCommand = new RelayCommand(ToggleNexusBindingEditor, () => SelectedMod is not null);
+        NexusIdClickCommand = new RelayCommand(HandleNexusIdClick, () => SelectedMod is not null);
         PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, () => SelectedMod?.NexusModId is not null && !IsBusy);
         ImportFavoritesCommand = new AsyncRelayCommand(ImportFavoritesAsync);
         ExportFavoritesCommand = new AsyncRelayCommand(ExportFavoritesAsync);
@@ -125,11 +123,9 @@ public sealed class ModsViewModel : ViewModelBase
     public IRelayCommand<string> FilterCommand { get; }
     public IAsyncRelayCommand EnableCommand { get; }
     public IAsyncRelayCommand DisableCommand { get; }
-    public IAsyncRelayCommand ArchiveCommand { get; }
-    public IAsyncRelayCommand RestoreArchivedCommand { get; }
     public IAsyncRelayCommand BackupCommand { get; }
     public IAsyncRelayCommand OpenModFolderCommand { get; }
-    public IRelayCommand CopyModInfoCommand { get; }
+    public IRelayCommand NexusIdClickCommand { get; }
     public IAsyncRelayCommand OpenBackupsCommand { get; }
     public IAsyncRelayCommand ChoosePackageCommand { get; }
     public IAsyncRelayCommand InstallPackageCommand { get; }
@@ -168,8 +164,8 @@ public sealed class ModsViewModel : ViewModelBase
                 OnPropertyChanged(nameof(NexusBindingText));
                 OnPropertyChanged(nameof(EnableVisibility));
                 OnPropertyChanged(nameof(DisableVisibility));
-                OnPropertyChanged(nameof(ArchiveVisibility));
-                OnPropertyChanged(nameof(RestoreArchivedVisibility));
+                OnPropertyChanged(nameof(NexusIdDisplayText));
+                OnPropertyChanged(nameof(DependencySectionVisibility));
                 NotifyCommands();
             }
         }
@@ -251,15 +247,19 @@ public sealed class ModsViewModel : ViewModelBase
         : Visibility.Collapsed;
     public Visibility EnableVisibility => SelectedMod is { IsEnabled: false, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DisableVisibility => SelectedMod is { IsEnabled: true, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility ArchiveVisibility => SelectedMod is { IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility RestoreArchivedVisibility => SelectedMod is { IsArchived: true } ? Visibility.Visible : Visibility.Collapsed;
     public string NexusBindingText => SelectedMod?.NexusModId is { } id ? $"Nexus Mod ID：{id}" : "未绑定 Nexus Mod ID";
+    public string NexusIdDisplayText => SelectedMod?.NexusModId is { } id ? $"ID：{id}" : "手动匹配ID";
+    public Visibility DependencySectionVisibility => SelectedMod?.HasRequiredDependencies == true ? Visibility.Visible : Visibility.Collapsed;
     public string InstalledCount => _allMods.Count.ToString();
     public string HealthyCount => _allMods.Count(mod => mod.IsEnabled && mod.Issues.Count == 0).ToString();
     public string ProblemCount => _allMods.Count(mod => mod.Issues.Count > 0).ToString();
     public string DisabledCount => _allMods.Count(mod => !mod.IsEnabled && !mod.IsArchived).ToString();
     public string MissingDependencyCount => _allMods.Count(mod => mod.Issues.Any(issue => issue.Message.Contains("前置", StringComparison.Ordinal))).ToString();
+    public string FavoriteCount => _allMods.Count(mod => mod.IsFavorite).ToString();
+    public string ArchivedCount => _allMods.Count(mod => mod.IsArchived).ToString();
     public string UpdateCount => _allMods.Count(mod => mod.HasUpdate).ToString();
+    public string CurrentFilter => _filter;
+    public bool HasProblems => _allMods.Any(mod => mod.Issues.Count > 0);
     public string TaskStatus => IsBusy ? ProgressText : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
     public ModInstallPlan? PendingPlan
     {
@@ -481,6 +481,8 @@ public sealed class ModsViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(TaskStatus));
+        OnPropertyChanged(nameof(CurrentFilter));
+        OnPropertyChanged(nameof(HasProblems));
     }
 
     private async Task ChangeEnabledAsync(bool enabled)
@@ -495,44 +497,9 @@ public sealed class ModsViewModel : ViewModelBase
             enabled ? "模组已启用。" : "模组已禁用。");
     }
 
-    private async Task ArchiveAsync()
-    {
-        if (SelectedMod is not { } mod
-            || !await _dialogs.ConfirmAsync("归档模组", $"确认归档“{mod.Name}”？操作前将自动创建备份。", "归档"))
-        {
-            return;
-        }
-
-        await RunModificationAsync(() => _transactions.ArchiveAsync(mod), "模组已归档。");
-    }
-
-    private async Task RestoreArchivedAsync()
-    {
-        if (SelectedMod is not { IsArchived: true } mod
-            || !await _dialogs.ConfirmAsync("恢复归档", $"将“{mod.Name}”恢复为已禁用模组，确认继续？操作前会自动创建恢复点。", "恢复"))
-        {
-            return;
-        }
-
-        await RunModificationAsync(() => _transactions.RestoreArchivedAsync(mod), "模组已恢复到已禁用列表。");
-    }
-
     private Task OpenModFolderAsync()
     {
         return SelectedMod is null ? Task.CompletedTask : _platform.OpenFolderAsync(SelectedMod.FolderPath);
-    }
-
-    private void CopyModInfo()
-    {
-        if (SelectedMod is not { } mod)
-        {
-            return;
-        }
-
-        var issues = mod.Issues.Count == 0 ? "未发现问题" : string.Join("；", mod.Issues.Select(issue => issue.Message));
-        _platform.CopyText($"模组：{mod.Name}{Environment.NewLine}作者：{mod.Author}{Environment.NewLine}版本：{mod.Version}{Environment.NewLine}状态：{mod.StatusText}{Environment.NewLine}问题：{issues}");
-        FeedbackMessage = "模组摘要已复制。";
-        OnPropertyChanged(nameof(FeedbackMessage));
     }
 
     private async Task BackupAsync()
@@ -903,6 +870,25 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
 
+    public void NotifyFeedbackMessage(string message)
+    {
+        FeedbackMessage = message;
+    }
+
+    private void HandleNexusIdClick()
+    {
+        if (SelectedMod?.NexusModId is { } id)
+        {
+            _platform.CopyText(id.ToString());
+            FeedbackMessage = "Nexus Mod ID 已复制。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+        }
+        else
+        {
+            ToggleNexusBindingEditor();
+        }
+    }
+
     private async Task BindNexusIdAsync()
     {
         if (SelectedMod is null || !long.TryParse(NexusModIdInput.Trim(), out var id) || id <= 0)
@@ -926,6 +912,7 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(NexusBoundVisibility));
         OnPropertyChanged(nameof(CancelNexusBindingVisibility));
         OnPropertyChanged(nameof(NexusBindingText));
+        OnPropertyChanged(nameof(NexusIdDisplayText));
     }
 
     private void ToggleNexusBindingEditor()
@@ -1011,11 +998,9 @@ public sealed class ModsViewModel : ViewModelBase
     {
         EnableCommand.NotifyCanExecuteChanged();
         DisableCommand.NotifyCanExecuteChanged();
-        ArchiveCommand.NotifyCanExecuteChanged();
-        RestoreArchivedCommand.NotifyCanExecuteChanged();
         BackupCommand.NotifyCanExecuteChanged();
         OpenModFolderCommand.NotifyCanExecuteChanged();
-        CopyModInfoCommand.NotifyCanExecuteChanged();
+        NexusIdClickCommand.NotifyCanExecuteChanged();
         ChoosePackageCommand.NotifyCanExecuteChanged();
         InstallPackageCommand.NotifyCanExecuteChanged();
         ToggleFavoriteCommand.NotifyCanExecuteChanged();
@@ -1035,7 +1020,6 @@ public sealed class ModsViewModel : ViewModelBase
     private bool CanUseOnlineNow() => !IsBusy;
     private bool HasSelected() => SelectedMod is not null && !IsBusy;
     private bool CanModifySelected() => HasSelected() && !_state.IsGameRunning && SelectedMod is { IsArchived: false };
-    private bool CanRestore() => HasSelected() && !_state.IsGameRunning && SelectedMod is { IsArchived: true };
     private bool CanEnable() => CanModifySelected() && SelectedMod is { IsEnabled: false };
     private bool CanDisable() => CanModifySelected() && SelectedMod is { IsEnabled: true };
 }
