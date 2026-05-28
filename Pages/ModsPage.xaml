@@ -210,66 +210,108 @@
                                     Command="{Binding FilterCommand}" CommandParameter="全部">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="0.3*" />
+                                        <ColumnDefinition Width="0.4*" />
+                                        <ColumnDefinition Width="0.3*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Column="1" Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </Grid>
                                 </Grid>
                             </Button>
                             <Button x:Name="NormalFilterButton" Grid.Column="1" Style="{StaticResource FilterPillButtonStyle}"
                                     Command="{Binding FilterCommand}" CommandParameter="正常">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="0.3*" />
+                                        <ColumnDefinition Width="0.4*" />
+                                        <ColumnDefinition Width="0.3*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Column="1" Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                                    </Grid>
                                 </Grid>
                             </Button>
                             <Button x:Name="UpdateFilterButton" Grid.Column="2" Style="{StaticResource FilterPillButtonStyle}"
                                     Command="{Binding FilterCommand}" CommandParameter="可更新">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="0.3*" />
+                                        <ColumnDefinition Width="0.4*" />
+                                        <ColumnDefinition Width="0.3*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Column="1" Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </Grid>
                                 </Grid>
                             </Button>
                             <Button x:Name="ProblemFilterButton" Grid.Column="3" Style="{StaticResource FilterPillButtonStyle}"
                                     Command="{Binding FilterCommand}" CommandParameter="有问题">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="0.3*" />
+                                        <ColumnDefinition Width="0.4*" />
+                                        <ColumnDefinition Width="0.3*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
-                                    <TextBlock x:Name="ProblemCountText" Grid.Column="1" Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        <TextBlock x:Name="ProblemCountText" Grid.Column="1" Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </Grid>
                                 </Grid>
                             </Button>
                             <Button x:Name="DisabledFilterButton" Grid.Column="4" Style="{StaticResource FilterPillButtonStyle}"
                                     Command="{Binding FilterCommand}" CommandParameter="已禁用">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="0.3*" />
+                                        <ColumnDefinition Width="0.4*" />
+                                        <ColumnDefinition Width="0.3*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Column="1" Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </Grid>
                                 </Grid>
                             </Button>
                             <Button x:Name="FavoriteFilterButton" Grid.Column="5" Style="{StaticResource FilterPillButtonStyle}"
                                     Command="{Binding FilterCommand}" CommandParameter="收藏">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="0.3*" />
+                                        <ColumnDefinition Width="0.4*" />
+                                        <ColumnDefinition Width="0.3*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="收藏" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Column="1" Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="收藏" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Column="1" Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </Grid>
                                 </Grid>
                             </Button>
                         </Grid>

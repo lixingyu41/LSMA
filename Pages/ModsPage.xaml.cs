@@ -81,24 +81,46 @@ public sealed partial class ModsPage : Page
 
         for (int i = 0; i < _filterButtons.Length; i++)
         {
-            if (_filterButtons[i].Content is Grid grid && grid.Children.Count > 1)
+            if (_filterButtons[i].Content is Grid outerGrid && outerGrid.Children.Count > 1
+                && outerGrid.Children[1] is Grid innerGrid && innerGrid.Children.Count > 1)
             {
-                // The count TextBlock is in the second column (Grid.Column="1")
-                var countTb = grid.Children[1] as TextBlock;
-                if (countTb is null) continue;
+                bool isSelected = i == selectedIndex;
 
-                if (countTb.Name == nameof(ProblemCountText))
-                    continue; // handled by UpdateProblemCountColor
+                // Update label (first child) — dark when selected, revert to MutedTextStyle when not
+                if (innerGrid.Children[0] is TextBlock labelTb)
+                {
+                    if (isSelected)
+                        labelTb.Foreground = selectedFg;
+                    else
+                        labelTb.ClearValue(TextBlock.ForegroundProperty);
+                }
 
-                countTb.Foreground = i == selectedIndex ? selectedFg : unselectedFg;
+                // Update count (second child)
+                if (innerGrid.Children[1] is TextBlock countTb)
+                {
+                    if (countTb.Name == nameof(ProblemCountText))
+                        continue; // handled by UpdateProblemCountColor
+
+                    countTb.Foreground = isSelected ? selectedFg : unselectedFg;
+                }
             }
         }
 
-        // "正常" count always green — override unselected color
-        if (NormalFilterButton.Content is Grid normalGrid && normalGrid.Children.Count > 1
-            && normalGrid.Children[1] is TextBlock normalCount)
+        // "正常" count always green
+        if (NormalFilterButton.Content is Grid normalOuter && normalOuter.Children.Count > 1
+            && normalOuter.Children[1] is Grid normalInner && normalInner.Children.Count > 1
+            && normalInner.Children[1] is TextBlock normalCount)
         {
             normalCount.Foreground = (SolidColorBrush)Application.Current.Resources["SuccessBrush"];
+        }
+
+        // "正常" label also reverts to MutedTextStyle when unselected
+        if (NormalFilterButton.Content is Grid nOuter && nOuter.Children.Count > 1
+            && nOuter.Children[1] is Grid nInner && nInner.Children.Count > 1
+            && nInner.Children[0] is TextBlock normalLabel
+            && selectedIndex != 1)
+        {
+            normalLabel.ClearValue(TextBlock.ForegroundProperty);
         }
 
         UpdateProblemCountColor();
