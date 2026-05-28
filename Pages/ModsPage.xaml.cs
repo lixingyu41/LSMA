@@ -42,6 +42,10 @@ public sealed partial class ModsPage : Page
 
     private void OnFilterContainerSizeChanged(object? sender, SizeChangedEventArgs e)
     {
+        // Reposition without animation on resize; skip if animation is in progress
+        if (_currentAnimation?.GetCurrentState() == ClockState.Active)
+            return;
+
         if (FilterIndexMap.TryGetValue(_vm.CurrentFilter, out var index))
         {
             PositionPillAtColumn(index, animate: false);
@@ -77,10 +81,10 @@ public sealed partial class ModsPage : Page
 
         for (int i = 0; i < _filterButtons.Length; i++)
         {
-            if (_filterButtons[i].Content is StackPanel panel && panel.Children.Count > 1)
+            if (_filterButtons[i].Content is Grid grid && grid.Children.Count > 1)
             {
-                // Only change count TextBlock (second child); labels keep MutedTextStyle
-                var countTb = panel.Children[1] as TextBlock;
+                // The count TextBlock is in the second column (Grid.Column="1")
+                var countTb = grid.Children[1] as TextBlock;
                 if (countTb is null) continue;
 
                 if (countTb.Name == nameof(ProblemCountText))
@@ -91,8 +95,8 @@ public sealed partial class ModsPage : Page
         }
 
         // "正常" count always green — override unselected color
-        if (NormalFilterButton.Content is StackPanel normalPanel && normalPanel.Children.Count > 1
-            && normalPanel.Children[1] is TextBlock normalCount)
+        if (NormalFilterButton.Content is Grid normalGrid && normalGrid.Children.Count > 1
+            && normalGrid.Children[1] is TextBlock normalCount)
         {
             normalCount.Foreground = (SolidColorBrush)Application.Current.Resources["SuccessBrush"];
         }
@@ -125,10 +129,13 @@ public sealed partial class ModsPage : Page
 
     private void AnimatePillToX(double targetX)
     {
+        // Capture current X before Stop (Stop reverts to pre-animation value)
+        double fromX = PillTransform.X;
         _currentAnimation?.Stop();
         var duration = new Duration(TimeSpan.FromMilliseconds(250));
         var animation = new DoubleAnimation
         {
+            From = fromX,
             To = targetX,
             Duration = duration,
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
