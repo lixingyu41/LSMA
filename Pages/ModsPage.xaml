@@ -185,7 +185,7 @@
                 </Border>
 
                 <Border Grid.Row="4" CornerRadius="16" Background="{ThemeResource CardBackgroundBrush}"
-                        Padding="4" Margin="-5,0" Visibility="{Binding FilterAndListVisibility}">
+                        Padding="0" Margin="-5,0" Visibility="{Binding FilterAndListVisibility}">
                     <Grid x:Name="FilterContainer">
                         <!-- Button grid -->
                         <Grid x:Name="FilterButtonGrid">

@@ -42,8 +42,7 @@ public sealed partial class ModsPage : Page
 
     private void OnFilterContainerSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        // Reposition without animation on resize; skip if animation is in progress
-        if (_currentAnimation?.GetCurrentState() == ClockState.Active)
+        if (_filterButtons is null || _currentAnimation?.GetCurrentState() == ClockState.Active)
             return;
 
         if (FilterIndexMap.TryGetValue(_vm.CurrentFilter, out var index))
@@ -76,6 +75,7 @@ public sealed partial class ModsPage : Page
 
     private void UpdateButtonColors(int selectedIndex)
     {
+        if (_filterButtons is null) return;
         var selectedFg = new SolidColorBrush(Color.FromArgb(255, 37, 32, 25)); // #252019
         var unselectedFg = (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
 
@@ -106,6 +106,7 @@ public sealed partial class ModsPage : Page
 
     private void PositionPillAtColumn(int columnIndex, bool animate)
     {
+        if (_filterButtons is null) return;
         double containerWidth = FilterContainer.ActualWidth;
         if (containerWidth <= 0)
         {
