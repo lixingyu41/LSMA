@@ -36,7 +36,6 @@ public sealed class ModsViewModel : ViewModelBase
     private bool _isEditingNexusBinding;
     private List<NexusModInfo> _loadedOnlineMods = [];
     private List<NexusFavorite> _favoriteValues = [];
-    private string _onlineSort = "默认";
     private NexusCategory? _selectedCategory;
     private CancellationTokenSource? _downloadCancellation;
     private bool _isDownloading;
@@ -78,7 +77,7 @@ public sealed class ModsViewModel : ViewModelBase
         BackupCommand = new AsyncRelayCommand(BackupAsync, HasSelected);
         OpenModFolderCommand = new AsyncRelayCommand(OpenModFolderAsync, HasSelected);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.ModBackups));
-        ChoosePackageCommand = new AsyncRelayCommand(ChoosePackageAsync, CanModify);
+        ChoosePackageCommand = new AsyncRelayCommand(InstallOrBrowseAsync);
         InstallPackageCommand = new AsyncRelayCommand(InstallPackageAsync, CanInstallPackage);
         CancelPackageCommand = new AsyncRelayCommand(ClearPackagePlanAsync);
         BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, CanUseOnline);
@@ -86,7 +85,6 @@ public sealed class ModsViewModel : ViewModelBase
         ShowFavoritesCommand = new AsyncRelayCommand(ShowFavoritesAsync);
         ShowDownloadsCommand = new AsyncRelayCommand(ShowDownloadsAsync);
         SearchOnlineCommand = new RelayCommand(ApplyOnlineFilter);
-        SortOnlineCommand = new RelayCommand<string>(SetOnlineSort);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedOnlineMod is not null);
         OpenNexusCommand = new AsyncRelayCommand<NexusModInfo?>(OpenNexusAsync, mod => mod is not null);
         LoadFilesCommand = new AsyncRelayCommand(LoadFilesAsync, () => SelectedOnlineMod is not null && !IsBusy);
@@ -97,8 +95,7 @@ public sealed class ModsViewModel : ViewModelBase
         EditNexusBindingCommand = new RelayCommand(ToggleNexusBindingEditor, () => SelectedMod is not null);
         NexusIdClickCommand = new RelayCommand(HandleNexusIdClick, () => SelectedMod is not null);
         PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, () => SelectedMod?.NexusModId is not null && !IsBusy);
-        ImportFavoritesCommand = new AsyncRelayCommand(ImportFavoritesAsync);
-        ExportFavoritesCommand = new AsyncRelayCommand(ExportFavoritesAsync);
+
         _state.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(AppStateService.IsGameRunning) or nameof(AppStateService.GameDirectory))
@@ -117,7 +114,6 @@ public sealed class ModsViewModel : ViewModelBase
     public ObservableCollection<ModInfo> Mods { get; } = [];
     public ObservableCollection<NexusModInfo> OnlineMods { get; } = [];
     public ObservableCollection<NexusFileInfo> OnlineFiles { get; } = [];
-    public ObservableCollection<NexusFavorite> Favorites { get; } = [];
     public ObservableCollection<DownloadQueueItem> DownloadQueue { get; } = [];
     public ObservableCollection<NexusCategory> Categories { get; } = [];
     public IRelayCommand<string> FilterCommand { get; }
@@ -135,7 +131,6 @@ public sealed class ModsViewModel : ViewModelBase
     public IAsyncRelayCommand ShowFavoritesCommand { get; }
     public IAsyncRelayCommand ShowDownloadsCommand { get; }
     public IRelayCommand SearchOnlineCommand { get; }
-    public IRelayCommand<string> SortOnlineCommand { get; }
     public IAsyncRelayCommand ToggleFavoriteCommand { get; }
     public IAsyncRelayCommand<NexusModInfo?> OpenNexusCommand { get; }
     public IAsyncRelayCommand LoadFilesCommand { get; }
@@ -145,9 +140,6 @@ public sealed class ModsViewModel : ViewModelBase
     public IAsyncRelayCommand BindNexusIdCommand { get; }
     public IRelayCommand EditNexusBindingCommand { get; }
     public IAsyncRelayCommand PrepareSelectedUpdateCommand { get; }
-    public IAsyncRelayCommand ImportFavoritesCommand { get; }
-    public IAsyncRelayCommand ExportFavoritesCommand { get; }
-
     public ModInfo? SelectedMod
     {
         get => _selectedMod;
@@ -223,6 +215,24 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
 
+    public List<string> OnlineSortOptions { get; } = ["趋势", "最多下载", "最多支持", "最近更新", "最新上架"];
+
+    private string _onlineSortValue = "趋势";
+    public string SelectedOnlineSort
+    {
+        get => _onlineSortValue;
+        set
+        {
+            if (SetProperty(ref _onlineSortValue, value))
+            {
+                ApplyOnlineFilter();
+            }
+        }
+    }
+
+    public string InstallButtonText => OnlinePanelVisible ? "安装本地" : "安装模组";
+    public Visibility OnlineBarVisibility => OnlinePanelVisible ? Visibility.Collapsed : Visibility.Visible;
+
     public bool OnlinePanelVisible
     {
         get => _onlinePanelVisible;
@@ -231,6 +241,9 @@ public sealed class ModsViewModel : ViewModelBase
             if (SetProperty(ref _onlinePanelVisible, value))
             {
                 OnPropertyChanged(nameof(OnlinePanelVisibility));
+                OnPropertyChanged(nameof(FilterAndListVisibility));
+                OnPropertyChanged(nameof(InstallButtonText));
+                OnPropertyChanged(nameof(OnlineBarVisibility));
             }
         }
     }
@@ -265,7 +278,7 @@ public sealed class ModsViewModel : ViewModelBase
     public string CurrentFilter => _filter;
     public bool HasProblems => _allMods.Any(mod => mod.Issues.Count > 0);
     public string FavoriteButtonText => SelectedOnlineMod?.IsFavorite == true ? "已收藏" : "收藏";
-    public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed
+    public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed && !OnlinePanelVisible
         ? Visibility.Visible : Visibility.Collapsed;
     public string TaskStatus => IsBusy ? ProgressText : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
     public ModInstallPlan? PendingPlan
@@ -595,6 +608,35 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(FeedbackMessage));
     }
 
+    private async Task SetupOnlinePanelAsync(string? feed, string key)
+    {
+        _loadedOnlineMods = (feed switch
+        {
+            "最新" => await _nexus.GetLatestAddedAsync(key),
+            "最近更新" => await _nexus.GetLatestUpdatedAsync(key),
+            _ => await _nexus.GetTrendingAsync(key)
+        }).ToList();
+        _favoriteValues = await _favoritesService.LoadAsync();
+        if (Categories.Count == 0)
+        {
+            Categories.Add(new NexusCategory { CategoryId = 0, Name = "全部分类" });
+            foreach (var category in await _nexus.GetCategoriesAsync(key))
+            {
+                Categories.Add(category);
+            }
+            SelectedCategory = Categories[0];
+        }
+        foreach (var mod in _loadedOnlineMods)
+        {
+            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
+        }
+
+        OnlinePanelTitle = feed ?? "趋势";
+        OnlinePanelVisible = true;
+        ApplyOnlineFilter();
+        OnPropertyChanged(nameof(RateLimitText));
+    }
+
     private async Task BrowseAsync(string? feed)
     {
         var key = RequireNexusKey();
@@ -608,31 +650,7 @@ public sealed class ModsViewModel : ViewModelBase
         Refresh();
         try
         {
-            _loadedOnlineMods = (feed switch
-            {
-                "最新" => await _nexus.GetLatestAddedAsync(key),
-                "最近更新" => await _nexus.GetLatestUpdatedAsync(key),
-                _ => await _nexus.GetTrendingAsync(key)
-            }).ToList();
-            _favoriteValues = await _favoritesService.LoadAsync();
-            if (Categories.Count == 0)
-            {
-                Categories.Add(new NexusCategory { CategoryId = 0, Name = "全部分类" });
-                foreach (var category in await _nexus.GetCategoriesAsync(key))
-                {
-                    Categories.Add(category);
-                }
-                SelectedCategory = Categories[0];
-            }
-            foreach (var mod in _loadedOnlineMods)
-            {
-                mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
-            }
-
-            OnlinePanelTitle = feed ?? "趋势";
-            OnlinePanelVisible = true;
-            ApplyOnlineFilter();
-            OnPropertyChanged(nameof(RateLimitText));
+            await SetupOnlinePanelAsync(feed, key);
         }
         catch (NexusApiException exception)
         {
@@ -646,6 +664,56 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
 
+    private async Task InstallOrBrowseAsync()
+    {
+        if (OnlinePanelVisible)
+        {
+            await ChoosePackageAsync();
+        }
+        else
+        {
+            await AutoBrowseAsync();
+        }
+    }
+
+    private async Task AutoBrowseAsync()
+    {
+        // Show panel immediately
+        OnlinePanelVisible = true;
+        OnlinePanelTitle = "趋势";
+
+        const int maxRetries = 5;
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            var key = RequireNexusKey();
+            if (key is null) return;
+
+            IsBusy = true;
+            ProgressText = $"正在加载 Nexus 模组... ({attempt}/{maxRetries})";
+            Refresh();
+            try
+            {
+                await SetupOnlinePanelAsync("趋势", key);
+                return;
+            }
+            catch (NexusApiException)
+            {
+                if (attempt >= maxRetries)
+                {
+                    await _dialogs.ShowMessageAsync("Nexus", "多次加载失败，请检查网络后重试。");
+                    return;
+                }
+                await Task.Delay(1000);
+            }
+            finally
+            {
+                IsBusy = false;
+                ProgressText = string.Empty;
+                Refresh();
+            }
+        }
+    }
+
     private void ApplyOnlineFilter()
     {
         var query = OnlineQuery.Trim();
@@ -654,11 +722,12 @@ public sealed class ModsViewModel : ViewModelBase
             || mod.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
             || mod.Author.Contains(query, StringComparison.CurrentCultureIgnoreCase)
             || mod.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase)));
-        values = _onlineSort switch
+        values = SelectedOnlineSort switch
         {
-            "最多支持" => values.OrderByDescending(mod => mod.Endorsements),
             "最多下载" => values.OrderByDescending(mod => mod.Downloads),
+            "最多支持" => values.OrderByDescending(mod => mod.Endorsements),
             "最近更新" => values.OrderByDescending(mod => mod.UpdatedTimestamp),
+            "最新上架" => values.OrderByDescending(mod => mod.ModId),
             _ => values
         };
         OnlineMods.Clear();
@@ -673,21 +742,9 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(FeedbackMessage));
     }
 
-    private void SetOnlineSort(string? sort)
-    {
-        _onlineSort = sort ?? "默认";
-        ApplyOnlineFilter();
-    }
-
     private async Task ShowFavoritesAsync()
     {
         _favoriteValues = await _favoritesService.LoadAsync();
-        Favorites.Clear();
-        foreach (var favorite in _favoriteValues)
-        {
-            Favorites.Add(favorite);
-        }
-
         OnlinePanelTitle = "收藏";
         OnlinePanelVisible = true;
     }
@@ -704,7 +761,6 @@ public sealed class ModsViewModel : ViewModelBase
         mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
         FeedbackMessage = mod.IsFavorite ? "已加入收藏。" : "已取消收藏。";
         OnPropertyChanged(nameof(FavoriteButtonText));
-        await ShowFavoritesAsync();
         OnPropertyChanged(nameof(FeedbackMessage));
     }
 
@@ -932,41 +988,6 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(NexusBindingEditorVisibility));
         OnPropertyChanged(nameof(NexusBoundVisibility));
         OnPropertyChanged(nameof(CancelNexusBindingVisibility));
-    }
-
-    private async Task ExportFavoritesAsync()
-    {
-        var path = await _platform.ChooseJsonSavePathAsync("LSMA-Favorites");
-        if (path is null)
-        {
-            return;
-        }
-
-        await JsonHelper.WriteAsync(path, await _favoritesService.LoadAsync());
-        FeedbackMessage = "收藏已导出。";
-        OnPropertyChanged(nameof(FeedbackMessage));
-    }
-
-    private async Task ImportFavoritesAsync()
-    {
-        var path = await _platform.ChooseJsonAsync();
-        if (path is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _favoriteValues = await JsonHelper.ReadAsync<List<NexusFavorite>>(path) ?? [];
-            await _favoritesService.SaveAsync(_favoriteValues.GroupBy(item => item.ModId).Select(group => group.First()).ToList());
-            await ShowFavoritesAsync();
-            FeedbackMessage = "收藏已导入。";
-            OnPropertyChanged(nameof(FeedbackMessage));
-        }
-        catch (Exception exception)
-        {
-            await _dialogs.ShowMessageAsync("导入失败", exception.Message);
-        }
     }
 
     private string? RequireNexusKey()

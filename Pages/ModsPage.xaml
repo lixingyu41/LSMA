@@ -25,17 +25,20 @@
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
                 </StackPanel>
                 <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True" HorizontalAlignment="Right">
-                    <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
+                    <AppBarButton Label="{Binding InstallButtonText}" Command="{Binding ChoosePackageCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
                     </AppBarButton>
-                    <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}">
+                    <AppBarButton Label="返回已安装" Command="{Binding ShowInstalledCommand}" Visibility="{Binding OnlinePanelVisibility}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE711;" /></AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}" Visibility="{Binding OnlineBarVisibility}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
                     </AppBarButton>
                     <AppBarButton Label="收藏" Command="{Binding ShowFavoritesCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
                     </AppBarButton>
                 </CommandBar>
-                <Button Grid.Column="2" Content="备份目录" Command="{Binding OpenBackupsCommand}"
+                <Button Grid.Column="2" Content="备份目录" Command="{Binding OpenBackupsCommand}" Visibility="{Binding OnlineBarVisibility}"
                         Style="{StaticResource SubtleButtonStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
             </Grid>
 
@@ -91,24 +94,24 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="3" Style="{StaticResource CardStyle}" Visibility="{Binding OnlinePanelVisibility}">
+                <Border Grid.Row="3" Background="Transparent" BorderThickness="0" Visibility="{Binding OnlinePanelVisibility}">
                     <StackPanel Spacing="13">
                         <Grid>
                             <TextBlock Text="{Binding OnlinePanelTitle}" Style="{StaticResource SectionTitleStyle}" />
                             <TextBlock Text="{Binding RateLimitText}" HorizontalAlignment="Right" Style="{StaticResource MutedTextStyle}" />
                         </Grid>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="趋势" Command="{Binding BrowseCommand}" CommandParameter="趋势" Style="{StaticResource SubtleButtonStyle}" />
-                            <Button Content="最新" Command="{Binding BrowseCommand}" CommandParameter="最新" Style="{StaticResource SubtleButtonStyle}" />
-                            <Button Content="最近更新" Command="{Binding BrowseCommand}" CommandParameter="最近更新" Style="{StaticResource SubtleButtonStyle}" />
-                            <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}" DisplayMemberPath="Name" PlaceholderText="分类" Width="130" />
-                            <TextBox Text="{Binding OnlineQuery, Mode=TwoWay}" PlaceholderText="筛选已加载结果" Width="220" />
-                            <Button Content="筛选" Command="{Binding SearchOnlineCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                            <Button Content="最多支持" Command="{Binding SortOnlineCommand}" CommandParameter="最多支持" Style="{StaticResource SubtleButtonStyle}" />
-                            <Button Content="最多下载" Command="{Binding SortOnlineCommand}" CommandParameter="最多下载" Style="{StaticResource SubtleButtonStyle}" />
-                            <Button Content="返回已安装" Command="{Binding ShowInstalledCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                        </StackPanel>
-                        <Grid ColumnSpacing="14" MaxHeight="280">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBox Text="{Binding OnlineQuery, Mode=TwoWay}" PlaceholderText="搜索模组" Width="220" />
+                                <Button Content="搜索" Command="{Binding SearchOnlineCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                <ComboBox ItemsSource="{Binding OnlineSortOptions}" SelectedItem="{Binding SelectedOnlineSort, Mode=TwoWay}" MinWidth="140" PlaceholderText="排序" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnSpacing="14">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="315" /></Grid.ColumnDefinitions>
                             <ListView ItemsSource="{Binding OnlineMods}" SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}">
                                 <ListView.ItemTemplate>
@@ -151,36 +154,7 @@
                                 <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
                             </StackPanel>
                         </Grid>
-                        <Expander Header="本地收藏">
-                            <StackPanel Spacing="8" Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="导入 JSON" Command="{Binding ImportFavoritesCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                    <Button Content="导出 JSON" Command="{Binding ExportFavoritesCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                </StackPanel>
-                                <ItemsControl ItemsSource="{Binding Favorites}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,3">
-                                                <TextBlock Text="{Binding Name}" />
-                                                <TextBlock Text="{Binding Version}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Expander>
-                        <Expander Header="下载队列">
-                            <ItemsControl ItemsSource="{Binding DownloadQueue}" Margin="0,8,0,0">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,4">
-                                            <TextBlock Text="{Binding ModName}" />
-                                            <TextBlock Text="{Binding StatusText}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Expander>
+
                     </StackPanel>
                 </Border>
 
