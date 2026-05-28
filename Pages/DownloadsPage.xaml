@@ -33,11 +33,12 @@
             </Grid.ColumnDefinitions>
 
             <!-- Mod list -->
-            <Border Style="{StaticResource CardStyle}" Padding="8">
+            <Border Background="Transparent" BorderThickness="0" Padding="4,0,0,0">
                 <ListView ItemsSource="{Binding OnlineMods}" SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}">
                     <ListView.ItemTemplate>
                         <DataTemplate>
-                            <Grid Padding="7,7,7,7" ColumnSpacing="8">
+                            <Border Background="{ThemeResource CardBackgroundBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,3,8,3">
+                                <Grid ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -52,6 +53,7 @@
                                         Click="NexusButton_Click"
                                         Style="{StaticResource SubtleButtonStyle}" />
                             </Grid>
+                            </Border>
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
