@@ -88,7 +88,7 @@ public sealed class ModsViewModel : ViewModelBase
         SearchOnlineCommand = new RelayCommand(ApplyOnlineFilter);
         SortOnlineCommand = new RelayCommand<string>(SetOnlineSort);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedOnlineMod is not null);
-        OpenNexusCommand = new AsyncRelayCommand(OpenNexusAsync, () => SelectedOnlineMod is not null);
+        OpenNexusCommand = new AsyncRelayCommand<NexusModInfo?>(OpenNexusAsync, mod => mod is not null);
         LoadFilesCommand = new AsyncRelayCommand(LoadFilesAsync, () => SelectedOnlineMod is not null && !IsBusy);
         DownloadFileCommand = new AsyncRelayCommand(DownloadSelectedFileAsync, () => SelectedOnlineFile is not null && !IsBusy);
         CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
@@ -137,7 +137,7 @@ public sealed class ModsViewModel : ViewModelBase
     public IRelayCommand SearchOnlineCommand { get; }
     public IRelayCommand<string> SortOnlineCommand { get; }
     public IAsyncRelayCommand ToggleFavoriteCommand { get; }
-    public IAsyncRelayCommand OpenNexusCommand { get; }
+    public IAsyncRelayCommand<NexusModInfo?> OpenNexusCommand { get; }
     public IAsyncRelayCommand LoadFilesCommand { get; }
     public IAsyncRelayCommand DownloadFileCommand { get; }
     public IRelayCommand CancelDownloadCommand { get; }
@@ -703,11 +703,11 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(FeedbackMessage));
     }
 
-    private Task OpenNexusAsync()
+    private Task OpenNexusAsync(NexusModInfo? mod)
     {
-        return SelectedOnlineMod is null
+        return mod is null
             ? Task.CompletedTask
-            : _platform.OpenUriAsync($"https://www.nexusmods.com/stardewvalley/mods/{SelectedOnlineMod.ModId}");
+            : _platform.OpenUriAsync($"https://www.nexusmods.com/stardewvalley/mods/{mod.ModId}");
     }
 
     private async Task LoadFilesAsync()

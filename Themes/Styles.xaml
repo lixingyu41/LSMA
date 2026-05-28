@@ -142,16 +142,16 @@
         <Setter Property="Foreground" Value="#252019" />
     </Style>
     <Style x:Key="CardFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonBaseStyle}">
-        <Setter Property="CornerRadius" Value="14" />
-        <Setter Property="Padding" Value="20" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="12,16" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}" />
         <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
     <Style x:Key="CardFilterButtonCheckedStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonBaseStyle}">
-        <Setter Property="CornerRadius" Value="14" />
-        <Setter Property="Padding" Value="20" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="12,16" />
         <Setter Property="Background" Value="{StaticResource AccentBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
         <Setter Property="Foreground" Value="#252019" />

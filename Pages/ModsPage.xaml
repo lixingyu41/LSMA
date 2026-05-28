@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Page
+    x:Name="ModsPageRoot"
     x:Class="LSMA.Pages.ModsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -116,11 +117,21 @@
                             <ListView ItemsSource="{Binding OnlineMods}" SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Padding="7" Spacing="3">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Author}" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
-                                        </StackPanel>
+                                        <Grid Padding="7,7,7,7" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Author}" Style="{StaticResource MutedTextStyle}" />
+                                                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Nexus" VerticalAlignment="Center"
+                                                    Command="{Binding ElementName=ModsPageRoot, Path=DataContext.OpenNexusCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource SubtleButtonStyle}" />
+                                        </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
@@ -128,12 +139,15 @@
                                 <TextBlock Text="{Binding SelectedOnlineMod.Name}" FontWeight="SemiBold" />
                                 <TextBlock Text="{Binding SelectedOnlineMod.Summary}" Style="{StaticResource BodyTextStyle}" MaxHeight="60" />
                                 <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <Button Content="收藏/取消" Command="{Binding ToggleFavoriteCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                    <Button Content="打开 Nexus" Command="{Binding OpenNexusCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <ToggleButton Content="选择" Command="{Binding ToggleFavoriteCommand}"
+                                                  IsChecked="{Binding SelectedOnlineMod.IsFavorite, Mode=OneWay}"
+                                                  Style="{StaticResource ChoiceToggleStyle}" />
                                 </StackPanel>
-                                <Button Content="选择下载文件" Command="{Binding LoadFilesCommand}" Style="{StaticResource SubtleButtonStyle}" HorizontalAlignment="Left" />
-                                <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}" DisplayMemberPath="DisplayText" PlaceholderText="选择文件" MinWidth="280" />
-                                <Button Content="下载并预检" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}" DisplayMemberPath="DisplayText" PlaceholderText="选择文件" MinWidth="250" />
+                                    <Button Content="刷新" Command="{Binding LoadFilesCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                </StackPanel>
+                                <Button Content="下载并预检" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
                                 <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
                             </StackPanel>
                         </Grid>
@@ -170,7 +184,7 @@
                     </StackPanel>
                 </Border>
 
-                <Grid Grid.Row="4" ColumnSpacing="10" Visibility="{Binding AvailableVisibility}">
+                <Grid Grid.Row="4" ColumnSpacing="6" Margin="-30,0" Visibility="{Binding AvailableVisibility}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
