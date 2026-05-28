@@ -49,11 +49,6 @@ public sealed class HomeViewModel : ViewModelBase
         CopyReportCommand = new RelayCommand(CopyReport);
         ExportReportCommand = new AsyncRelayCommand(ExportReportAsync);
         OpenLogsCommand = new AsyncRelayCommand(OpenLogsAsync);
-        UseSmapiCommand = new AsyncRelayCommand(() => SetTargetAsync(LaunchTarget.Smapi));
-        UseVanillaCommand = new AsyncRelayCommand(() => SetTargetAsync(LaunchTarget.Vanilla));
-        UseQuickModeCommand = new AsyncRelayCommand(() => SetModeAsync(LaunchMode.Quick));
-        UseSafeModeCommand = new AsyncRelayCommand(() => SetModeAsync(LaunchMode.Safe));
-        UseDiagnosticModeCommand = new AsyncRelayCommand(() => SetModeAsync(LaunchMode.Diagnostic));
         RestoreStableStateCommand = new AsyncRelayCommand(RestoreStableStateAsync, () => _availableSnapshot is not null && !_state.IsGameRunning && !IsBusy);
         _state.PropertyChanged += (_, _) => Refresh();
     }
@@ -65,11 +60,6 @@ public sealed class HomeViewModel : ViewModelBase
     public IRelayCommand CopyReportCommand { get; }
     public IAsyncRelayCommand ExportReportCommand { get; }
     public IAsyncRelayCommand OpenLogsCommand { get; }
-    public IAsyncRelayCommand UseSmapiCommand { get; }
-    public IAsyncRelayCommand UseVanillaCommand { get; }
-    public IAsyncRelayCommand UseQuickModeCommand { get; }
-    public IAsyncRelayCommand UseSafeModeCommand { get; }
-    public IAsyncRelayCommand UseDiagnosticModeCommand { get; }
     public IAsyncRelayCommand RestoreStableStateCommand { get; }
 
     public Visibility MissingDirectoryVisibility => _state.IsGameConfigured ? Visibility.Collapsed : Visibility.Visible;
@@ -104,14 +94,6 @@ public sealed class HomeViewModel : ViewModelBase
                         : _state.Mods.Any(mod => mod.IsEnabled && mod.Issues.Any(issue => issue.Severity == IssueSeverity.Warning))
                             ? "部分模组存在非阻断提醒，建议启动前查看。"
                         : "目录和启动程序就绪，未发现阻断问题。";
-    public string LaunchProfileText => $"{TargetText} · {ModeText}启动";
-    public string TargetText => _settings.Current.DefaultLaunchTarget == LaunchTarget.Smapi ? "SMAPI" : "原版";
-    public string ModeText => _settings.Current.DefaultLaunchMode switch
-    {
-        LaunchMode.Quick => "快速",
-        LaunchMode.Diagnostic => "诊断",
-        _ => "安全"
-    };
     public string ModSummaryText => _state.Mods.Count == 0
         ? "未发现本地模组"
         : $"正常 {_state.Mods.Count(mod => mod.IsEnabled && mod.Issues.Count == 0)} · 问题 {_state.Mods.Count(mod => mod.Issues.Count > 0)} · 更新待检查";
@@ -357,18 +339,6 @@ public sealed class HomeViewModel : ViewModelBase
             ProgressText = string.Empty;
             Refresh();
         }
-    }
-
-    private async Task SetTargetAsync(LaunchTarget target)
-    {
-        await _settings.UpdateAsync(value => value.DefaultLaunchTarget = target);
-        Refresh();
-    }
-
-    private async Task SetModeAsync(LaunchMode mode)
-    {
-        await _settings.UpdateAsync(value => value.DefaultLaunchMode = mode);
-        Refresh();
     }
 
     private bool CanInteract() => !IsBusy;

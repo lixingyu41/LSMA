@@ -10,7 +10,6 @@ public static class AppPaths
 
     public static string SettingsFile => Path.Combine(RoamingRoot, "settings.json");
     public static string FavoritesFile => Path.Combine(RoamingRoot, "favorites.json");
-    public static string DownloadQueueFile => Path.Combine(RoamingRoot, "downloads.json");
     public static string Downloads => Path.Combine(LocalRoot, "Downloads");
     public static string ModBackups => Path.Combine(LocalRoot, "Backups", "Mods");
     public static string SaveBackups => Path.Combine(LocalRoot, "Backups", "Saves");

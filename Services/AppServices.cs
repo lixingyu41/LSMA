@@ -44,7 +44,7 @@ public sealed class AppServices
         LastKnownGood = new LastKnownGoodService(State, RunLock, ModScanner, SaveBackups, Files, Logging);
 
         Home = new HomeViewModel(State, Settings, GameLocator, GameIcons, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
-        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Platform, Dialogs, UiDispatcher);
+        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, NexusCredentials, Nexus, NexusFavorites, Platform, Dialogs, UiDispatcher);
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
         Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);

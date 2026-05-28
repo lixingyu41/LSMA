@@ -23,12 +23,21 @@ public static class JsonHelper
     public static async Task WriteAsync<T>(string path, T value, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temporaryPath = path + ".tmp";
-        await using (var stream = File.Create(temporaryPath))
+        var temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, value, Options, cancellationToken);
-        }
+            await using (var stream = File.Create(temporaryPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, value, Options, cancellationToken);
+            }
 
-        File.Move(temporaryPath, path, true);
+            File.Move(temporaryPath, path, true);
+        }
+        catch
+        {
+            // Clean up orphaned temp file on failure.
+            try { File.Delete(temporaryPath); } catch { /* best effort */ }
+            throw;
+        }
     }
 }

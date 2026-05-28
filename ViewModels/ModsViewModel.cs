@@ -19,7 +19,6 @@ public sealed class ModsViewModel : ViewModelBase
     private readonly NexusCredentialService _credentials;
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
-    private readonly NexusDownloadService _downloadsService;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
     private readonly AutomaticScanMonitor _automaticScanMonitor;
@@ -27,18 +26,8 @@ public sealed class ModsViewModel : ViewModelBase
     private ModInfo? _selectedMod;
     private string _filter = "全部";
     private ModInstallPlan? _pendingPlan;
-    private NexusModInfo? _selectedOnlineMod;
-    private NexusFileInfo? _selectedOnlineFile;
-    private string _onlineQuery = string.Empty;
-    private string _onlinePanelTitle = "发现";
-    private bool _onlinePanelVisible;
     private string _nexusModIdInput = string.Empty;
     private bool _isEditingNexusBinding;
-    private List<NexusModInfo> _loadedOnlineMods = [];
-    private List<NexusFavorite> _favoriteValues = [];
-    private NexusCategory? _selectedCategory;
-    private CancellationTokenSource? _downloadCancellation;
-    private bool _isDownloading;
     private bool _automaticScanningStarted;
 
     public ModsViewModel(
@@ -52,7 +41,6 @@ public sealed class ModsViewModel : ViewModelBase
         NexusCredentialService credentials,
         NexusClient nexus,
         NexusFavoriteService favoritesService,
-        NexusDownloadService downloadsService,
         PlatformService platform,
         DialogService dialogs,
         UiDispatcherService dispatcher)
@@ -67,7 +55,6 @@ public sealed class ModsViewModel : ViewModelBase
         _credentials = credentials;
         _nexus = nexus;
         _favoritesService = favoritesService;
-        _downloadsService = downloadsService;
         _platform = platform;
         _dialogs = dialogs;
         _automaticScanMonitor = new AutomaticScanMonitor(dispatcher, ScanAutomaticallyAsync);
@@ -77,25 +64,13 @@ public sealed class ModsViewModel : ViewModelBase
         BackupCommand = new AsyncRelayCommand(BackupAsync, HasSelected);
         OpenModFolderCommand = new AsyncRelayCommand(OpenModFolderAsync, HasSelected);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.ModBackups));
-        ChoosePackageCommand = new RelayCommand(() => App.Current.Services.Navigation.Navigate(typeof(Pages.DownloadsPage)));
+        ChoosePackageCommand = new RelayCommand(() => App.Current.Services.Navigation.Navigate(typeof(DownloadsPage)));
         InstallPackageCommand = new AsyncRelayCommand(InstallPackageAsync, CanInstallPackage);
         CancelPackageCommand = new AsyncRelayCommand(ClearPackagePlanAsync);
-        BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, CanUseOnline);
-        ShowInstalledCommand = new RelayCommand(() => OnlinePanelVisible = false);
-        ShowFavoritesCommand = new AsyncRelayCommand(ShowFavoritesAsync);
-        ShowDownloadsCommand = new AsyncRelayCommand(ShowDownloadsAsync);
-        SearchOnlineCommand = new RelayCommand(ApplyOnlineFilter);
-        ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedOnlineMod is not null);
-        OpenNexusCommand = new AsyncRelayCommand<NexusModInfo?>(OpenNexusAsync, mod => mod is not null);
-        LoadFilesCommand = new AsyncRelayCommand(LoadFilesAsync, () => SelectedOnlineMod is not null && !IsBusy);
-        DownloadFileCommand = new AsyncRelayCommand(DownloadSelectedFileAsync, () => SelectedOnlineFile is not null && !IsBusy);
-        CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, CanUseOnlineNow);
         BindNexusIdCommand = new AsyncRelayCommand(BindNexusIdAsync, () => SelectedMod is not null);
         EditNexusBindingCommand = new RelayCommand(ToggleNexusBindingEditor, () => SelectedMod is not null);
         NexusIdClickCommand = new RelayCommand(HandleNexusIdClick, () => SelectedMod is not null);
-        PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, () => SelectedMod?.NexusModId is not null && !IsBusy);
-
         _state.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(AppStateService.IsGameRunning) or nameof(AppStateService.GameDirectory))
@@ -112,10 +87,6 @@ public sealed class ModsViewModel : ViewModelBase
     }
 
     public ObservableCollection<ModInfo> Mods { get; } = [];
-    public ObservableCollection<NexusModInfo> OnlineMods { get; } = [];
-    public ObservableCollection<NexusFileInfo> OnlineFiles { get; } = [];
-    public ObservableCollection<DownloadQueueItem> DownloadQueue { get; } = [];
-    public ObservableCollection<NexusCategory> Categories { get; } = [];
     public IRelayCommand<string> FilterCommand { get; }
     public IAsyncRelayCommand EnableCommand { get; }
     public IAsyncRelayCommand DisableCommand { get; }
@@ -126,20 +97,9 @@ public sealed class ModsViewModel : ViewModelBase
     public IRelayCommand ChoosePackageCommand { get; }
     public IAsyncRelayCommand InstallPackageCommand { get; }
     public IAsyncRelayCommand CancelPackageCommand { get; }
-    public IAsyncRelayCommand<string> BrowseCommand { get; }
-    public IRelayCommand ShowInstalledCommand { get; }
-    public IAsyncRelayCommand ShowFavoritesCommand { get; }
-    public IAsyncRelayCommand ShowDownloadsCommand { get; }
-    public IRelayCommand SearchOnlineCommand { get; }
-    public IAsyncRelayCommand ToggleFavoriteCommand { get; }
-    public IAsyncRelayCommand<NexusModInfo?> OpenNexusCommand { get; }
-    public IAsyncRelayCommand LoadFilesCommand { get; }
-    public IAsyncRelayCommand DownloadFileCommand { get; }
-    public IRelayCommand CancelDownloadCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public IAsyncRelayCommand BindNexusIdCommand { get; }
     public IRelayCommand EditNexusBindingCommand { get; }
-    public IAsyncRelayCommand PrepareSelectedUpdateCommand { get; }
     public ModInfo? SelectedMod
     {
         get => _selectedMod;
@@ -165,87 +125,10 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
 
-    public NexusModInfo? SelectedOnlineMod
-    {
-        get => _selectedOnlineMod;
-        set
-        {
-            if (SetProperty(ref _selectedOnlineMod, value))
-            {
-                OnlineFiles.Clear();
-                OnPropertyChanged(nameof(FavoriteButtonText));
-                NotifyCommands();
-            }
-        }
-    }
-
-    public NexusFileInfo? SelectedOnlineFile
-    {
-        get => _selectedOnlineFile;
-        set
-        {
-            if (SetProperty(ref _selectedOnlineFile, value))
-            {
-                NotifyCommands();
-            }
-        }
-    }
-
-    public string OnlineQuery
-    {
-        get => _onlineQuery;
-        set => SetProperty(ref _onlineQuery, value);
-    }
-
     public string NexusModIdInput
     {
         get => _nexusModIdInput;
         set => SetProperty(ref _nexusModIdInput, value);
-    }
-
-    public NexusCategory? SelectedCategory
-    {
-        get => _selectedCategory;
-        set
-        {
-            if (SetProperty(ref _selectedCategory, value))
-            {
-                ApplyOnlineFilter();
-            }
-        }
-    }
-
-    public List<string> OnlineSortOptions { get; } = ["趋势", "最多下载", "最多支持", "最近更新", "最新上架"];
-
-    private string _onlineSortValue = "趋势";
-    public string SelectedOnlineSort
-    {
-        get => _onlineSortValue;
-        set
-        {
-            if (SetProperty(ref _onlineSortValue, value))
-            {
-                ApplyOnlineFilter();
-            }
-        }
-    }
-
-    public string InstallButtonText => OnlinePanelVisible ? "安装本地" : "安装模组";
-    public Visibility OnlineBarVisibility => OnlinePanelVisible ? Visibility.Collapsed : Visibility.Visible;
-
-    public bool OnlinePanelVisible
-    {
-        get => _onlinePanelVisible;
-        set
-        {
-            if (SetProperty(ref _onlinePanelVisible, value))
-            {
-                OnPropertyChanged(nameof(OnlinePanelVisibility));
-                OnPropertyChanged(nameof(FilterAndListVisibility));
-                OnPropertyChanged(nameof(InstallButtonText));
-                OnPropertyChanged(nameof(OnlineBarVisibility));
-            }
-        }
     }
 
     public Visibility UnavailableVisibility => _state.IsGameConfigured ? Visibility.Collapsed : Visibility.Visible;
@@ -277,8 +160,7 @@ public sealed class ModsViewModel : ViewModelBase
     public string UpdateCount => _allMods.Count(mod => mod.HasUpdate).ToString();
     public string CurrentFilter => _filter;
     public bool HasProblems => _allMods.Any(mod => mod.Issues.Count > 0);
-    public string FavoriteButtonText => SelectedOnlineMod?.IsFavorite == true ? "已收藏" : "收藏";
-    public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed && !OnlinePanelVisible
+    public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed
         ? Visibility.Visible : Visibility.Collapsed;
     public string TaskStatus => IsBusy ? ProgressText : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
     public ModInstallPlan? PendingPlan
@@ -295,13 +177,6 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
     public Visibility PlanVisibility => PendingPlan is null ? Visibility.Collapsed : Visibility.Visible;
-    public Visibility OnlinePanelVisibility => OnlinePanelVisible ? Visibility.Visible : Visibility.Collapsed;
-    public string OnlinePanelTitle
-    {
-        get => _onlinePanelTitle;
-        private set => SetProperty(ref _onlinePanelTitle, value);
-    }
-    public string RateLimitText => _nexus.RateLimitStatus;
 
     public void Refresh()
     {
@@ -631,273 +506,6 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(FeedbackMessage));
     }
 
-    private async Task SetupOnlinePanelAsync(string? feed, string key)
-    {
-        _loadedOnlineMods = (feed switch
-        {
-            "最新" => await _nexus.GetLatestAddedAsync(key),
-            "最近更新" => await _nexus.GetLatestUpdatedAsync(key),
-            _ => await _nexus.GetTrendingAsync(key)
-        }).ToList();
-        _favoriteValues = await _favoritesService.LoadAsync();
-        if (Categories.Count == 0)
-        {
-            Categories.Add(new NexusCategory { CategoryId = 0, Name = "全部分类" });
-            foreach (var category in await _nexus.GetCategoriesAsync(key))
-            {
-                Categories.Add(category);
-            }
-            SelectedCategory = Categories[0];
-        }
-        foreach (var mod in _loadedOnlineMods)
-        {
-            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
-        }
-
-        OnlinePanelTitle = feed ?? "趋势";
-        OnlinePanelVisible = true;
-        ApplyOnlineFilter();
-        OnPropertyChanged(nameof(RateLimitText));
-    }
-
-    private async Task BrowseAsync(string? feed)
-    {
-        var key = RequireNexusKey();
-        if (key is null)
-        {
-            return;
-        }
-
-        IsBusy = true;
-        ProgressText = "正在加载 Nexus 模组...";
-        Refresh();
-        try
-        {
-            await SetupOnlinePanelAsync(feed, key);
-        }
-        catch (NexusApiException exception)
-        {
-            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-            ProgressText = string.Empty;
-            Refresh();
-        }
-    }
-
-    private async Task InstallOrBrowseAsync()
-    {
-        if (OnlinePanelVisible)
-        {
-            await ChoosePackageAsync();
-        }
-        else
-        {
-            await AutoBrowseAsync();
-        }
-    }
-
-    private async Task AutoBrowseAsync()
-    {
-        // Show panel immediately
-        OnlinePanelVisible = true;
-        OnlinePanelTitle = "趋势";
-
-        const int maxRetries = 5;
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            var key = RequireNexusKey();
-            if (key is null) return;
-
-            IsBusy = true;
-            ProgressText = $"正在加载 Nexus 模组... ({attempt}/{maxRetries})";
-            Refresh();
-            try
-            {
-                await SetupOnlinePanelAsync("趋势", key);
-                return;
-            }
-            catch (NexusApiException)
-            {
-                if (attempt >= maxRetries)
-                {
-                    await _dialogs.ShowMessageAsync("Nexus", "多次加载失败，请检查网络后重试。");
-                    return;
-                }
-                await Task.Delay(1000);
-            }
-            finally
-            {
-                IsBusy = false;
-                ProgressText = string.Empty;
-                Refresh();
-            }
-        }
-    }
-
-    private void ApplyOnlineFilter()
-    {
-        var query = OnlineQuery.Trim();
-        IEnumerable<NexusModInfo> values = _loadedOnlineMods.Where(mod => (SelectedCategory is null || SelectedCategory.CategoryId == 0 || mod.CategoryId == SelectedCategory.CategoryId)
-            && (string.IsNullOrWhiteSpace(query)
-            || mod.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-            || mod.Author.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-            || mod.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase)));
-        values = SelectedOnlineSort switch
-        {
-            "最多下载" => values.OrderByDescending(mod => mod.Downloads),
-            "最多支持" => values.OrderByDescending(mod => mod.Endorsements),
-            "最近更新" => values.OrderByDescending(mod => mod.UpdatedTimestamp),
-            "最新上架" => values.OrderByDescending(mod => mod.ModId),
-            _ => values
-        };
-        OnlineMods.Clear();
-        foreach (var item in values)
-        {
-            OnlineMods.Add(item);
-        }
-
-        FeedbackMessage = string.IsNullOrWhiteSpace(query)
-            ? "在线列表已加载。"
-            : "当前搜索基于已加载的 Nexus 列表筛选。";
-        OnPropertyChanged(nameof(FeedbackMessage));
-    }
-
-    private async Task ShowFavoritesAsync()
-    {
-        _favoriteValues = await _favoritesService.LoadAsync();
-        OnlinePanelTitle = "收藏";
-        OnlinePanelVisible = true;
-    }
-
-    private async Task ToggleFavoriteAsync()
-    {
-        if (SelectedOnlineMod is not { } mod)
-        {
-            return;
-        }
-
-        _favoriteValues = await _favoritesService.LoadAsync();
-        await _favoritesService.ToggleAsync(mod, _favoriteValues);
-        mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
-        FeedbackMessage = mod.IsFavorite ? "已加入收藏。" : "已取消收藏。";
-        OnPropertyChanged(nameof(FavoriteButtonText));
-        OnPropertyChanged(nameof(FeedbackMessage));
-    }
-
-    private Task OpenNexusAsync(NexusModInfo? mod)
-    {
-        return mod is null
-            ? Task.CompletedTask
-            : _platform.OpenUriAsync($"https://www.nexusmods.com/stardewvalley/mods/{mod.ModId}");
-    }
-
-    private async Task LoadFilesAsync()
-    {
-        var key = RequireNexusKey();
-        if (key is null || SelectedOnlineMod is not { } mod)
-        {
-            return;
-        }
-
-        try
-        {
-            OnlineFiles.Clear();
-            foreach (var file in await _nexus.GetFilesAsync(mod.ModId, key))
-            {
-                OnlineFiles.Add(file);
-            }
-
-            SelectedOnlineFile = OnlineFiles.FirstOrDefault();
-            OnPropertyChanged(nameof(RateLimitText));
-        }
-        catch (NexusApiException exception)
-        {
-            await _dialogs.ShowMessageAsync("获取文件失败", exception.Message);
-        }
-    }
-
-    private async Task DownloadSelectedFileAsync()
-    {
-        var key = RequireNexusKey();
-        if (key is null || SelectedOnlineMod is not { } mod || SelectedOnlineFile is not { } file)
-        {
-            return;
-        }
-
-        var item = new DownloadQueueItem
-        {
-            ModId = mod.ModId,
-            FileId = file.FileId,
-            ModName = mod.Name,
-            FileName = file.FileName ?? string.Empty
-        };
-        DownloadQueue.Add(item);
-        _downloadCancellation = new CancellationTokenSource();
-        _isDownloading = true;
-        CancelDownloadCommand.NotifyCanExecuteChanged();
-        IsBusy = true;
-        ProgressText = "正在下载模组...";
-        Refresh();
-        try
-        {
-            var path = await _downloadsService.DownloadAsync(item, key, _downloadCancellation.Token);
-            await SaveDownloadQueueAsync();
-            IsBusy = false;
-            ProgressText = string.Empty;
-            await InspectPackageAsync(path);
-        }
-        catch (OperationCanceledException)
-        {
-            item.State = DownloadState.Canceled;
-            FeedbackMessage = "下载已取消。";
-            await SaveDownloadQueueAsync();
-            OnPropertyChanged(nameof(FeedbackMessage));
-        }
-        catch (Exception exception)
-        {
-            await SaveDownloadQueueAsync();
-            await _dialogs.ShowMessageAsync("下载未完成", exception.Message);
-        }
-        finally
-        {
-            _isDownloading = false;
-            _downloadCancellation?.Dispose();
-            _downloadCancellation = null;
-            CancelDownloadCommand.NotifyCanExecuteChanged();
-            IsBusy = false;
-            ProgressText = string.Empty;
-            Refresh();
-        }
-    }
-
-    private void CancelDownload()
-    {
-        _downloadCancellation?.Cancel();
-    }
-
-    private async Task ShowDownloadsAsync()
-    {
-        DownloadQueue.Clear();
-        if (File.Exists(AppPaths.DownloadQueueFile))
-        {
-            foreach (var item in await JsonHelper.ReadAsync<List<DownloadQueueItem>>(AppPaths.DownloadQueueFile) ?? [])
-            {
-                DownloadQueue.Add(item);
-            }
-        }
-
-        OnlinePanelTitle = "下载";
-        OnlinePanelVisible = true;
-    }
-
-    private async Task SaveDownloadQueueAsync()
-    {
-        await JsonHelper.WriteAsync(AppPaths.DownloadQueueFile, DownloadQueue.ToList());
-    }
-
     private async Task CheckUpdatesAsync()
     {
         var key = RequireNexusKey();
@@ -931,30 +539,6 @@ public sealed class ModsViewModel : ViewModelBase
             IsBusy = false;
             ProgressText = string.Empty;
             Refresh();
-        }
-    }
-
-    private async Task PrepareSelectedUpdateAsync()
-    {
-        var key = RequireNexusKey();
-        if (key is null || SelectedMod?.NexusModId is not { } modId)
-        {
-            return;
-        }
-
-        try
-        {
-            SelectedOnlineMod = await _nexus.GetModAsync(modId, key);
-            _loadedOnlineMods = [SelectedOnlineMod];
-            OnlineMods.Clear();
-            OnlineMods.Add(SelectedOnlineMod);
-            OnlinePanelTitle = "更新文件";
-            OnlinePanelVisible = true;
-            await LoadFilesAsync();
-        }
-        catch (NexusApiException exception)
-        {
-            await _dialogs.ShowMessageAsync("准备更新失败", exception.Message);
         }
     }
 
@@ -1057,20 +641,13 @@ public sealed class ModsViewModel : ViewModelBase
         NexusIdClickCommand.NotifyCanExecuteChanged();
         ChoosePackageCommand.NotifyCanExecuteChanged();
         InstallPackageCommand.NotifyCanExecuteChanged();
-        ToggleFavoriteCommand.NotifyCanExecuteChanged();
-        OpenNexusCommand.NotifyCanExecuteChanged();
-        LoadFilesCommand.NotifyCanExecuteChanged();
-        DownloadFileCommand.NotifyCanExecuteChanged();
-        CancelDownloadCommand.NotifyCanExecuteChanged();
         CheckUpdatesCommand.NotifyCanExecuteChanged();
         BindNexusIdCommand.NotifyCanExecuteChanged();
         EditNexusBindingCommand.NotifyCanExecuteChanged();
-        PrepareSelectedUpdateCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanModify() => _state.IsGameConfigured && !_state.IsGameRunning && !IsBusy;
     private bool CanInstallPackage() => CanModify() && PendingPlan is { CanInstall: true };
-    private bool CanUseOnline(string? _) => !IsBusy;
     private bool CanUseOnlineNow() => !IsBusy;
     private bool HasSelected() => SelectedMod is not null && !IsBusy;
     private bool CanModifySelected() => HasSelected() && !_state.IsGameRunning && SelectedMod is { IsArchived: false };

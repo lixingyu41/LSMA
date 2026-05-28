@@ -55,13 +55,13 @@ public sealed partial class HomePage : Page
 
     private async void LaunchSmapi_Click(object sender, RoutedEventArgs e)
     {
-        await App.Current.Services.Home.UseSmapiCommand.ExecuteAsync(null);
+        await App.Current.Services.SettingsPage.UseSmapiCommand.ExecuteAsync(null);
         UpdateLaunchToggle(true);
     }
 
     private async void LaunchVanilla_Click(object sender, RoutedEventArgs e)
     {
-        await App.Current.Services.Home.UseVanillaCommand.ExecuteAsync(null);
+        await App.Current.Services.SettingsPage.UseVanillaCommand.ExecuteAsync(null);
         UpdateLaunchToggle(false);
     }
 
