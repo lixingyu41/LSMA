@@ -28,10 +28,10 @@
                     <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
                     </AppBarButton>
-                    <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}" Visibility="{Binding OnlineBarVisibility}">
+                    <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
                     </AppBarButton>
-                    <AppBarButton Label="备份目录" Command="{Binding OpenBackupsCommand}" Visibility="{Binding OnlineBarVisibility}">
+                    <AppBarButton Label="备份目录" Command="{Binding OpenBackupsCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE8A7;" /></AppBarButton.Icon>
                     </AppBarButton>
                 </CommandBar>
@@ -89,71 +89,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="3" Background="Transparent" BorderThickness="0" Visibility="{Binding OnlinePanelVisibility}">
-                    <StackPanel Spacing="13">
-                        <Grid>
-                            <TextBlock Text="{Binding OnlinePanelTitle}" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="{Binding RateLimitText}" HorizontalAlignment="Right" Style="{StaticResource MutedTextStyle}" />
-                        </Grid>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBox Text="{Binding OnlineQuery, Mode=TwoWay}" PlaceholderText="搜索模组" Width="220" />
-                                <Button Content="搜索" Command="{Binding SearchOnlineCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                <ComboBox ItemsSource="{Binding OnlineSortOptions}" SelectedItem="{Binding SelectedOnlineSort, Mode=TwoWay}" MinWidth="140" PlaceholderText="排序" />
-                            </StackPanel>
-                        </Grid>
-                        <Grid ColumnSpacing="14">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="315" /></Grid.ColumnDefinitions>
-                            <ListView ItemsSource="{Binding OnlineMods}" SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}">
-                                <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Padding="7,7,7,7" ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Spacing="3">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                <TextBlock Text="{Binding Author}" Style="{StaticResource MutedTextStyle}" />
-                                                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Content="Nexus" VerticalAlignment="Center"
-                                                    Command="{Binding ElementName=ModsPageRoot, Path=DataContext.OpenNexusCommand}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource SubtleButtonStyle}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
-                            <StackPanel Grid.Column="1" Spacing="8">
-                                <TextBlock Text="{Binding SelectedOnlineMod.Name}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding SelectedOnlineMod.Summary}" Style="{StaticResource BodyTextStyle}" MaxHeight="60" />
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <ToggleButton Content="{Binding FavoriteButtonText}" Command="{Binding ToggleFavoriteCommand}"
-                                                  IsChecked="{Binding SelectedOnlineMod.IsFavorite, Mode=OneWay}"
-                                                  Style="{StaticResource ChoiceToggleStyle}" />
-                                </StackPanel>
-                                <Grid Height="32">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}" DisplayMemberPath="DisplayText" PlaceholderText="选择文件" VerticalAlignment="Stretch" />
-                                    <Button Grid.Column="1" Content="刷新" Command="{Binding LoadFilesCommand}" Style="{StaticResource SubtleButtonStyle}" VerticalAlignment="Stretch" Padding="12,0" />
-                                </Grid>
-                                <Button Content="下载并预检" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
-                                <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
-                            </StackPanel>
-                        </Grid>
-
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Row="4" CornerRadius="16" Background="{ThemeResource CardBackgroundBrush}"
+                <Border Grid.Row="3" CornerRadius="16" Background="{ThemeResource CardBackgroundBrush}"
                         Padding="0" Margin="-5,0" Visibility="{Binding FilterAndListVisibility}">
                     <Grid x:Name="FilterContainer">
                         <!-- Button grid -->
@@ -269,7 +205,7 @@
                     </Grid>
                 </Border>
 
-                <Grid Grid.Row="5" ColumnSpacing="14" MinHeight="250" Visibility="{Binding FilterAndListVisibility}">
+                <Grid Grid.Row="4" ColumnSpacing="14" MinHeight="250" Visibility="{Binding FilterAndListVisibility}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="430" />
                         <ColumnDefinition Width="*" />

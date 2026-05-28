@@ -20,6 +20,7 @@ public sealed partial class ModsPage : Page
 
     private ModsViewModel _vm = null!;
     private Button[] _filterButtons = null!;
+    private int _selectedFilterIndex = 0;
     private Storyboard? _currentAnimation;
 
     public ModsPage()
@@ -35,6 +36,11 @@ public sealed partial class ModsPage : Page
     {
         _filterButtons = [AllFilterButton, UpdateFilterButton,
                            ProblemFilterButton, DisabledFilterButton, FavoriteFilterButton];
+        foreach (var btn in _filterButtons)
+        {
+            btn.PointerEntered += FilterButton_PointerEntered;
+            btn.PointerExited += FilterButton_PointerExited;
+        }
         FilterContainer.SizeChanged += OnFilterContainerSizeChanged;
         UpdateFilterSelection(_vm.CurrentFilter);
         UpdateProblemCountColor();
@@ -69,15 +75,28 @@ public sealed partial class ModsPage : Page
         if (!FilterIndexMap.TryGetValue(currentFilter, out var index))
             return;
 
+        _selectedFilterIndex = index;
         PositionPillAtColumn(index, animate: true);
         UpdateButtonColors(index);
     }
+
+    private void FilterButton_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Button btn && FilterIndexMap.TryGetValue(_vm.CurrentFilter, out var idx)
+            && _filterButtons[idx] == btn)
+        {
+            // Selected button hovered — keep Normal state (no hover tint on yellow pill)
+            VisualStateManager.GoToState(btn, "Normal", false);
+        }
+    }
+
+    private void FilterButton_PointerExited(object sender, PointerRoutedEventArgs e) { }
 
     private void UpdateButtonColors(int selectedIndex)
     {
         if (_filterButtons is null) return;
         var selectedFg = new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
-        var unselectedFg = (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
+        var unselectedFg = (SolidColorBrush)Application.Current.Resources["PrimaryTextBrush"];
 
         for (int i = 0; i < _filterButtons.Length; i++)
         {

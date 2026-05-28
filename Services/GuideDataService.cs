@@ -35,4 +35,5 @@ public sealed class GuideDataService
         new() { ObjectId = 270, Name = "秋季作物收集包", Season = "秋季", ItemHint = "玉米、茄子、南瓜、山药" }
     ];
 
+    public IReadOnlyList<NpcGiftRecord> NpcGifts => NpcGiftData.All;
 }

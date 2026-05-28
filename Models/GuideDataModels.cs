@@ -75,6 +75,19 @@ public sealed class BundleRecord : GuideRecord
     public string Detail => $"{Season} 可准备：{ItemHint}";
 }
 
+public sealed class NpcGiftRecord : GuideRecord
+{
+    public string NpcId { get; init; } = string.Empty;
+    public string Npc { get; init; } = string.Empty;
+    public string Birthday { get; init; } = string.Empty;
+    public string Loves { get; init; } = string.Empty;
+    public string Likes { get; init; } = string.Empty;
+    public string Neutral { get; init; } = string.Empty;
+    public string Dislikes { get; init; } = string.Empty;
+    public string Hates { get; init; } = string.Empty;
+    public string? IconUri { get; set; }
+}
+
 public sealed class GuideSearchResult
 {
     public string Category { get; init; } = string.Empty;

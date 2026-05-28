@@ -34,6 +34,7 @@
 
             <!-- Mod list -->
             <Border Background="Transparent" BorderThickness="0" Padding="4,0,0,0">
+                <StackPanel>
                 <ListView ItemsSource="{Binding OnlineMods}" SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}">
                     <ListView.ItemTemplate>
                         <DataTemplate>
@@ -57,6 +58,11 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
+                <Button Content="加载更多" Command="{Binding LoadMoreCommand}"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        HorizontalAlignment="Center" Margin="0,8,8,4"
+                        Visibility="{Binding LoadMoreVisibility}" />
+                </StackPanel>
             </Border>
 
             <!-- Detail panel -->

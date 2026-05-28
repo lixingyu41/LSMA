@@ -56,6 +56,8 @@ public sealed class GuideViewModel : ViewModelBase
     public async Task SearchAsync(string query)
     {
         _query = query?.Trim() ?? string.Empty;
+
+        // Load icons for catalog results
         if (!string.IsNullOrWhiteSpace(_query))
         {
             foreach (var result in _catalog.Search(_query))
@@ -69,6 +71,27 @@ public sealed class GuideViewModel : ViewModelBase
         }
 
         Refresh();
+        SearchNpcGifts();
+    }
+
+    private void SearchNpcGifts()
+    {
+        if (string.IsNullOrWhiteSpace(_query)) return;
+
+        foreach (var gift in _data.NpcGifts
+            .Where(g => g.Npc.Contains(_query, StringComparison.CurrentCultureIgnoreCase)
+                || g.Loves.Contains(_query, StringComparison.CurrentCultureIgnoreCase)
+                || g.Likes.Contains(_query, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            gift.IconUri ??= _icons.GetPortraitUri(gift.NpcId);
+            SearchResults.Add(new GuideSearchResult
+            {
+                Category = "礼物",
+                Title = $"{gift.Npc} ({gift.Birthday})",
+                Detail = $"喜爱：{gift.Loves}\n喜欢：{gift.Likes}",
+                NpcId = gift.NpcId
+            });
+        }
     }
 
     public async Task RefreshAsync()

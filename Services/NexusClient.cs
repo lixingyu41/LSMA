@@ -42,14 +42,14 @@ public sealed class NexusClient(LoggingService logging)
         }
     }
 
-    public Task<List<NexusModInfo>> GetTrendingAsync(string apiKey)
-        => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/trending.json", apiKey);
+    public Task<List<NexusModInfo>> GetTrendingAsync(string apiKey, int page = 1)
+        => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/trending.json?page={page}&size=20", apiKey);
 
-    public Task<List<NexusModInfo>> GetLatestAddedAsync(string apiKey)
-        => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/latest_added.json", apiKey);
+    public Task<List<NexusModInfo>> GetLatestAddedAsync(string apiKey, int page = 1)
+        => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/latest_added.json?page={page}&size=20", apiKey);
 
-    public Task<List<NexusModInfo>> GetLatestUpdatedAsync(string apiKey)
-        => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/latest_updated.json", apiKey);
+    public Task<List<NexusModInfo>> GetLatestUpdatedAsync(string apiKey, int page = 1)
+        => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/latest_updated.json?page={page}&size=20", apiKey);
 
     public Task<NexusModInfo> GetModAsync(long modId, string apiKey)
         => GetAsync<NexusModInfo>($"games/{GameDomain}/mods/{modId}.json", apiKey);

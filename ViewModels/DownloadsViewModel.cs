@@ -25,6 +25,8 @@ public sealed class DownloadsViewModel : ViewModelBase
     private bool _isDownloading;
     private string _onlineSortValue = "趋势";
     private bool _hasLoaded;
+    private int _currentPage = 1;
+    private const int PageSize = 20;
 
     public DownloadsViewModel(
         NexusCredentialService credentials,
@@ -49,6 +51,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
         BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, _ => !IsBusy);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
+        LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync, () => HasMorePages && !IsBusy);
     }
 
     public List<string> OnlineSortOptions { get; } = ["趋势", "最多下载", "最多支持", "最近更新", "最新上架"];
@@ -117,6 +120,10 @@ public sealed class DownloadsViewModel : ViewModelBase
     public IRelayCommand CancelDownloadCommand { get; }
     public IAsyncRelayCommand<string> BrowseCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+    public IAsyncRelayCommand LoadMoreCommand { get; }
+
+    public bool HasMorePages { get; private set; } = true;
+    public Visibility LoadMoreVisibility => HasMorePages ? Visibility.Visible : Visibility.Collapsed;
 
     public async Task StartAsync()
     {
@@ -164,24 +171,62 @@ public sealed class DownloadsViewModel : ViewModelBase
     private async Task RefreshAsync()
     {
         _hasLoaded = false;
+        _currentPage = 1;
+        _loadedOnlineMods = [];
+        _favoriteValues = [];
+        HasMorePages = true;
         await AutoBrowseAsync();
     }
 
-    private async Task SetupOnlinePanelAsync(string? feed, string key)
+    private async Task LoadMoreAsync()
     {
-        _loadedOnlineMods = (feed switch
+        if (!HasMorePages) return;
+        _currentPage++;
+        var key = RequireNexusKey();
+        if (key is null) return;
+
+        IsBusy = true;
+        ProgressText = "加载更多...";
+        Refresh();
+        try
         {
-            "最新" => await _nexus.GetLatestAddedAsync(key),
-            "最近更新" => await _nexus.GetLatestUpdatedAsync(key),
-            _ => await _nexus.GetTrendingAsync(key)
+            await SetupOnlinePanelAsync(OnlinePanelTitle, key, append: true);
+        }
+        catch (NexusApiException exception)
+        {
+            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+        }
+    }
+
+    private async Task SetupOnlinePanelAsync(string? feed, string key, bool append = false)
+    {
+        var newMods = (feed switch
+        {
+            "最新" => await _nexus.GetLatestAddedAsync(key, append ? _currentPage : 1),
+            "最近更新" => await _nexus.GetLatestUpdatedAsync(key, append ? _currentPage : 1),
+            _ => await _nexus.GetTrendingAsync(key, append ? _currentPage : 1)
         }).ToList();
+        HasMorePages = newMods.Count >= PageSize;
+
+        if (append)
+            _loadedOnlineMods.AddRange(newMods);
+        else
+            _loadedOnlineMods = newMods;
+
         _favoriteValues = await _favoritesService.LoadAsync();
         foreach (var mod in _loadedOnlineMods)
-        {
             mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
-        }
+
         OnlinePanelTitle = feed ?? "趋势";
-        ApplyOnlineFilter();
+        OnlineMods.Clear();
+        foreach (var item in _loadedOnlineMods) OnlineMods.Add(item);
+        OnPropertyChanged(nameof(LoadMoreVisibility));
     }
 
     private async Task BrowseAsync(string? feed)
@@ -215,7 +260,8 @@ public sealed class DownloadsViewModel : ViewModelBase
             string.IsNullOrWhiteSpace(query)
             || mod.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
             || mod.Author.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-            || mod.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase));
+            || mod.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            || mod.ModId.ToString().Contains(query, StringComparison.Ordinal));
         values = SelectedOnlineSort switch
         {
             "最多下载" => values.OrderByDescending(mod => mod.Downloads),
@@ -225,10 +271,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             _ => values
         };
         OnlineMods.Clear();
-        foreach (var item in values)
-        {
-            OnlineMods.Add(item);
-        }
+        foreach (var item in _loadedOnlineMods) OnlineMods.Add(item);
     }
 
     private async Task ToggleFavoriteAsync()

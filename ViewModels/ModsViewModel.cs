@@ -4,6 +4,7 @@ using LSMA.Models;
 using LSMA.Services;
 using LSMA.Utilities;
 using Microsoft.UI.Xaml;
+using LSMA.Pages;
 namespace LSMA.ViewModels;
 
 public sealed class ModsViewModel : ViewModelBase
@@ -76,7 +77,7 @@ public sealed class ModsViewModel : ViewModelBase
         BackupCommand = new AsyncRelayCommand(BackupAsync, HasSelected);
         OpenModFolderCommand = new AsyncRelayCommand(OpenModFolderAsync, HasSelected);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.ModBackups));
-        ChoosePackageCommand = new AsyncRelayCommand(ChoosePackageAsync, CanModify);
+        ChoosePackageCommand = new RelayCommand(() => App.Current.Services.Navigation.Navigate(typeof(Pages.DownloadsPage)));
         InstallPackageCommand = new AsyncRelayCommand(InstallPackageAsync, CanInstallPackage);
         CancelPackageCommand = new AsyncRelayCommand(ClearPackagePlanAsync);
         BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, CanUseOnline);
@@ -122,7 +123,7 @@ public sealed class ModsViewModel : ViewModelBase
     public IAsyncRelayCommand OpenModFolderCommand { get; }
     public IRelayCommand NexusIdClickCommand { get; }
     public IAsyncRelayCommand OpenBackupsCommand { get; }
-    public IAsyncRelayCommand ChoosePackageCommand { get; }
+    public IRelayCommand ChoosePackageCommand { get; }
     public IAsyncRelayCommand InstallPackageCommand { get; }
     public IAsyncRelayCommand CancelPackageCommand { get; }
     public IAsyncRelayCommand<string> BrowseCommand { get; }
@@ -432,6 +433,7 @@ public sealed class ModsViewModel : ViewModelBase
             _runLock.Refresh();
             _allMods = _analyzer.Analyze(await _scanner.ScanAsync()).ToList();
             _state.Mods = _allMods;
+            await SyncFavoritesAsync();
             ApplyFilter(_filter);
             SelectedMod = Mods.FirstOrDefault(mod => string.Equals(mod.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
                 ?? Mods.FirstOrDefault();
@@ -552,6 +554,22 @@ public sealed class ModsViewModel : ViewModelBase
             IsBusy = false;
             ProgressText = string.Empty;
             Refresh();
+        }
+    }
+
+    private async Task SyncFavoritesAsync()
+    {
+        try
+        {
+            var favorites = await _favoritesService.LoadAsync();
+            foreach (var mod in _allMods)
+            {
+                mod.IsFavorite = mod.NexusModId is { } id && favorites.Any(f => f.ModId == id);
+            }
+        }
+        catch
+        {
+            // Silently ignore favorites sync errors
         }
     }
 
