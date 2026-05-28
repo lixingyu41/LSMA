@@ -2,15 +2,25 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
+using Windows.UI;
 using LSMA.ViewModels;
 
 namespace LSMA.Pages;
 
 public sealed partial class ModsPage : Page
 {
+    private static readonly Dictionary<string, int> FilterIndexMap = new()
+    {
+        ["全部"] = 0, ["正常"] = 1, ["可更新"] = 2,
+        ["有问题"] = 3, ["已禁用"] = 4, ["收藏"] = 5,
+    };
+
     private ModsViewModel _vm = null!;
+    private Button[] _filterButtons = null!;
+    private Storyboard? _currentAnimation;
 
     public ModsPage()
     {
@@ -23,15 +33,27 @@ public sealed partial class ModsPage : Page
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        UpdateFilterButtonStyles(_vm.CurrentFilter);
+        _filterButtons = [AllFilterButton, NormalFilterButton, UpdateFilterButton,
+                           ProblemFilterButton, DisabledFilterButton, FavoriteFilterButton];
+        FilterContainer.SizeChanged += OnFilterContainerSizeChanged;
+        UpdateFilterSelection(_vm.CurrentFilter);
         UpdateProblemCountColor();
+    }
+
+    private void OnFilterContainerSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (FilterIndexMap.TryGetValue(_vm.CurrentFilter, out var index))
+        {
+            PositionPillAtColumn(index, animate: false);
+            UpdateButtonColors(index);
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ModsViewModel.CurrentFilter))
         {
-            UpdateFilterButtonStyles(_vm.CurrentFilter);
+            UpdateFilterSelection(_vm.CurrentFilter);
         }
         else if (e.PropertyName == nameof(ModsViewModel.HasProblems))
         {
@@ -39,29 +61,90 @@ public sealed partial class ModsPage : Page
         }
     }
 
-    private void UpdateFilterButtonStyles(string currentFilter)
+    private void UpdateFilterSelection(string currentFilter)
     {
-        var selectedStyle = (Style)Application.Current.Resources["CardFilterButtonCheckedStyle"];
-        var unselectedStyle = (Style)Application.Current.Resources["CardFilterButtonStyle"];
+        if (!FilterIndexMap.TryGetValue(currentFilter, out var index))
+            return;
 
-        AllFilterButton.Style = currentFilter == "全部" ? selectedStyle : unselectedStyle;
-        NormalFilterButton.Style = currentFilter == "正常" ? selectedStyle : unselectedStyle;
-        UpdateFilterButton.Style = currentFilter == "可更新" ? selectedStyle : unselectedStyle;
-        ProblemFilterButton.Style = currentFilter == "有问题" ? selectedStyle : unselectedStyle;
-        DisabledFilterButton.Style = currentFilter == "已禁用" ? selectedStyle : unselectedStyle;
-        FavoriteFilterButton.Style = currentFilter == "收藏" ? selectedStyle : unselectedStyle;
+        PositionPillAtColumn(index, animate: true);
+        UpdateButtonColors(index);
+    }
+
+    private void UpdateButtonColors(int selectedIndex)
+    {
+        var selectedFg = new SolidColorBrush(Color.FromArgb(255, 37, 32, 25)); // #252019
+        var unselectedFg = (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
+
+        for (int i = 0; i < _filterButtons.Length; i++)
+        {
+            if (_filterButtons[i].Content is StackPanel panel && panel.Children.Count > 1)
+            {
+                // Only change count TextBlock (second child); labels keep MutedTextStyle
+                var countTb = panel.Children[1] as TextBlock;
+                if (countTb is null) continue;
+
+                if (countTb.Name == nameof(ProblemCountText))
+                    continue; // handled by UpdateProblemCountColor
+
+                countTb.Foreground = i == selectedIndex ? selectedFg : unselectedFg;
+            }
+        }
+
+        // "正常" count always green — override unselected color
+        if (NormalFilterButton.Content is StackPanel normalPanel && normalPanel.Children.Count > 1
+            && normalPanel.Children[1] is TextBlock normalCount)
+        {
+            normalCount.Foreground = (SolidColorBrush)Application.Current.Resources["SuccessBrush"];
+        }
+
+        UpdateProblemCountColor();
+    }
+
+    private void PositionPillAtColumn(int columnIndex, bool animate)
+    {
+        double containerWidth = FilterContainer.ActualWidth;
+        if (containerWidth <= 0)
+        {
+            FilterSelectionPill.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        FilterSelectionPill.Visibility = Visibility.Visible;
+        double columnWidth = containerWidth / _filterButtons.Length;
+        double targetX = columnIndex * columnWidth;
+
+        if (animate)
+        {
+            AnimatePillToX(targetX);
+        }
+        else
+        {
+            PillTransform.X = targetX;
+        }
+    }
+
+    private void AnimatePillToX(double targetX)
+    {
+        _currentAnimation?.Stop();
+        var duration = new Duration(TimeSpan.FromMilliseconds(250));
+        var animation = new DoubleAnimation
+        {
+            To = targetX,
+            Duration = duration,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(animation, PillTransform);
+        Storyboard.SetTargetProperty(animation, "X");
+        _currentAnimation = new Storyboard();
+        _currentAnimation.Children.Add(animation);
+        _currentAnimation.Begin();
     }
 
     private void UpdateProblemCountColor()
     {
-        if (_vm.HasProblems)
-        {
-            ProblemCountText.Foreground = (SolidColorBrush)Application.Current.Resources["DangerBrush"];
-        }
-        else
-        {
-            ProblemCountText.Foreground = (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
-        }
+        ProblemCountText.Foreground = _vm.HasProblems
+            ? (SolidColorBrush)Application.Current.Resources["DangerBrush"]
+            : (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
     }
 
     private void Package_DragOver(object sender, DragEventArgs e)

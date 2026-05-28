@@ -184,55 +184,73 @@
                     </StackPanel>
                 </Border>
 
-                <Grid Grid.Row="4" ColumnSpacing="20" Margin="-5,0" Visibility="{Binding FilterAndListVisibility}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="AllFilterButton" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="全部">
-                        <StackPanel>
-                            <TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="NormalFilterButton" Grid.Column="1" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="正常">
-                        <StackPanel>
-                            <TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="UpdateFilterButton" Grid.Column="2" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="可更新">
-                        <StackPanel>
-                            <TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="ProblemFilterButton" Grid.Column="3" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="有问题">
-                        <StackPanel>
-                            <TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock x:Name="ProblemCountText" Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="DisabledFilterButton" Grid.Column="4" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="已禁用">
-                        <StackPanel>
-                            <TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="FavoriteFilterButton" Grid.Column="5" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="收藏">
-                        <StackPanel>
-                            <TextBlock Text="收藏" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
+                <Border Grid.Row="4" CornerRadius="16" Background="{ThemeResource CardBackgroundBrush}"
+                        Padding="4" Margin="-5,0" Visibility="{Binding FilterAndListVisibility}">
+                    <Grid x:Name="FilterContainer">
+                        <!-- Button grid -->
+                        <Grid x:Name="FilterButtonGrid">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Selection pill (inside the same grid, fills one column) -->
+                            <Border x:Name="FilterSelectionPill"
+                                    Background="{StaticResource AccentBrush}"
+                                    CornerRadius="20"
+                                    HorizontalAlignment="Stretch"
+                                    RenderTransformOrigin="0.0,0.5"
+                                    Visibility="Collapsed">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="PillTransform" />
+                                </Border.RenderTransform>
+                            </Border>
+                            <Button x:Name="AllFilterButton" Style="{StaticResource FilterPillButtonStyle}"
+                                    Command="{Binding FilterCommand}" CommandParameter="全部">
+                                <StackPanel>
+                                    <TextBlock Text="已安装" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding InstalledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="NormalFilterButton" Grid.Column="1" Style="{StaticResource FilterPillButtonStyle}"
+                                    Command="{Binding FilterCommand}" CommandParameter="正常">
+                                <StackPanel>
+                                    <TextBlock Text="正常" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding HealthyCount}" FontSize="27" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="UpdateFilterButton" Grid.Column="2" Style="{StaticResource FilterPillButtonStyle}"
+                                    Command="{Binding FilterCommand}" CommandParameter="可更新">
+                                <StackPanel>
+                                    <TextBlock Text="可更新" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding UpdateCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="ProblemFilterButton" Grid.Column="3" Style="{StaticResource FilterPillButtonStyle}"
+                                    Command="{Binding FilterCommand}" CommandParameter="有问题">
+                                <StackPanel>
+                                    <TextBlock Text="有问题" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock x:Name="ProblemCountText" Text="{Binding ProblemCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="DisabledFilterButton" Grid.Column="4" Style="{StaticResource FilterPillButtonStyle}"
+                                    Command="{Binding FilterCommand}" CommandParameter="已禁用">
+                                <StackPanel>
+                                    <TextBlock Text="已禁用" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding DisabledCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="FavoriteFilterButton" Grid.Column="5" Style="{StaticResource FilterPillButtonStyle}"
+                                    Command="{Binding FilterCommand}" CommandParameter="收藏">
+                                <StackPanel>
+                                    <TextBlock Text="收藏" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
 
                 <Grid Grid.Row="5" ColumnSpacing="14" MinHeight="250" Visibility="{Binding FilterAndListVisibility}">
                     <Grid.ColumnDefinitions>
