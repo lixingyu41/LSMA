@@ -14,8 +14,8 @@ public sealed partial class ModsPage : Page
 {
     private static readonly Dictionary<string, int> FilterIndexMap = new()
     {
-        ["全部"] = 0, ["正常"] = 1, ["可更新"] = 2,
-        ["有问题"] = 3, ["已禁用"] = 4, ["收藏"] = 5,
+        ["全部"] = 0, ["可更新"] = 1,
+        ["有问题"] = 2, ["已禁用"] = 3, ["收藏"] = 4,
     };
 
     private ModsViewModel _vm = null!;
@@ -33,7 +33,7 @@ public sealed partial class ModsPage : Page
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _filterButtons = [AllFilterButton, NormalFilterButton, UpdateFilterButton,
+        _filterButtons = [AllFilterButton, UpdateFilterButton,
                            ProblemFilterButton, DisabledFilterButton, FavoriteFilterButton];
         FilterContainer.SizeChanged += OnFilterContainerSizeChanged;
         UpdateFilterSelection(_vm.CurrentFilter);
@@ -76,7 +76,7 @@ public sealed partial class ModsPage : Page
     private void UpdateButtonColors(int selectedIndex)
     {
         if (_filterButtons is null) return;
-        var selectedFg = new SolidColorBrush(Color.FromArgb(255, 37, 32, 25)); // #252019
+        var selectedFg = new SolidColorBrush(Colors.Black);
         var unselectedFg = (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
 
         for (int i = 0; i < _filterButtons.Length; i++)
@@ -104,23 +104,6 @@ public sealed partial class ModsPage : Page
                     countTb.Foreground = isSelected ? selectedFg : unselectedFg;
                 }
             }
-        }
-
-        // "正常" count always green
-        if (NormalFilterButton.Content is Grid normalOuter && normalOuter.Children.Count > 1
-            && normalOuter.Children[1] is Grid normalInner && normalInner.Children.Count > 1
-            && normalInner.Children[1] is TextBlock normalCount)
-        {
-            normalCount.Foreground = (SolidColorBrush)Application.Current.Resources["SuccessBrush"];
-        }
-
-        // "正常" label also reverts to MutedTextStyle when unselected
-        if (NormalFilterButton.Content is Grid nOuter && nOuter.Children.Count > 1
-            && nOuter.Children[1] is Grid nInner && nInner.Children.Count > 1
-            && nInner.Children[0] is TextBlock normalLabel
-            && selectedIndex != 1)
-        {
-            normalLabel.ClearValue(TextBlock.ForegroundProperty);
         }
 
         UpdateProblemCountColor();
