@@ -48,6 +48,7 @@ public sealed class AppServices
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
         Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
+        Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Platform, Dialogs);
     }
 
     public LoggingService Logging { get; }
@@ -89,6 +90,7 @@ public sealed class AppServices
     public GuideViewModel Guide { get; }
     public SavesViewModel Saves { get; }
     public SettingsViewModel SettingsPage { get; }
+    public DownloadsViewModel Downloads { get; }
 
     public async Task InitializeAppearanceAsync()
     {

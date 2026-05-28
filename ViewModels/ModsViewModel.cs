@@ -4,7 +4,6 @@ using LSMA.Models;
 using LSMA.Services;
 using LSMA.Utilities;
 using Microsoft.UI.Xaml;
-
 namespace LSMA.ViewModels;
 
 public sealed class ModsViewModel : ViewModelBase
@@ -77,7 +76,7 @@ public sealed class ModsViewModel : ViewModelBase
         BackupCommand = new AsyncRelayCommand(BackupAsync, HasSelected);
         OpenModFolderCommand = new AsyncRelayCommand(OpenModFolderAsync, HasSelected);
         OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.ModBackups));
-        ChoosePackageCommand = new AsyncRelayCommand(InstallOrBrowseAsync);
+        ChoosePackageCommand = new AsyncRelayCommand(ChoosePackageAsync, CanModify);
         InstallPackageCommand = new AsyncRelayCommand(InstallPackageAsync, CanInstallPackage);
         CancelPackageCommand = new AsyncRelayCommand(ClearPackagePlanAsync);
         BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, CanUseOnline);
@@ -309,6 +308,12 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(AvailableVisibility));
         OnPropertyChanged(nameof(FilterAndListVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
+        OnPropertyChanged(nameof(InstalledCount));
+        OnPropertyChanged(nameof(HealthyCount));
+        OnPropertyChanged(nameof(ProblemCount));
+        OnPropertyChanged(nameof(DisabledCount));
+        OnPropertyChanged(nameof(FavoriteCount));
+        OnPropertyChanged(nameof(UpdateCount));
         OnPropertyChanged(nameof(TaskStatus));
         NotifyCommands();
     }

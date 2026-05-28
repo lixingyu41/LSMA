@@ -155,6 +155,7 @@ public sealed partial class MainWindow : Window
         var pageType = tag switch
         {
             "mods" => typeof(ModsPage),
+            "downloads" => typeof(DownloadsPage),
             "guide" => typeof(GuidePage),
             "saves" => typeof(SavesPage),
             "settings" => typeof(SettingsPage),

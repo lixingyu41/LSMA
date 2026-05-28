@@ -25,21 +25,16 @@
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
                 </StackPanel>
                 <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True" HorizontalAlignment="Right">
-                    <AppBarButton Label="{Binding InstallButtonText}" Command="{Binding ChoosePackageCommand}">
+                    <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
-                    </AppBarButton>
-                    <AppBarButton Label="返回已安装" Command="{Binding ShowInstalledCommand}" Visibility="{Binding OnlinePanelVisibility}">
-                        <AppBarButton.Icon><FontIcon Glyph="&#xE711;" /></AppBarButton.Icon>
                     </AppBarButton>
                     <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}" Visibility="{Binding OnlineBarVisibility}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
                     </AppBarButton>
-                    <AppBarButton Label="收藏" Command="{Binding ShowFavoritesCommand}">
-                        <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
+                    <AppBarButton Label="备份目录" Command="{Binding OpenBackupsCommand}" Visibility="{Binding OnlineBarVisibility}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE8A7;" /></AppBarButton.Icon>
                     </AppBarButton>
                 </CommandBar>
-                <Button Grid.Column="2" Content="备份目录" Command="{Binding OpenBackupsCommand}" Visibility="{Binding OnlineBarVisibility}"
-                        Style="{StaticResource SubtleButtonStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
             </Grid>
 
             <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
