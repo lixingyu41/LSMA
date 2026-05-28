@@ -17,12 +17,12 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
                     <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                    <Button Content="打开备份目录" Command="{Binding OpenBackupsCommand}" Style="{StaticResource SubtleButtonStyle}" />
                 </StackPanel>
                 <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True" HorizontalAlignment="Right">
                     <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
@@ -31,16 +31,12 @@
                     <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
                     </AppBarButton>
-                    <AppBarButton Label="发现" Command="{Binding BrowseCommand}" CommandParameter="趋势">
-                        <AppBarButton.Icon><FontIcon Glyph="&#xE721;" /></AppBarButton.Icon>
-                    </AppBarButton>
                     <AppBarButton Label="收藏" Command="{Binding ShowFavoritesCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
                     </AppBarButton>
-                    <AppBarButton Label="下载" Command="{Binding ShowDownloadsCommand}">
-                        <AppBarButton.Icon><FontIcon Glyph="&#xE896;" /></AppBarButton.Icon>
-                    </AppBarButton>
                 </CommandBar>
+                <Button Grid.Column="2" Content="备份目录" Command="{Binding OpenBackupsCommand}"
+                        Style="{StaticResource SubtleButtonStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
             </Grid>
 
             <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
@@ -139,14 +135,18 @@
                                 <TextBlock Text="{Binding SelectedOnlineMod.Name}" FontWeight="SemiBold" />
                                 <TextBlock Text="{Binding SelectedOnlineMod.Summary}" Style="{StaticResource BodyTextStyle}" MaxHeight="60" />
                                 <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <ToggleButton Content="选择" Command="{Binding ToggleFavoriteCommand}"
+                                    <ToggleButton Content="{Binding FavoriteButtonText}" Command="{Binding ToggleFavoriteCommand}"
                                                   IsChecked="{Binding SelectedOnlineMod.IsFavorite, Mode=OneWay}"
                                                   Style="{StaticResource ChoiceToggleStyle}" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}" DisplayMemberPath="DisplayText" PlaceholderText="选择文件" MinWidth="250" />
-                                    <Button Content="刷新" Command="{Binding LoadFilesCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                                </StackPanel>
+                                <Grid Height="32">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}" DisplayMemberPath="DisplayText" PlaceholderText="选择文件" VerticalAlignment="Stretch" />
+                                    <Button Grid.Column="1" Content="刷新" Command="{Binding LoadFilesCommand}" Style="{StaticResource SubtleButtonStyle}" VerticalAlignment="Stretch" Padding="12,0" />
+                                </Grid>
                                 <Button Content="下载并预检" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
                                 <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
                             </StackPanel>
@@ -184,12 +184,11 @@
                     </StackPanel>
                 </Border>
 
-                <Grid Grid.Row="4" ColumnSpacing="6" Margin="-30,0" Visibility="{Binding AvailableVisibility}">
+                <Grid Grid.Row="4" ColumnSpacing="20" Margin="-5,0" Visibility="{Binding FilterAndListVisibility}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Button x:Name="AllFilterButton" Style="{StaticResource CardFilterButtonStyle}"
                             Command="{Binding FilterCommand}" CommandParameter="全部">
@@ -233,16 +232,9 @@
                             <TextBlock Text="{Binding FavoriteCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button x:Name="ArchivedFilterButton" Grid.Column="6" Style="{StaticResource CardFilterButtonStyle}"
-                            Command="{Binding FilterCommand}" CommandParameter="已归档">
-                        <StackPanel>
-                            <TextBlock Text="已归档" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding ArchivedCount}" FontSize="27" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
                 </Grid>
 
-                <Grid Grid.Row="5" ColumnSpacing="14" MinHeight="250" Visibility="{Binding AvailableVisibility}">
+                <Grid Grid.Row="5" ColumnSpacing="14" MinHeight="250" Visibility="{Binding FilterAndListVisibility}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="430" />
                         <ColumnDefinition Width="*" />

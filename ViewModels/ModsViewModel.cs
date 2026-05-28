@@ -181,6 +181,7 @@ public sealed class ModsViewModel : ViewModelBase
             if (SetProperty(ref _selectedOnlineMod, value))
             {
                 OnlineFiles.Clear();
+                OnPropertyChanged(nameof(FavoriteButtonText));
                 NotifyCommands();
             }
         }
@@ -260,10 +261,12 @@ public sealed class ModsViewModel : ViewModelBase
     public string DisabledCount => _allMods.Count(mod => !mod.IsEnabled && !mod.IsArchived).ToString();
     public string MissingDependencyCount => _allMods.Count(mod => mod.Issues.Any(issue => issue.Message.Contains("前置", StringComparison.Ordinal))).ToString();
     public string FavoriteCount => _allMods.Count(mod => mod.IsFavorite).ToString();
-    public string ArchivedCount => _allMods.Count(mod => mod.IsArchived).ToString();
     public string UpdateCount => _allMods.Count(mod => mod.HasUpdate).ToString();
     public string CurrentFilter => _filter;
     public bool HasProblems => _allMods.Any(mod => mod.Issues.Count > 0);
+    public string FavoriteButtonText => SelectedOnlineMod?.IsFavorite == true ? "已收藏" : "收藏";
+    public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed
+        ? Visibility.Visible : Visibility.Collapsed;
     public string TaskStatus => IsBusy ? ProgressText : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
     public ModInstallPlan? PendingPlan
     {
@@ -273,6 +276,7 @@ public sealed class ModsViewModel : ViewModelBase
             if (SetProperty(ref _pendingPlan, value))
             {
                 OnPropertyChanged(nameof(PlanVisibility));
+                OnPropertyChanged(nameof(FilterAndListVisibility));
                 InstallPackageCommand.NotifyCanExecuteChanged();
             }
         }
@@ -290,6 +294,7 @@ public sealed class ModsViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(UnavailableVisibility));
         OnPropertyChanged(nameof(AvailableVisibility));
+        OnPropertyChanged(nameof(FilterAndListVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
         OnPropertyChanged(nameof(TaskStatus));
         NotifyCommands();
@@ -473,7 +478,6 @@ public sealed class ModsViewModel : ViewModelBase
             "缺少前置" => mod.Issues.Any(issue => issue.Message.Contains("前置", StringComparison.Ordinal)),
             "有问题" => mod.Issues.Count > 0,
             "已禁用" => !mod.IsEnabled,
-            "已归档" => mod.IsArchived,
             "收藏" => mod.IsFavorite,
             "可更新" => mod.HasUpdate,
             _ => true
@@ -699,6 +703,7 @@ public sealed class ModsViewModel : ViewModelBase
         await _favoritesService.ToggleAsync(mod, _favoriteValues);
         mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
         FeedbackMessage = mod.IsFavorite ? "已加入收藏。" : "已取消收藏。";
+        OnPropertyChanged(nameof(FavoriteButtonText));
         await ShowFavoritesAsync();
         OnPropertyChanged(nameof(FeedbackMessage));
     }

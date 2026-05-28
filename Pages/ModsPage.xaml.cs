@@ -50,7 +50,6 @@ public sealed partial class ModsPage : Page
         ProblemFilterButton.Style = currentFilter == "有问题" ? selectedStyle : unselectedStyle;
         DisabledFilterButton.Style = currentFilter == "已禁用" ? selectedStyle : unselectedStyle;
         FavoriteFilterButton.Style = currentFilter == "收藏" ? selectedStyle : unselectedStyle;
-        ArchivedFilterButton.Style = currentFilter == "已归档" ? selectedStyle : unselectedStyle;
     }
 
     private void UpdateProblemCountColor()
