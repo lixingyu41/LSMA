@@ -37,7 +37,7 @@ public sealed class SaveInfo
     public string ListDisplay => $"{FarmName}-{FarmerName}-{Year}年{Season}{Day}日";
     public string MoneyDisplay => $"{Money:N0}g";
     public string TotalIncomeDisplay => $"{TotalMoneyEarned:N0}g";
-    public string ProgressDisplay => $"版本 {GameVersion} · 总天数 {TotalDays}";
+    public string ProgressDisplay => $"版本 {GameVersion}";
     public string HouseholdDisplay => $"农场类型：{FarmType} · 配偶：{Spouse} · 宠物：{Pet}";
     public string ExplorationDisplay => $"矿洞 {MineLevel} 层 · 沙漠矿洞 {SkullCavernLevel} 层 · Qi 宝石 {QiGems}";
     public int RemainingDaysInSeason => Math.Max(0, 28 - Day);
