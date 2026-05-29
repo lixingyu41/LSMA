@@ -105,8 +105,25 @@ public sealed class SavesViewModel : ViewModelBase
     public Visibility AvailableVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DetailVisibility => SelectedSave is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
-    public string BackupStatus => SelectedSave?.LatestBackup is { } date ? $"最近备份：{date:yyyy-MM-dd HH:mm}" : "尚无备份";
-    public string TaskStatus => IsBusy ? ProgressText : "就绪";
+    public string BackupStatus => SelectedSave?.LatestBackup is { } date
+        ? $"最近备份：{FormatRelativeTime(date)}"
+        : "尚无备份";
+
+    public string BackupToolTip => SelectedSave?.LatestBackup is { } date
+        ? date.ToString("yyyy-MM-dd HH:mm:ss")
+        : string.Empty;
+
+    private static string FormatRelativeTime(DateTime date)
+    {
+        var span = DateTime.Now - date;
+        if (span.TotalSeconds < 60) return "刚刚";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}分钟前";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}小时前";
+        if (span.TotalDays < 7) return $"{(int)span.TotalDays}天前";
+        if (span.TotalDays < 30) return $"{(int)(span.TotalDays / 7)}周前";
+        if (span.TotalDays < 365) return $"{(int)(span.TotalDays / 30)}个月前";
+        return $"{(int)(span.TotalDays / 365)}年前";
+    }
     public string SavesCountDisplay => $"共发现 {Saves.Count} 个存档";
     public string SelectedSaveStats => SelectedSave is null
         ? string.Empty
@@ -143,7 +160,6 @@ public sealed class SavesViewModel : ViewModelBase
         OnPropertyChanged(nameof(UnavailableVisibility));
         OnPropertyChanged(nameof(AvailableVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
-        OnPropertyChanged(nameof(TaskStatus));
         OnPropertyChanged(nameof(SavesCountDisplay));
         BackupCommand.NotifyCanExecuteChanged();
         BackupAllCommand.NotifyCanExecuteChanged();
