@@ -90,37 +90,37 @@
                  Message="当前可以查看存档，但恢复操作已暂停。" Visibility="{Binding RunningVisibility}" />
 
         <!-- Row 2: 详情面板（全宽） -->
-        <ScrollViewer Grid.Row="2" Visibility="{Binding AvailableVisibility}" Margin="0,0,-30,0" Padding="0,0,30,0">
+        <ScrollViewer x:Name="DetailScrollViewer" Grid.Row="2" Visibility="{Binding AvailableVisibility}" Margin="0,0,-30,0" Padding="0,0,30,0">
             <StackPanel Spacing="16" Visibility="{Binding DetailVisibility}">
 
                     <!-- 卡片行 1：时间相关 -->
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <Border Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="当前游戏内的日期、季节和天数">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><Image Source="{Binding SelectedSave.SeasonIconUri}" Width="18" Height="18" /><TextBlock Text="游戏日期" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.DateDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="从游戏第1天开始累计的经过天数">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE787;" FontSize="14" /><TextBlock Text="总天数" FontSize="13" /></StackPanel>
                                 <TextBlock FontWeight="SemiBold" FontSize="15"><Run Text="{Binding SelectedSave.TotalDays}" /><Run Text=" 天" /></TextBlock>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="实际游戏游玩时长（不含暂停和过场）">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE823;" FontSize="14" /><TextBlock Text="游戏时间" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.PlayTimeDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="当前持有的金币数量">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8C7;" FontSize="14" /><TextBlock Text="当前金币" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.MoneyDisplay}" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource AccentBrush}" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="游戏开始以来累计获得的金币总额">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9D2;" FontSize="14" /><TextBlock Text="总收入" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.TotalIncomeDisplay}" FontWeight="SemiBold" FontSize="15" />
@@ -131,31 +131,31 @@
                     <!-- 卡片行 2：经济与进度 -->
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <Border Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="总收入 ÷ 总天数，反映每日平均收益水平">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8C7;" FontSize="14" /><TextBlock Text="日均收入" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.AverageMoneyDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="按当前日均收入 × 28天估算的每季度预期收入">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9D2;" FontSize="14" /><TextBlock Text="季度估算" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.SeasonEstimateDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="社区中心全部献祭包裹的完成比例">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE73E;" FontSize="14" /><TextBlock Text="社区中心" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.CommunityCenterDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="出货和收集品完成进度，共145种物品">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8FD;" FontSize="14" /><TextBlock Text="全收集" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.CollectionDisplay}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="当前存档选择的农场地图类型">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE81E;" FontSize="14" /><TextBlock Text="农场类型" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.FarmType}" FontWeight="SemiBold" FontSize="15" />
@@ -166,31 +166,31 @@
                     <!-- 卡片行 3：家庭与探索 -->
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <Border Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="当前角色的结婚对象或室友">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE716;" FontSize="14" /><TextBlock Text="配偶" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.Spouse}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="当前农场饲养的宠物种类">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE76E;" FontSize="14" /><TextBlock Text="宠物" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.Pet}" FontWeight="SemiBold" FontSize="15" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="普通矿洞到达的最深层数，最高120层">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE81C;" FontSize="14" /><TextBlock Text="矿洞" FontSize="13" /></StackPanel>
                                 <TextBlock FontWeight="SemiBold" FontSize="15"><Run Text="{Binding SelectedSave.MineLevel}" /><Run Text=" 层" /></TextBlock>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="沙漠骷髅矿洞到达的最深层数">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7AC;" FontSize="14" /><TextBlock Text="沙漠矿洞" FontSize="13" /></StackPanel>
                                 <TextBlock FontWeight="SemiBold" FontSize="15"><Run Text="{Binding SelectedSave.SkullCavernLevel}" /><Run Text=" 层" /></TextBlock>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12">
+                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="12" ToolTipService.ToolTip="当前持有的齐氏宝石数量，用于兑换姜岛特殊物品">
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE970;" FontSize="14" /><TextBlock Text="Qi宝石" FontSize="13" /></StackPanel>
                                 <TextBlock Text="{Binding SelectedSave.QiGems}" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource AccentBrush}" />
