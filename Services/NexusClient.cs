@@ -140,22 +140,26 @@ public sealed class NexusClient(LoggingService logging)
     {
         return statusCode switch
         {
-            HttpStatusCode.Unauthorized => new NexusApiException("授权码无效，请重新生成后保存。"),
-            HttpStatusCode.Forbidden => new NexusApiException("当前账户没有执行该操作的权限。非 Premium 下载请先在 Nexus 页面选择文件。"),
-            HttpStatusCode.NotFound => new NexusApiException("Nexus 上找不到该资源。"),
+            HttpStatusCode.Unauthorized => new NexusApiException("授权码无效，请重新生成后保存。", statusCode),
+            HttpStatusCode.Forbidden => new NexusApiException("当前账户需要浏览器确认下载，请在 Nexus 页面选择文件。", statusCode),
+            HttpStatusCode.NotFound => new NexusApiException("Nexus 上找不到该资源。", statusCode),
             HttpStatusCode.TooManyRequests => StartCooldown(),
-            _ => new NexusApiException($"Nexus 请求失败，服务返回 {(int)statusCode}。")
+            _ => new NexusApiException($"Nexus 请求失败，服务返回 {(int)statusCode}。", statusCode)
         };
     }
 
     private NexusApiException StartCooldown()
     {
         _cooldownUntil = DateTime.Now.AddMinutes(5);
-        return new NexusApiException("请求被限流，LSMA 已暂停在线请求 5 分钟。");
+        return new NexusApiException("请求被限流，LSMA 已暂停在线请求 5 分钟。", HttpStatusCode.TooManyRequests);
     }
 
     private static string GetVersion()
         => typeof(NexusClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
 }
 
-public sealed class NexusApiException(string message) : Exception(message);
+public sealed class NexusApiException(string message, HttpStatusCode? statusCode = null) : Exception(message)
+{
+    public HttpStatusCode? StatusCode { get; } = statusCode;
+    public bool RequiresBrowserDownload => StatusCode == HttpStatusCode.Forbidden;
+}

@@ -131,7 +131,8 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
                 IconTexture = item.IconTexture,
                 IconSpriteIndex = item.IconSpriteIndex,
                 IconWidth = item.IconWidth,
-                IconHeight = item.IconHeight
+                IconHeight = item.IconHeight,
+                GuideQuery = item.Name
             })
             .ToList();
     }
@@ -875,9 +876,14 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             }
         }
 
-        foreach (var item in LoadRecipeCollectionItems(cookingRecipes, objectNamesById))
+        foreach (var item in LoadRecipeCollectionItems(cookingRecipes, objectNamesById, "食材", "烹饪食谱"))
         {
             AddCollectionCatalogItem("Cooking", item);
+        }
+
+        foreach (var item in LoadRecipeCollectionItems(craftingRecipes, objectNamesById, "材料", "制造配方"))
+        {
+            AddCollectionCatalogItem("Crafting", item);
         }
 
         foreach (var result in LoadRecipeSearchResults(cookingRecipes, objectNamesById, "菜谱").ToList())
@@ -2342,7 +2348,9 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
 
     private static IEnumerable<CollectionCatalogItem> LoadRecipeCollectionItems(
         IReadOnlyDictionary<string, string> recipeData,
-        IReadOnlyDictionary<string, string> objectNamesById)
+        IReadOnlyDictionary<string, string> objectNamesById,
+        string ingredientLabel,
+        string fallbackDetail)
     {
         foreach (var (recipeKey, raw) in recipeData)
         {
@@ -2365,8 +2373,8 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
                 recipeKey,
                 outputName,
                 ingredients.Count > 0
-                    ? $"食材：{string.Join("、", ingredients.Select(item => item.DisplayText))}"
-                    : "烹饪食谱",
+                    ? $"{ingredientLabel}：{string.Join("、", ingredients.Select(item => item.DisplayText))}"
+                    : fallbackDetail,
                 objectId,
                 null,
                 null,

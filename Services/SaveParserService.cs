@@ -63,21 +63,44 @@ public sealed class SaveParserService(
         "ccVault"
     ];
 
-    private static readonly string[] MonsterEradicationFlags =
+    private static readonly PerfectionGoal[] ObeliskGoals =
     [
-        "Gil_Slimes",
-        "Gil_VoidSpirits",
-        "Gil_Bats",
-        "Gil_Skeletons",
-        "Gil_Insects",
-        "Gil_Duggies",
-        "Gil_DustSprites",
-        "Gil_RockCrabs",
-        "Gil_Mummies",
-        "Gil_Serpents",
-        "Gil_MagmaSprites",
-        "Gil_PepperRex"
+        new("Earth Obelisk", "地之图腾柱", "传送到山脉区域的后期建筑", "地之图腾柱"),
+        new("Water Obelisk", "水之图腾柱", "传送到海滩区域的后期建筑", "水之图腾柱"),
+        new("Desert Obelisk", "沙漠图腾柱", "传送到卡利科沙漠的后期建筑", "沙漠图腾柱"),
+        new("Island Obelisk", "姜岛图腾柱", "传送到姜岛的后期建筑", "姜岛图腾柱")
     ];
+
+    private static readonly PerfectionGoal[] StardropGoals =
+    [
+        new("Stardrop.Fair", "星露谷展览会星之果实", "在秋季星露谷展览会兑换获得", "星之果实"),
+        new("Stardrop.Mines", "矿洞 100 层星之果实", "到达矿洞 100 层宝箱获得", "星之果实"),
+        new("Stardrop.Spouse", "配偶或室友星之果实", "结婚或室友关系达到条件后获得", "星之果实"),
+        new("Stardrop.Krobus", "下水道星之果实", "在科罗布斯商店购买获得", "星之果实"),
+        new("Stardrop.SecretNote", "秘密纸条星之果实", "根据秘密纸条线索获得", "星之果实"),
+        new("Stardrop.Museum", "博物馆星之果实", "博物馆捐赠达到目标后获得", "星之果实"),
+        new("Stardrop.Fishing", "钓鱼大师星之果实", "钓到全部鱼类后从威利处获得", "星之果实")
+    ];
+
+    private static readonly MonsterEradicationGoal[] MonsterEradicationGoals =
+    [
+        new("Gil_Slimes", "史莱姆除害目标", "史莱姆"),
+        new("Gil_VoidSpirits", "虚空怪除害目标", "暗影狂徒"),
+        new("Gil_Bats", "蝙蝠除害目标", "蝙蝠"),
+        new("Gil_Skeletons", "骷髅除害目标", "骷髅"),
+        new("Gil_Insects", "昆虫除害目标", "臭虫"),
+        new("Gil_Duggies", "掘地虫除害目标", "掘地虫"),
+        new("Gil_DustSprites", "灰尘精灵除害目标", "灰尘精灵"),
+        new("Gil_RockCrabs", "岩石蟹除害目标", "岩石蟹"),
+        new("Gil_Mummies", "木乃伊除害目标", "木乃伊"),
+        new("Gil_Serpents", "飞蛇除害目标", "飞蛇"),
+        new("Gil_MagmaSprites", "岩浆精灵除害目标", "岩浆精灵"),
+        new("Gil_PepperRex", "霸王喷火龙除害目标", "霸王喷火龙")
+    ];
+
+    private static readonly string[] MonsterEradicationFlags = MonsterEradicationGoals
+        .Select(goal => goal.Flag)
+        .ToArray();
 
     public async Task<SaveInfo?> ParseAsync(SaveSource source)
     {
@@ -230,6 +253,7 @@ public sealed class SaveParserService(
         AddCollectionStats(save);
         AddCollectionDetails(save, player);
         AddPerfectionStats(save);
+        AddPerfectionDetails(save, root);
         AddMonsterKillStats(save, player);
         AddFishCatchStats(save, player);
         save.PerfectionProgress = CalculatePerfectionProgress(save);
@@ -254,6 +278,7 @@ public sealed class SaveParserService(
         AddCollectionDetails(save, "Minerals", player, "mineralsFound");
         AddCollectionDetails(save, "Artifacts", player, "archaeologyFound");
         AddCollectionDetails(save, "Cooking", player, "cookingRecipes");
+        AddCollectionDetails(save, "Crafting", player, "craftingRecipes");
         AddCollectionDetails(save, "Fish", player, "fishCaught");
     }
 
@@ -272,25 +297,125 @@ public sealed class SaveParserService(
         var friendshipTotal = save.Friendships.Count > 0 ? save.Friendships.Count : TotalGreatFriends;
         save.PerfectionStats.AddRange(
         [
-            Progress("农场上的图腾柱", save.ObelisksBuilt, TotalObelisks, "图腾柱是后期传送建筑，地、水、沙漠、姜岛四座都属于完美度目标"),
-            Toggle("农场上有黄金时钟", save.HasGoldClock, "黄金时钟是后期昂贵建筑，可以阻止农场杂草和栅栏腐坏，也是完美度目标之一"),
-            Progress("好朋友", save.GoodFriends, friendshipTotal, "好朋友统计达到当前关系上限的村民，完美度要求主要村民关系达到上限"),
-            Progress("找到所有星之果实", save.StardropsFound, 7, "星之果实会永久增加最大体力，全部找到是完美度目标之一"),
-            Progress("制作的制造设计图", save.CraftedRecipes, TotalCraftingRecipes, "制造设计图统计已经制作过的配方，完美度要求每种配方至少制作一次"),
-            Progress("找到的金色核桃", save.GoldenWalnutsFound, TotalGoldenWalnuts, "金色核桃是姜岛探索货币，可解锁道路、建筑、传送点和齐先生核桃房"),
-            Progress("已售出的产品和采集品", save.ItemsShipped, TotalShippableItems, "出货项目要求把主要产品和采集品至少出货一次，是完美度的重要组成"),
-            Toggle("杀怪英雄", save.IsMonsterHero, "杀怪英雄要求完成冒险者公会主要除害目标，会影响完美度中的战斗项目"),
-            Progress("农场主等级", save.FarmerLevelScore, TotalFarmerLevelScore, "农场主等级由五项技能综合折算，代表角色基础成长是否接近满档"),
-            Progress("制作的烹饪食谱", save.CookedRecipes, TotalCookingRecipes, "烹饪食谱要求每道菜至少制作一次，通常需要补齐配方和食材来源"),
-            Progress("捕获的鱼", save.FishSpeciesCaught, TotalFishSpecies, "捕获的鱼统计鱼类图鉴完成情况，完美度要求所有鱼类都至少钓到一次"),
+            Progress("农场上的图腾柱", save.ObelisksBuilt, TotalObelisks, "图腾柱是后期传送建筑，地、水、沙漠、姜岛四座都属于完美度目标", detailKey: "Perfection.Obelisks"),
+            Toggle("农场上有黄金时钟", save.HasGoldClock, "黄金时钟是后期昂贵建筑，可以阻止农场杂草和栅栏腐坏，也是完美度目标之一", "Perfection.GoldClock"),
+            Progress("好朋友", save.GoodFriends, friendshipTotal, "好朋友统计达到当前关系上限的村民，完美度要求主要村民关系达到上限", detailKey: "Perfection.Friends"),
+            Progress("找到所有星之果实", save.StardropsFound, 7, "星之果实会永久增加最大体力，全部找到是完美度目标之一", detailKey: "Perfection.Stardrops"),
+            Progress("制作的制造设计图", save.CraftedRecipes, TotalCraftingRecipes, "制造设计图统计已经制作过的配方，完美度要求每种配方至少制作一次", detailKey: "Crafting"),
+            Progress("找到的金色核桃", save.GoldenWalnutsFound, TotalGoldenWalnuts, "金色核桃是姜岛探索货币，可解锁道路、建筑、传送点和齐先生核桃房", detailKey: "Perfection.Walnuts"),
+            Progress("已售出的产品和采集品", save.ItemsShipped, TotalShippableItems, "出货项目要求把主要产品和采集品至少出货一次，是完美度的重要组成", detailKey: "Shipped"),
+            Toggle("杀怪英雄", save.IsMonsterHero, "杀怪英雄要求完成冒险者公会主要除害目标，会影响完美度中的战斗项目", "Perfection.MonsterHero"),
+            Progress("农场主等级", save.FarmerLevelScore, TotalFarmerLevelScore, "农场主等级由五项技能综合折算，代表角色基础成长是否接近满档", detailKey: "Perfection.FarmerLevel"),
+            Progress("制作的烹饪食谱", save.CookedRecipes, TotalCookingRecipes, "烹饪食谱要求每道菜至少制作一次，通常需要补齐配方和食材来源", detailKey: "Cooking"),
+            Progress("捕获的鱼", save.FishSpeciesCaught, TotalFishSpecies, "捕获的鱼统计鱼类图鉴完成情况，完美度要求所有鱼类都至少钓到一次", detailKey: "Fish"),
             new SaveProgressInfo
             {
                 Name = "完美豁免书",
                 Value = save.PerfectionWaivers.ToString("N0"),
                 Percent = 0,
-                Detail = "完美豁免书可在齐先生处购买，用来直接补完美度分数，适合跳过不想完成的目标"
+                Detail = "完美豁免书可在齐先生处购买，用来直接补完美度分数，适合跳过不想完成的目标",
+                DetailKey = "Perfection.Waivers"
             }
         ]);
+    }
+
+    private static void AddPerfectionDetails(SaveInfo save, XElement root)
+    {
+        var buildingTypes = ReadBuildingTypes(root);
+        save.ProgressDetailItems["Perfection.Obelisks"] = ObeliskGoals
+            .Select(goal => DetailItem(
+                goal.Id,
+                goal.Name,
+                buildingTypes.Contains(goal.Id),
+                goal.Detail,
+                goal.GuideQuery,
+                "\uE80F"))
+            .ToList();
+
+        save.ProgressDetailItems["Perfection.GoldClock"] =
+        [
+            DetailItem(
+                "Gold Clock",
+                "黄金时钟",
+                save.HasGoldClock,
+                "农场后期建筑，可阻止农场杂草和栅栏腐坏",
+                "黄金时钟",
+                "\uE80F")
+        ];
+
+        save.ProgressDetailItems["Perfection.Friends"] = save.Friendships.Count > 0
+            ? save.Friendships
+                .OrderBy(friendship => friendship.Hearts < friendship.MaximumHearts)
+                .ThenByDescending(friendship => friendship.Points)
+                .ThenBy(friendship => friendship.Name)
+                .Select(friendship => DetailItem(
+                    friendship.NpcId,
+                    friendship.Name,
+                    friendship.Hearts >= friendship.MaximumHearts,
+                    string.Join(" · ", new[]
+                    {
+                        $"{friendship.Hearts}/{friendship.MaximumHearts} 心",
+                        friendship.RelationshipText
+                    }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                    friendship.Name,
+                    "\uE77B"))
+                .ToList()
+            : CountSummaryItems("好朋友", save.GoodFriends, TotalGreatFriends, "主要村民关系达到上限", "好感", "\uE77B");
+
+        save.ProgressDetailItems["Perfection.Stardrops"] = StardropGoals
+            .Select((goal, index) => DetailItem(
+                goal.Id,
+                goal.Name,
+                index < save.StardropsFound,
+                $"{goal.Detail}；存档只记录星之果实数量，此处按常见来源顺序标记",
+                goal.GuideQuery,
+                "\uE735"))
+            .ToList();
+
+        save.ProgressDetailItems["Perfection.Walnuts"] = CountSummaryItems(
+            "金色核桃",
+            save.GoldenWalnutsFound,
+            TotalGoldenWalnuts,
+            "姜岛探索货币，可解锁道路、建筑、传送点和齐先生核桃房",
+            "金色核桃",
+            "\uE8D1");
+
+        save.ProgressDetailItems["Perfection.MonsterHero"] = MonsterEradicationGoals
+            .Select(goal => DetailItem(
+                goal.Flag,
+                goal.Name,
+                save.MailFlags.Contains(goal.Flag),
+                "冒险者公会除害目标，完成后计入杀怪英雄",
+                goal.GuideQuery,
+                "\uE7FC"))
+            .ToList();
+
+        save.ProgressDetailItems["Perfection.FarmerLevel"] = save.Skills
+            .Where(skill => !skill.Key.Equals("Mastery", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(skill => skill.IsMaxLevel)
+            .ThenByDescending(skill => skill.Level)
+            .ThenBy(skill => skill.Name)
+            .Select(skill => DetailItem(
+                skill.Key,
+                skill.Name,
+                skill.IsMaxLevel,
+                $"{skill.LevelText} · {skill.ExperienceText}",
+                skill.Name,
+                "\uE735"))
+            .ToList();
+
+        save.ProgressDetailItems["Perfection.Waivers"] =
+        [
+            DetailItem(
+                "PerfectionWaivers",
+                "完美豁免书",
+                save.PerfectionWaivers > 0,
+                save.PerfectionWaivers > 0
+                    ? $"已购买 {save.PerfectionWaivers:N0} 本，用于补足完美度分数"
+                    : "未购买；可在齐先生处购买来补足完美度分数",
+                "完美豁免书",
+                "\uE8A5")
+        ];
     }
 
     private static void AddMonsterKillStats(SaveInfo save, XElement player)
@@ -349,7 +474,13 @@ public sealed class SaveParserService(
         }
     }
 
-    private static SaveProgressInfo Progress(string name, int current, int total, string detail, string? collectionKey = null)
+    private static SaveProgressInfo Progress(
+        string name,
+        int current,
+        int total,
+        string detail,
+        string? collectionKey = null,
+        string? detailKey = null)
     {
         var safeTotal = Math.Max(1, total);
         var percent = Math.Clamp(current / (double)safeTotal * 100, 0, 100);
@@ -359,17 +490,70 @@ public sealed class SaveParserService(
             Value = $"{current:N0}/{total:N0}",
             Percent = percent,
             Detail = $"{detail}。当前 {current:N0}/{total:N0}，完成度 {percent:0}%",
-            CollectionKey = collectionKey
+            CollectionKey = collectionKey,
+            DetailKey = detailKey
         };
     }
 
-    private static SaveProgressInfo Toggle(string name, bool value, string detail)
+    private static SaveProgressInfo Toggle(string name, bool value, string detail, string? detailKey = null)
         => new()
         {
             Name = name,
             Value = value ? "是" : "否",
             Percent = value ? 100 : 0,
-            Detail = $"{detail}。当前状态：{(value ? "已完成" : "未完成")}"
+            Detail = $"{detail}。当前状态：{(value ? "已完成" : "未完成")}",
+            DetailKey = detailKey
+        };
+
+    private static List<SaveCollectionItemInfo> CountSummaryItems(
+        string name,
+        int current,
+        int total,
+        string detail,
+        string guideQuery,
+        string glyph)
+    {
+        var safeTotal = Math.Max(1, total);
+        var completed = Math.Clamp(current, 0, safeTotal);
+        var missing = Math.Max(0, safeTotal - completed);
+        return
+        [
+            DetailItem(
+                $"{name}.Done",
+                $"已完成{name}",
+                completed > 0 || missing == 0,
+                $"{detail}；当前已完成 {completed:N0}/{safeTotal:N0}",
+                guideQuery,
+                glyph,
+                completed > 0 || missing == 0 ? "已完成" : "未开始"),
+            DetailItem(
+                $"{name}.Missing",
+                $"未完成{name}",
+                missing == 0,
+                missing == 0 ? "没有未完成项目" : $"{detail}；还差 {missing:N0} 项",
+                guideQuery,
+                glyph,
+                missing == 0 ? "已完成" : "未完成")
+        ];
+    }
+
+    private static SaveCollectionItemInfo DetailItem(
+        string itemId,
+        string name,
+        bool isComplete,
+        string detail,
+        string guideQuery,
+        string glyph,
+        string? statusText = null)
+        => new()
+        {
+            ItemId = itemId,
+            Name = name,
+            Detail = detail,
+            IsCollected = isComplete,
+            GuideQuery = guideQuery,
+            Glyph = glyph,
+            StatusTextOverride = statusText ?? (isComplete ? "已完成" : "未完成")
         };
 
     private static double CalculatePerfectionProgress(SaveInfo save)
@@ -887,6 +1071,14 @@ public sealed class SaveParserService(
         return result;
     }
 
+    private static HashSet<string> ReadBuildingTypes(XElement root)
+        => root.Descendants()
+            .Where(element => !element.HasElements
+                && element.Name.LocalName.Equals("buildingType", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(element.Value))
+            .Select(element => element.Value.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     private static int CountBuildings(XElement root, string namePart)
         => root.Descendants()
             .Count(element => !element.HasElements
@@ -907,4 +1099,8 @@ public sealed class SaveParserService(
         var count = CountDictionaryItems(player, "basicShipped");
         return Math.Clamp(count / 145d * 100, 0, 100);
     }
+
+    private sealed record PerfectionGoal(string Id, string Name, string Detail, string GuideQuery);
+
+    private sealed record MonsterEradicationGoal(string Flag, string Name, string GuideQuery);
 }

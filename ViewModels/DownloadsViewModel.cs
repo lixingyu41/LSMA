@@ -9,6 +9,9 @@ namespace LSMA.ViewModels;
 
 public sealed class DownloadsViewModel : ViewModelBase
 {
+    private const string GameDomain = "stardewvalley";
+    private const int StardewGameId = 1303;
+    private const int PageSize = 20;
     private readonly NexusCredentialService _credentials;
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
@@ -22,11 +25,11 @@ public sealed class DownloadsViewModel : ViewModelBase
     private string _onlinePanelTitle = "趋势";
     private List<NexusFavorite> _favoriteValues = [];
     private CancellationTokenSource? _downloadCancellation;
+    private CancellationTokenSource? _browserTokenWatcher;
     private bool _isDownloading;
     private string _onlineSortValue = "趋势";
     private bool _hasLoaded;
     private int _currentPage = 1;
-    private const int PageSize = 20;
 
     public DownloadsViewModel(
         NexusCredentialService credentials,
@@ -318,13 +321,95 @@ public sealed class DownloadsViewModel : ViewModelBase
         var key = RequireNexusKey();
         if (key is null || SelectedOnlineMod is not { } mod || SelectedOnlineFile is not { } file) return;
 
-        var item = new DownloadQueueItem
+        await DownloadItemAsync(CreateQueueItem(mod, file), key);
+    }
+
+    public async Task HandleNxmLinkAsync(string link)
+    {
+        var key = RequireNexusKey();
+        if (key is null)
+        {
+            return;
+        }
+
+        if (!NexusDownloadToken.TryParse(link, out var token) || token is null)
+        {
+            if (NexusRequirementsPopupLink.TryParse(link, out var popup) && popup is not null)
+            {
+                await HandleRequirementsPopupLinkAsync(popup);
+                return;
+            }
+
+            await _dialogs.ShowMessageAsync("下载链接无效", "Nexus 返回的链接不是最终下载令牌；请点左侧 Slow download，或复制 nxm:// 开头的链接。");
+            return;
+        }
+
+        if (!string.Equals(token.GameDomain, GameDomain, StringComparison.OrdinalIgnoreCase))
+        {
+            await _dialogs.ShowMessageAsync("游戏不匹配", "该 Nexus 链接不是星露谷物语文件。");
+            return;
+        }
+
+        if (token.IsExpired)
+        {
+            await _dialogs.ShowMessageAsync("下载链接已过期", "请回到 Nexus 文件页重新点击 Mod Manager Download。");
+            return;
+        }
+
+        var item = await CreateQueueItemAsync(token, key);
+        await DownloadItemAsync(item, key, token);
+    }
+
+    private static DownloadQueueItem CreateQueueItem(NexusModInfo mod, NexusFileInfo file)
+    {
+        return new DownloadQueueItem
         {
             ModId = mod.ModId,
             FileId = file.FileId,
             ModName = mod.Name,
             FileName = file.FileName ?? string.Empty
         };
+    }
+
+    private async Task<DownloadQueueItem> CreateQueueItemAsync(NexusDownloadToken token, string apiKey)
+    {
+        var modName = SelectedOnlineMod?.ModId == token.ModId
+            ? SelectedOnlineMod.Name
+            : $"Nexus 模组 {token.ModId}";
+        var fileName = SelectedOnlineFile?.FileId == token.FileId
+            ? SelectedOnlineFile.FileName ?? string.Empty
+            : string.Empty;
+
+        try
+        {
+            if (SelectedOnlineMod?.ModId != token.ModId)
+            {
+                modName = (await _nexus.GetModAsync(token.ModId, apiKey)).Name;
+            }
+
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                var file = (await _nexus.GetFilesAsync(token.ModId, apiKey))
+                    .FirstOrDefault(value => value.FileId == token.FileId);
+                fileName = file?.FileName ?? file?.Name ?? string.Empty;
+            }
+        }
+        catch (NexusApiException exception)
+        {
+            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+        }
+
+        return new DownloadQueueItem
+        {
+            ModId = token.ModId,
+            FileId = token.FileId,
+            ModName = modName,
+            FileName = fileName
+        };
+    }
+
+    private async Task DownloadItemAsync(DownloadQueueItem item, string key, NexusDownloadToken? token = null)
+    {
         DownloadQueue.Add(item);
         _downloadCancellation = new CancellationTokenSource();
         _isDownloading = true;
@@ -334,8 +419,119 @@ public sealed class DownloadsViewModel : ViewModelBase
         Refresh();
         try
         {
-            var path = await _downloadsService.DownloadAsync(item, key, _downloadCancellation.Token);
-            FeedbackMessage = $"{file.FileName} 下载完成。";
+            var path = await _downloadsService.DownloadAsync(item, key, token, _downloadCancellation.Token);
+            FeedbackMessage = $"{Path.GetFileName(path)} 下载完成。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+        }
+        catch (OperationCanceledException)
+        {
+            item.State = DownloadState.Canceled;
+            FeedbackMessage = "下载已取消。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+        }
+        catch (NexusApiException exception) when (exception.RequiresBrowserDownload && token is null)
+        {
+            item.State = DownloadState.Pending;
+            item.Error = "等待 Nexus 下载链接";
+            FeedbackMessage = "已打开 Nexus 文件页。点 Vortex 后如出现 Free/Premium 卡片，请点左侧 Slow download。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            StartBrowserTokenWatcher(item, key);
+            await _platform.OpenUriAsync(CreateNexusFilePageUrl(item.ModId, item.FileId));
+            await _dialogs.ShowMessageAsync("需要浏览器确认", "登录 Nexus 后点该文件的 Vortex；若出现 Free/Premium 卡片，点左侧 Slow download。");
+        }
+        catch (Exception exception)
+        {
+            item.State = DownloadState.Failed;
+            item.Error = exception.Message;
+            await _dialogs.ShowMessageAsync("下载失败", exception.Message);
+        }
+        finally
+        {
+            _isDownloading = false;
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+            NotifyCommands();
+        }
+    }
+
+    private static string CreateNexusFilePageUrl(long modId, long fileId)
+        => $"https://www.nexusmods.com/{GameDomain}/mods/{modId}?tab=files&file_id={fileId}";
+
+    private void StartBrowserTokenWatcher(DownloadQueueItem item, string key)
+    {
+        _browserTokenWatcher?.Cancel();
+        _browserTokenWatcher?.Dispose();
+        _browserTokenWatcher = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        _ = WatchClipboardForNxmAsync(item, key, _browserTokenWatcher.Token);
+    }
+
+    private async Task WatchClipboardForNxmAsync(DownloadQueueItem item, string key, CancellationToken cancellationToken)
+    {
+        string? lastSeen = null;
+        try
+        {
+            await Task.Delay(1000, cancellationToken);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var value = (await _platform.GetClipboardTextAsync())?.Trim();
+                if (!string.IsNullOrWhiteSpace(value) && !string.Equals(value, lastSeen, StringComparison.Ordinal))
+                {
+                    lastSeen = value;
+                    if (NexusDownloadToken.TryParse(value, out var token)
+                        && token is not null
+                        && token.ModId == item.ModId
+                        && token.FileId == item.FileId
+                        && string.Equals(token.GameDomain, GameDomain, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (token.IsExpired)
+                        {
+                            FeedbackMessage = "Nexus 下载链接已过期，请重新复制 Mod Manager Download 链接。";
+                            OnPropertyChanged(nameof(FeedbackMessage));
+                            return;
+                        }
+
+                        await DownloadPendingBrowserItemAsync(item, key, token, cancellationToken);
+                        return;
+                    }
+
+                    if (NexusRequirementsPopupLink.TryParse(value, out var popup)
+                        && popup is not null
+                        && popup.FileId == item.FileId
+                        && popup.GameId == StardewGameId)
+                    {
+                        FeedbackMessage = "已识别 Nexus 依赖确认页；在浏览器左侧 Free 卡片底部点 Slow download。";
+                        OnPropertyChanged(nameof(FeedbackMessage));
+                        await _platform.OpenUriAsync(popup.Uri.AbsoluteUri);
+                    }
+                }
+
+                await Task.Delay(1000, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task DownloadPendingBrowserItemAsync(
+        DownloadQueueItem item,
+        string key,
+        NexusDownloadToken token,
+        CancellationToken cancellationToken)
+    {
+        _downloadCancellation?.Cancel();
+        _downloadCancellation?.Dispose();
+        _downloadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _isDownloading = true;
+        IsBusy = true;
+        ProgressText = "正在下载...";
+        NotifyCommands();
+        Refresh();
+        try
+        {
+            var path = await _downloadsService.DownloadAsync(item, key, token, _downloadCancellation.Token);
+            FeedbackMessage = $"{Path.GetFileName(path)} 下载完成。";
             OnPropertyChanged(nameof(FeedbackMessage));
         }
         catch (OperationCanceledException)
@@ -360,9 +556,22 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
     }
 
+    private async Task HandleRequirementsPopupLinkAsync(NexusRequirementsPopupLink popup)
+    {
+        if (popup.GameId != StardewGameId)
+        {
+            await _dialogs.ShowMessageAsync("游戏不匹配", "该 Nexus 链接不是星露谷物语文件。");
+            return;
+        }
+
+        await _platform.OpenUriAsync(popup.Uri.AbsoluteUri);
+        await _dialogs.ShowMessageAsync("继续下载", "浏览器页面打开后，点左侧 Free 卡片底部的 Slow download。");
+    }
+
     private void CancelDownload()
     {
         _downloadCancellation?.Cancel();
+        _browserTokenWatcher?.Cancel();
     }
 
     private string? RequireNexusKey()

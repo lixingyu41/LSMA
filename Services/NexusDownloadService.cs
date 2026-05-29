@@ -7,14 +7,20 @@ public sealed class NexusDownloadService(NexusClient nexus, LoggingService loggi
 {
     private readonly HttpClient _downloads = new() { Timeout = TimeSpan.FromMinutes(10) };
 
-    public async Task<string> DownloadAsync(DownloadQueueItem item, string apiKey, CancellationToken cancellationToken = default)
+    public async Task<string> DownloadAsync(
+        DownloadQueueItem item,
+        string apiKey,
+        NexusDownloadToken? token = null,
+        CancellationToken cancellationToken = default)
     {
         item.State = DownloadState.Downloading;
         try
         {
-            var url = await nexus.GetDownloadUrlAsync(item.ModId, item.FileId, apiKey);
+            var url = token is null
+                ? await nexus.GetDownloadUrlAsync(item.ModId, item.FileId, apiKey)
+                : await nexus.GetDownloadUrlAsync(item.ModId, item.FileId, apiKey, token.Key, token.Expires);
             var safeName = FileSystemHelper.SafeFilePart(string.IsNullOrWhiteSpace(item.FileName) ? $"{item.ModName}.zip" : item.FileName);
-            if (!safeName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(Path.GetExtension(safeName)))
             {
                 safeName += ".zip";
             }

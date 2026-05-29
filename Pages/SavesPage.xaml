@@ -92,7 +92,6 @@
 
         <DataTemplate x:Key="CollectionDialogItemTemplate">
             <Border
-                Width="198"
                 MinHeight="68"
                 Margin="4"
                 Padding="9"
@@ -100,7 +99,8 @@
                 BorderBrush="{ThemeResource CardBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
-                Opacity="{Binding TileOpacity}">
+                Opacity="{Binding TileOpacity}"
+                Tapped="ProgressDetailItem_Tapped">
                 <Grid ColumnSpacing="9">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="34" />
@@ -597,5 +597,58 @@
             Visibility="{Binding AvailableVisibility}"
             IsHitTestVisible="False"
             Canvas.ZIndex="2000" />
+
+        <Grid
+            x:Name="ProgressDetailOverlay"
+            Grid.RowSpan="3"
+            Background="#66000000"
+            Canvas.ZIndex="3000"
+            Tapped="ProgressDetailOverlay_Tapped"
+            Visibility="Collapsed">
+            <Border
+                x:Name="ProgressDetailCard"
+                Background="{ThemeResource CardBackgroundBrush}"
+                BorderBrush="{ThemeResource CardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="18"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Tapped="ProgressDetailCard_Tapped">
+                <Grid RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ProgressDetailTitle" Style="{StaticResource SectionTitleStyle}" FontSize="20" TextTrimming="CharacterEllipsis" />
+                        <Button Grid.Column="1" Style="{StaticResource NeutralButtonStyle}" Padding="8" Click="CloseProgressDetail_Click">
+                            <SymbolIcon Symbol="Cancel" />
+                        </Button>
+                    </Grid>
+
+                    <TextBlock x:Name="ProgressDetailSummary" Grid.Row="1" Style="{StaticResource MutedTextStyle}" />
+
+                    <ScrollViewer
+                        Grid.Row="2"
+                        HorizontalScrollMode="Disabled"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollMode="Enabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <ItemsRepeater x:Name="ProgressDetailItems" ItemTemplate="{StaticResource CollectionDialogItemTemplate}" HorizontalAlignment="Stretch">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout MinItemWidth="198" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Page>

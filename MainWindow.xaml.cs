@@ -1,11 +1,15 @@
 using LSMA.Models;
 using LSMA.Pages;
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Navigation;
 using Windows.Graphics;
+using Windows.System;
 using Windows.UI;
 
 namespace LSMA;
@@ -17,6 +21,7 @@ public sealed partial class MainWindow : Window
     private int _appearanceTransitionVersion;
     private Storyboard? _appearanceStoryboard;
     private TaskCompletionSource? _appearanceStoryboardCompletion;
+    private bool _updatingNavigationSelection;
 
     public MainWindow()
     {
@@ -34,6 +39,8 @@ public sealed partial class MainWindow : Window
         };
         App.Current.Services.Navigation.AttachFrame(ContentFrame);
         App.Current.Services.PageAcceleration.AttachFrame(ContentFrame);
+        ContentFrame.Navigated += ContentFrame_Navigated;
+        RegisterHistoryInput();
         RootLayout.Loaded += RootLayout_Loaded;
     }
 
@@ -167,14 +174,65 @@ public sealed partial class MainWindow : Window
         App.Current.Services.RunLock.AttachDispatcher(RootLayout.DispatcherQueue);
         App.Current.Services.UiDispatcher.Attach(RootLayout.DispatcherQueue);
         await App.Current.Services.InitializeAsync();
+        if (await App.Current.TryHandlePendingActivationAsync())
+        {
+            return;
+        }
+
         if (ContentFrame.CurrentSourcePageType is null)
         {
             App.Current.Services.Navigation.Navigate(typeof(HomePage));
         }
     }
 
+    private void RegisterHistoryInput()
+    {
+        var backAccelerator = new KeyboardAccelerator
+        {
+            Key = VirtualKey.Left,
+            Modifiers = VirtualKeyModifiers.Menu
+        };
+        backAccelerator.Invoked += (_, args) => args.Handled = App.Current.Services.Navigation.GoBack();
+        RootLayout.KeyboardAccelerators.Add(backAccelerator);
+
+        var forwardAccelerator = new KeyboardAccelerator
+        {
+            Key = VirtualKey.Right,
+            Modifiers = VirtualKeyModifiers.Menu
+        };
+        forwardAccelerator.Invoked += (_, args) => args.Handled = App.Current.Services.Navigation.GoForward();
+        RootLayout.KeyboardAccelerators.Add(forwardAccelerator);
+
+        RootLayout.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootLayout_PointerPressed), true);
+    }
+
+    private void RootLayout_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        var updateKind = e.GetCurrentPoint(RootLayout).Properties.PointerUpdateKind;
+        var handled = updateKind switch
+        {
+            PointerUpdateKind.XButton1Pressed => App.Current.Services.Navigation.GoBack(),
+            PointerUpdateKind.XButton2Pressed => App.Current.Services.Navigation.GoForward(),
+            _ => false
+        };
+        if (handled)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
+    {
+        SelectNavigationItem(e.SourcePageType);
+    }
+
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
+        if (_updatingNavigationSelection)
+        {
+            return;
+        }
+
         if (args.SelectedItemContainer?.Tag is not string tag)
         {
             return;
@@ -190,6 +248,40 @@ public sealed partial class MainWindow : Window
             _ => typeof(HomePage)
         };
 
-        App.Current.Services.Navigation.Navigate(pageType);
+        var parameter = pageType == typeof(GuidePage) ? string.Empty : null;
+        App.Current.Services.Navigation.Navigate(pageType, parameter);
+    }
+
+    private void SelectNavigationItem(Type pageType)
+    {
+        var tag = pageType == typeof(ModsPage)
+            ? "mods"
+            : pageType == typeof(DownloadsPage)
+                ? "downloads"
+                : pageType == typeof(GuidePage)
+                    ? "guide"
+                    : pageType == typeof(SavesPage)
+                        ? "saves"
+                        : pageType == typeof(SettingsPage)
+                            ? "settings"
+                            : "home";
+
+        var target = ShellNavigation.MenuItems
+            .OfType<NavigationViewItem>()
+            .FirstOrDefault(item => item.Tag as string == tag);
+        if (target is null || ReferenceEquals(ShellNavigation.SelectedItem, target))
+        {
+            return;
+        }
+
+        try
+        {
+            _updatingNavigationSelection = true;
+            ShellNavigation.SelectedItem = target;
+        }
+        finally
+        {
+            _updatingNavigationSelection = false;
+        }
     }
 }

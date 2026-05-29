@@ -19,6 +19,10 @@ public sealed partial class SavesPage : Page
     private const double MinSectionColumnWidth = 320;
     private const double MaxSectionColumnWidth = 380;
     private const double SectionColumnSpacing = 20;
+    private const int InactiveBubbleZIndex = 1;
+    private const int InactiveSnapshotZIndex = 2;
+    private const int ActiveBubbleZIndex = 3;
+    private const int ActiveSnapshotZIndex = 4;
     private const double CollapsedCatchPanelHeight = 360;
     private const double CollapsedFriendshipPanelHeight = 430;
     private static readonly Duration AnimationDuration = new(TimeSpan.FromMilliseconds(190));
@@ -59,6 +63,7 @@ public sealed partial class SavesPage : Page
         DetailScrollViewer.SizeChanged += OnDetailScrollViewerSizeChanged;
         DetailScrollViewer.ViewChanged += OnDetailScrollViewerViewChanged;
         DetailScrollViewer.PointerEntered += (_, _) => QueueBubbleRefresh();
+        SizeChanged += OnPageSizeChanged;
         FishPanel.SizeChanged += OnExpandablePanelSizeChanged;
         MonsterPanel.SizeChanged += OnExpandablePanelSizeChanged;
         FriendshipPanel.SizeChanged += OnExpandablePanelSizeChanged;
@@ -66,6 +71,11 @@ public sealed partial class SavesPage : Page
         UpdateResponsiveLayout();
         QueueResponsiveLayoutUpdate();
         QueueDetailTopMarginUpdate();
+    }
+
+    private void OnPageSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateProgressDetailCardSize();
     }
 
     private void OnDetailContentSizeChanged(object sender, SizeChangedEventArgs e)
@@ -166,6 +176,8 @@ public sealed partial class SavesPage : Page
 
         _activeBubble = host;
         host.Animation?.Stop();
+        Canvas.SetZIndex(host.Bubble, ActiveBubbleZIndex);
+        Canvas.SetZIndex(host.CardSnapshot, ActiveSnapshotZIndex);
         RefreshBubbleText(host);
 
         if (host.Bubble.Visibility != Visibility.Visible)
@@ -205,6 +217,8 @@ public sealed partial class SavesPage : Page
         }
 
         host.Animation?.Stop();
+        Canvas.SetZIndex(host.Bubble, InactiveBubbleZIndex);
+        Canvas.SetZIndex(host.CardSnapshot, InactiveSnapshotZIndex);
         host.Animation = CreateAnimation(host, HiddenOffset, 0, EasingMode.EaseIn);
         host.Animation.Completed += (_, _) =>
         {
@@ -215,6 +229,8 @@ public sealed partial class SavesPage : Page
                 host.CardSnapshot.Opacity = 0;
                 host.Bubble.Opacity = 0;
                 host.Offset.Y = HiddenOffset;
+                Canvas.SetZIndex(host.Bubble, InactiveBubbleZIndex);
+                Canvas.SetZIndex(host.CardSnapshot, InactiveSnapshotZIndex);
                 host.Animation = null;
             }
         };
@@ -327,7 +343,7 @@ public sealed partial class SavesPage : Page
 
     private void SetSectionGrid(int columns)
     {
-        SectionGrid.ColumnSpacing = columns > 1 ? SectionColumnSpacing : 0;
+        SectionGrid.ColumnSpacing = columns == MaxSectionColumns ? SectionColumnSpacing : 0;
         var columnPanels = new[] { SectionColumn0, SectionColumn1, SectionColumn2, SectionColumn3 };
         for (var index = 0; index < SectionGrid.ColumnDefinitions.Count; index++)
         {
@@ -336,6 +352,7 @@ public sealed partial class SavesPage : Page
                 : new GridLength(0);
             columnPanels[index].Visibility = index < columns ? Visibility.Visible : Visibility.Collapsed;
         }
+        ApplySectionColumnMargins(columnPanels, columns);
 
         var sections = SectionPanels();
         var signature = columns.ToString();
@@ -344,8 +361,16 @@ public sealed partial class SavesPage : Page
             return;
         }
 
+        var columnCountChanged = _sectionColumnCount != columns;
         _sectionColumnCount = columns;
         _sectionLayoutSignature = signature;
+        if (columnCountChanged)
+        {
+            _isFishPanelExpanded = columns > 1;
+            _isMonsterPanelExpanded = columns > 1;
+            ApplyExpandablePanelStates();
+        }
+
         RemoveSectionPanels(sections);
         ResetTopColumnStretch();
 
@@ -410,6 +435,16 @@ public sealed partial class SavesPage : Page
         {
             DetachFromParent(section);
             column.Children.Add(section);
+        }
+    }
+
+    private static void ApplySectionColumnMargins(IReadOnlyList<StackPanel> columnPanels, int columns)
+    {
+        for (var index = 0; index < columnPanels.Count; index++)
+        {
+            columnPanels[index].Margin = columns is > 1 and < MaxSectionColumns && index < columns - 1
+                ? new Thickness(0, 0, SectionColumnSpacing, 0)
+                : new Thickness(0);
         }
     }
 
@@ -570,12 +605,22 @@ public sealed partial class SavesPage : Page
         host.Text.Text = text;
     }
 
-    private async void CollectionTile_Tapped(object sender, TappedRoutedEventArgs e)
+    private void CollectionTile_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: SaveProgressInfo { CollectionKey: { Length: > 0 } key } progress }
-            || App.Current.Services.Saves.SelectedSave is not { } save
-            || !save.CollectionItems.TryGetValue(key, out var items)
-            || items.Count == 0)
+        if (sender is not FrameworkElement { DataContext: SaveProgressInfo progress }
+            || App.Current.Services.Saves.SelectedSave is not { } save)
+        {
+            return;
+        }
+
+        var key = progress.DetailKey ?? progress.CollectionKey;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        var items = ResolveProgressDetailItems(save, key);
+        if (items.Count == 0)
         {
             return;
         }
@@ -586,48 +631,80 @@ public sealed partial class SavesPage : Page
             HideBubble(active);
         }
 
-        var dialog = new ContentDialog
-        {
-            XamlRoot = XamlRoot,
-            Title = progress.Name,
-            CloseButtonText = "关闭",
-            DefaultButton = ContentDialogButton.Close,
-            Content = CreateCollectionDialogContent(items)
-        };
-        await dialog.ShowAsync();
+        ShowProgressDetailCard(progress.Name, items);
     }
 
-    private FrameworkElement CreateCollectionDialogContent(IReadOnlyList<SaveCollectionItemInfo> items)
+    private static IReadOnlyList<SaveCollectionItemInfo> ResolveProgressDetailItems(SaveInfo save, string key)
     {
-        var width = ActualWidth > 0
-            ? Math.Clamp(ActualWidth - 96, 360, 720)
-            : 680;
-        var height = ActualHeight > 0
-            ? Math.Clamp(ActualHeight - 220, 320, 560)
-            : 520;
-        var panel = new StackPanel
+        if (save.ProgressDetailItems.TryGetValue(key, out var progressItems))
         {
-            Width = width,
-            Spacing = 12
-        };
+            return progressItems;
+        }
 
-        panel.Children.Add(new TextBlock
+        return save.CollectionItems.TryGetValue(key, out var collectionItems)
+            ? collectionItems
+            : [];
+    }
+
+    private void ShowProgressDetailCard(string title, IReadOnlyList<SaveCollectionItemInfo> items)
+    {
+        ProgressDetailTitle.Text = title;
+        ProgressDetailSummary.Text = $"{items.Count(item => item.IsCollected):N0}/{items.Count:N0} 已完成 · 点击条目打开攻略搜索";
+        ProgressDetailItems.ItemsSource = items;
+        UpdateProgressDetailCardSize();
+        ProgressDetailOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void UpdateProgressDetailCardSize()
+    {
+        var rootWidth = XamlRoot?.Size.Width ?? ActualWidth;
+        var rootHeight = XamlRoot?.Size.Height ?? ActualHeight;
+        if (rootWidth <= 0 || rootHeight <= 0)
         {
-            Text = $"{items.Count(item => item.IsCollected):N0}/{items.Count:N0} 已收集",
-            Style = (Style)Application.Current.Resources["MutedTextStyle"]
-        });
+            return;
+        }
 
-        panel.Children.Add(new GridView
+        ProgressDetailCard.Width = Math.Floor(rootWidth * 0.8);
+        ProgressDetailCard.Height = Math.Floor(rootHeight * 0.8);
+    }
+
+    private void ProgressDetailItem_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SaveCollectionItemInfo item })
         {
-            ItemsSource = items,
-            ItemTemplate = (DataTemplate)Resources["CollectionDialogItemTemplate"],
-            SelectionMode = ListViewSelectionMode.None,
-            IsItemClickEnabled = false,
-            MaxHeight = height,
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        });
+            return;
+        }
 
-        return panel;
+        e.Handled = true;
+        var query = item.EffectiveSearchQuery.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        HideProgressDetailCard();
+        App.Current.Services.Navigation.Navigate(typeof(GuidePage), query);
+    }
+
+    private void CloseProgressDetail_Click(object sender, RoutedEventArgs e)
+    {
+        HideProgressDetailCard();
+    }
+
+    private void ProgressDetailOverlay_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        HideProgressDetailCard();
+    }
+
+    private void ProgressDetailCard_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private void HideProgressDetailCard()
+    {
+        ProgressDetailOverlay.Visibility = Visibility.Collapsed;
+        ProgressDetailItems.ItemsSource = null;
     }
 
     private BubbleHost? TryCreateBubbleHost(Border card, string text)
@@ -678,8 +755,8 @@ public sealed partial class SavesPage : Page
 
         BubbleOverlay.Children.Add(bubble);
         BubbleOverlay.Children.Add(cardSnapshot);
-        Canvas.SetZIndex(bubble, 1);
-        Canvas.SetZIndex(cardSnapshot, 2);
+        Canvas.SetZIndex(bubble, InactiveBubbleZIndex);
+        Canvas.SetZIndex(cardSnapshot, InactiveSnapshotZIndex);
 
         var wrapper = new Grid { Margin = margin };
         wrapper.Children.Add(card);

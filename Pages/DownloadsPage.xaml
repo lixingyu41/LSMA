@@ -91,6 +91,8 @@
 
                         <Button Content="下载并预检" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
                         <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
+                        <TextBlock Text="{Binding ProgressText}" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>

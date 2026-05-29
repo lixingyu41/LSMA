@@ -1,7 +1,10 @@
 using LSMA.Models;
+using LSMA.Pages;
 using LSMA.Services;
+using Microsoft.Windows.AppLifecycle;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.Activation;
 using Windows.UI;
 
 namespace LSMA;
@@ -9,6 +12,7 @@ namespace LSMA;
 public partial class App : Application
 {
     private MainWindow? _window;
+    private Uri? _pendingNxmUri;
 
     public App()
     {
@@ -20,13 +24,76 @@ public partial class App : Application
 
     public AppServices Services { get; }
 
-    protected override async void OnLaunched(LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        var activationArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
+        var mainInstance = AppInstance.FindOrRegisterForKey("LSMA.Main");
+        if (!mainInstance.IsCurrent)
+        {
+            await mainInstance.RedirectActivationToAsync(activationArgs);
+            Environment.Exit(0);
+            return;
+        }
+
+        mainInstance.Activated += AppInstance_Activated;
+        if (TryGetProtocolActivationUri(activationArgs, out var activationUri))
+        {
+            _pendingNxmUri = activationUri;
+        }
+
         await Services.InitializeAppearanceAsync();
         _window = new MainWindow();
         Services.Platform.AttachWindow(_window);
         ApplyAppearance(Services.Settings.Current.Theme, Services.Settings.Current.Palette);
         _window.Activate();
+    }
+
+    public async Task<bool> TryHandlePendingActivationAsync()
+    {
+        if (_pendingNxmUri is not { } uri)
+        {
+            return false;
+        }
+
+        _pendingNxmUri = null;
+        await HandleNxmActivationAsync(uri);
+        return true;
+    }
+
+    private void AppInstance_Activated(object? sender, AppActivationArguments args)
+    {
+        if (!TryGetProtocolActivationUri(args, out var uri) || uri is null)
+        {
+            return;
+        }
+
+        if (_window is null)
+        {
+            _pendingNxmUri = uri;
+            return;
+        }
+
+        _window.DispatcherQueue.TryEnqueue(async () => await HandleNxmActivationAsync(uri));
+    }
+
+    private async Task HandleNxmActivationAsync(Uri uri)
+    {
+        Services.Navigation.Navigate(typeof(DownloadsPage));
+        await Services.Downloads.HandleNxmLinkAsync(uri.AbsoluteUri);
+    }
+
+    private static bool TryGetProtocolActivationUri(AppActivationArguments args, out Uri? uri)
+    {
+        uri = null;
+        if (args.Kind != ExtendedActivationKind.Protocol
+            || args.Data is not ProtocolActivatedEventArgs protocolArgs
+            || !string.Equals(protocolArgs.Uri.Scheme, "nxm", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        uri = protocolArgs.Uri;
+        return true;
     }
 
     public void ApplyAppearance(AppTheme theme, AppPalette palette)

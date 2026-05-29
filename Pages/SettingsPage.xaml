@@ -91,6 +91,7 @@
                     </Border>
                     <TextBlock Text="{Binding NexusStatus}" Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Text="{Binding NexusRateLimitStatus}" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="非 Premium 下载会打开 Nexus 文件页，登录后点击 Mod Manager Download 回到 LSMA。" Style="{StaticResource MutedTextStyle}" />
                     <PasswordBox Password="{Binding NexusKeyInput, Mode=TwoWay}" PlaceholderText="粘贴 Nexus 个人授权码" PasswordRevealMode="Peek" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="保存授权码" Command="{Binding SaveNexusKeyCommand}" Style="{StaticResource AccentButtonStyle}" />

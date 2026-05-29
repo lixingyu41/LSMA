@@ -71,6 +71,7 @@ public sealed class SaveInfo
     public List<SaveMetricInfo> MonsterKillStats { get; } = [];
     public List<SaveMetricInfo> FishCatchStats { get; } = [];
     public Dictionary<string, List<SaveCollectionItemInfo>> CollectionItems { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, List<SaveCollectionItemInfo>> ProgressDetailItems { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<int, List<bool>> CommunityBundleStates { get; } = [];
     public HashSet<string> MailFlags { get; } = new(StringComparer.OrdinalIgnoreCase);
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
@@ -161,6 +162,7 @@ public sealed class SaveProgressInfo
     public double Percent { get; init; }
     public string Detail { get; init; } = string.Empty;
     public string? CollectionKey { get; init; }
+    public string? DetailKey { get; init; }
     public Visibility DetailVisibility => string.IsNullOrWhiteSpace(Detail) ? Visibility.Collapsed : Visibility.Visible;
 }
 
@@ -177,7 +179,12 @@ public sealed class SaveCollectionItemInfo
     public int IconHeight { get; init; } = 16;
     public string? IconUri { get; set; }
     public string Glyph { get; init; } = "\uE8FD";
-    public string StatusText => IsCollected ? "已收集" : "未收集";
+    public string StatusTextOverride { get; init; } = string.Empty;
+    public string GuideQuery { get; init; } = string.Empty;
+    public string StatusText => string.IsNullOrWhiteSpace(StatusTextOverride)
+        ? IsCollected ? "已收集" : "未收集"
+        : StatusTextOverride;
+    public string EffectiveSearchQuery => string.IsNullOrWhiteSpace(GuideQuery) ? Name : GuideQuery;
     public double TileOpacity => IsCollected ? 1 : 0.48;
     public Visibility DetailVisibility => string.IsNullOrWhiteSpace(Detail) ? Visibility.Collapsed : Visibility.Visible;
     public Visibility IconVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Collapsed : Visibility.Visible;

@@ -227,14 +227,12 @@ public sealed class GameIconService(
 
         foreach (var item in save.CollectionItems.Values.SelectMany(items => items))
         {
-            if (item.ObjectId is { } objectId)
-            {
-                item.IconUri = await GetObjectIconAsync(objectId);
-            }
-            else if (item.IconTexture is { Length: > 0 } texture && item.IconSpriteIndex is { } spriteIndex)
-            {
-                item.IconUri = await GetTextureIconAsync(texture, spriteIndex, item.IconWidth, item.IconHeight);
-            }
+            await ApplyCollectionItemIconAsync(item);
+        }
+
+        foreach (var item in save.ProgressDetailItems.Values.SelectMany(items => items))
+        {
+            await ApplyCollectionItemIconAsync(item);
         }
 
         foreach (var friendship in save.Friendships)
@@ -262,6 +260,18 @@ public sealed class GameIconService(
                     FillPercent = isPartial ? partialProgress : (isFull ? 1.0 : 0.0)
                 });
             }
+        }
+    }
+
+    private async Task ApplyCollectionItemIconAsync(SaveCollectionItemInfo item)
+    {
+        if (item.ObjectId is { } objectId)
+        {
+            item.IconUri = await GetObjectIconAsync(objectId);
+        }
+        else if (item.IconTexture is { Length: > 0 } texture && item.IconSpriteIndex is { } spriteIndex)
+        {
+            item.IconUri = await GetTextureIconAsync(texture, spriteIndex, item.IconWidth, item.IconHeight);
         }
     }
 
