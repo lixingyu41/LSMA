@@ -365,13 +365,18 @@
                     </ItemsRepeater.Layout>
                 </ItemsRepeater>
 
-                <Grid x:Name="SectionGrid" ColumnSpacing="20">
+                <Grid x:Name="SectionGrid" ColumnSpacing="20" RowSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <StackPanel x:Name="SectionColumn0" Spacing="16">
                         <Border x:Name="FarmSummaryPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="12">
@@ -465,17 +470,8 @@
                             </StackPanel>
                         </Border>
 
-                        <Grid x:Name="CatchGrid" ColumnSpacing="16" RowSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Border x:Name="FishPanel" Style="{StaticResource CardStyle}" Padding="16">
-                                <StackPanel Spacing="10">
+                        <Border x:Name="FishPanel" Style="{StaticResource CardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
                                 <Button
                                     Background="Transparent"
                                     BorderBrush="Transparent"
@@ -497,10 +493,10 @@
                                             <UniformGridLayout MinItemWidth="118" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
                                         </ItemsRepeater.Layout>
                                     </ItemsRepeater>
-                                </StackPanel>
-                            </Border>
-                            <Border x:Name="MonsterPanel" Grid.Column="1" Style="{StaticResource CardStyle}" Padding="16">
-                                <StackPanel Spacing="10">
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="MonsterPanel" Style="{StaticResource CardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
                                     <Button
                                         Background="Transparent"
                                         BorderBrush="Transparent"
@@ -522,9 +518,8 @@
                                             <UniformGridLayout MinItemWidth="118" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
                                         </ItemsRepeater.Layout>
                                     </ItemsRepeater>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel x:Name="SectionColumn3" Grid.Column="3" Spacing="16">

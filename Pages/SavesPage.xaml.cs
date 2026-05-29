@@ -19,8 +19,6 @@ public sealed partial class SavesPage : Page
     private const double MinSectionColumnWidth = 320;
     private const double MaxSectionColumnWidth = 380;
     private const double SectionColumnSpacing = 20;
-    private const double CatchColumnSpacing = 16;
-    private const double CatchTwoColumnMinWidth = 560;
     private const double CollapsedCatchPanelHeight = 360;
     private const double CollapsedFriendshipPanelHeight = 430;
     private static readonly Duration AnimationDuration = new(TimeSpan.FromMilliseconds(190));
@@ -73,6 +71,7 @@ public sealed partial class SavesPage : Page
     private void OnDetailContentSizeChanged(object sender, SizeChangedEventArgs e)
     {
         QueueResponsiveLayoutUpdate();
+        QueueTopColumnStretch(_sectionColumnCount);
         QueueBubbleRefresh();
         QueueDetailTopMarginUpdate();
     }
@@ -298,8 +297,6 @@ public sealed partial class SavesPage : Page
         HeaderBar.Width = contentWidth;
         DetailContent.Width = contentWidth;
         SectionGrid.Width = contentWidth;
-        var sectionColumnWidth = (contentWidth - (sectionColumns - 1) * SectionColumnSpacing) / sectionColumns;
-        SetAdaptiveGrid(CatchGrid, FishPanel, MonsterPanel, sectionColumnWidth >= CatchTwoColumnMinWidth, CatchColumnSpacing);
         SetSectionGrid(sectionColumns);
     }
 
@@ -350,30 +347,37 @@ public sealed partial class SavesPage : Page
         _sectionColumnCount = columns;
         _sectionLayoutSignature = signature;
         RemoveSectionPanels(sections);
+        ResetTopColumnStretch();
 
         if (columns == 1)
         {
-            AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel, PerfectionPanel, CollectionPanel, ActivityPanel, CatchGrid, FriendshipPanel);
+            AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel, PerfectionPanel, CollectionPanel, ActivityPanel, FriendshipPanel, FishPanel, MonsterPanel);
             return;
         }
 
         if (columns == 2)
         {
-            AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel, ActivityPanel);
-            AddSections(SectionColumn1, PerfectionPanel, CollectionPanel, CatchGrid, FriendshipPanel);
+            AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel, ActivityPanel, FishPanel);
+            AddSections(SectionColumn1, PerfectionPanel, CollectionPanel, FriendshipPanel, MonsterPanel);
             return;
         }
 
         AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel);
-        AddSections(SectionColumn1, PerfectionPanel, CollectionPanel);
+        AddSections(SectionColumn1, ActivityPanel, CollectionPanel);
         if (columns == 3)
         {
-            AddSections(SectionColumn2, ActivityPanel, CatchGrid, FriendshipPanel);
+            AddSections(SectionColumn2, PerfectionPanel, FriendshipPanel);
+            AddGridSection(FishPanel, 0, 1, 3);
+            AddGridSection(MonsterPanel, 0, 2, 3);
+            QueueTopColumnStretch(columns);
             return;
         }
 
-        AddSections(SectionColumn2, ActivityPanel, CatchGrid);
+        AddSections(SectionColumn2, PerfectionPanel);
         AddSections(SectionColumn3, FriendshipPanel);
+        AddGridSection(FishPanel, 0, 1, 2);
+        AddGridSection(MonsterPanel, 2, 1, 2);
+        QueueTopColumnStretch(columns);
     }
 
     private FrameworkElement[] SectionPanels()
@@ -385,7 +389,8 @@ public sealed partial class SavesPage : Page
             PerfectionPanel,
             CollectionPanel,
             ActivityPanel,
-            CatchGrid,
+            FishPanel,
+            MonsterPanel,
             FriendshipPanel
         ];
     }
@@ -394,10 +399,7 @@ public sealed partial class SavesPage : Page
     {
         foreach (var section in sections)
         {
-            if (section.Parent is Panel parent)
-            {
-                parent.Children.Remove(section);
-            }
+            DetachFromParent(section);
         }
     }
 
@@ -405,7 +407,66 @@ public sealed partial class SavesPage : Page
     {
         foreach (var section in sections)
         {
+            DetachFromParent(section);
             column.Children.Add(section);
+        }
+    }
+
+    private void AddGridSection(FrameworkElement section, int column, int row, int columnSpan)
+    {
+        DetachFromParent(section);
+        SectionGrid.Children.Add(section);
+        Grid.SetColumn(section, column);
+        Grid.SetRow(section, row);
+        Grid.SetColumnSpan(section, columnSpan);
+    }
+
+    private static void DetachFromParent(FrameworkElement section)
+    {
+        if (section.Parent is Panel parent)
+        {
+            parent.Children.Remove(section);
+        }
+    }
+
+    private void QueueTopColumnStretch(int columns)
+    {
+        DispatcherQueue.TryEnqueue(() => StretchTopColumns(columns));
+    }
+
+    private void StretchTopColumns(int columns)
+    {
+        if (columns < 3)
+        {
+            return;
+        }
+
+        var columnPanels = new[] { SectionColumn0, SectionColumn1, SectionColumn2, SectionColumn3 }
+            .Take(columns)
+            .ToArray();
+        ResetTopColumnStretch();
+
+        var targetHeight = columnPanels.Max(column => column.ActualHeight);
+        foreach (var column in columnPanels)
+        {
+            if (column.Children.LastOrDefault() is not FrameworkElement last)
+            {
+                continue;
+            }
+
+            var extra = targetHeight - column.ActualHeight;
+            if (extra > 1 && last.ActualHeight > 0)
+            {
+                last.MinHeight = last.ActualHeight + extra;
+            }
+        }
+    }
+
+    private void ResetTopColumnStretch()
+    {
+        foreach (var panel in new FrameworkElement[] { SkillsPanel, CollectionPanel, PerfectionPanel, FriendshipPanel })
+        {
+            panel.MinHeight = 0;
         }
     }
 
@@ -432,6 +493,7 @@ public sealed partial class SavesPage : Page
         SetExpandablePanel(FishPanel, FishExpandIcon, _isFishPanelExpanded, CollapsedCatchPanelHeight);
         SetExpandablePanel(MonsterPanel, MonsterExpandIcon, _isMonsterPanelExpanded, CollapsedCatchPanelHeight);
         SetExpandablePanel(FriendshipPanel, FriendshipExpandIcon, _isFriendshipPanelExpanded, CollapsedFriendshipPanelHeight);
+        QueueTopColumnStretch(_sectionColumnCount);
 
         if (_activeBubble is { } active)
         {
