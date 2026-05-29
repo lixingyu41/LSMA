@@ -363,16 +363,17 @@ public sealed partial class SavesPage : Page
         }
 
         AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel);
-        AddSections(SectionColumn1, ActivityPanel, CollectionPanel);
         if (columns == 3)
         {
-            AddSections(SectionColumn2, PerfectionPanel, FriendshipPanel);
+            AddSections(SectionColumn1, ActivityPanel, FriendshipPanel);
+            AddSections(SectionColumn2, PerfectionPanel, CollectionPanel);
             AddGridSection(FishPanel, 0, 1, 3);
             AddGridSection(MonsterPanel, 0, 2, 3);
             QueueTopColumnStretch(columns);
             return;
         }
 
+        AddSections(SectionColumn1, ActivityPanel, CollectionPanel);
         AddSections(SectionColumn2, PerfectionPanel);
         AddSections(SectionColumn3, FriendshipPanel);
         AddGridSection(FishPanel, 0, 1, 2);
