@@ -91,7 +91,7 @@
 
         <!-- Row 2: 详情面板（全宽） -->
         <ScrollViewer x:Name="DetailScrollViewer" Grid.Row="2" Visibility="{Binding AvailableVisibility}" Margin="0,0,-30,0" Padding="0,0,30,0">
-            <StackPanel Spacing="16" Visibility="{Binding DetailVisibility}">
+            <StackPanel Spacing="16" Visibility="{Binding DetailVisibility}" Margin="0,30,0,0">
 
                     <!-- 卡片行 1：时间相关 -->
                     <Grid ColumnSpacing="10">
