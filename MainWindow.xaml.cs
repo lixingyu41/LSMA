@@ -166,7 +166,10 @@ public sealed partial class MainWindow : Window
         App.Current.Services.RunLock.AttachDispatcher(RootLayout.DispatcherQueue);
         App.Current.Services.UiDispatcher.Attach(RootLayout.DispatcherQueue);
         await App.Current.Services.InitializeAsync();
-        App.Current.Services.Navigation.Navigate(typeof(HomePage));
+        if (ContentFrame.CurrentSourcePageType is null)
+        {
+            App.Current.Services.Navigation.Navigate(typeof(HomePage));
+        }
     }
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

@@ -14,6 +14,28 @@ public sealed class XnbTextureService
     public Task ExportPngAsync(string xnbPath, string pngPath, string gameDirectory)
         => Task.Run(() => ExportPng(xnbPath, pngPath, gameDirectory, null));
 
+    public Task ExportBlurredPngAsync(string xnbPath, string pngPath, string gameDirectory, int radius)
+        => Task.Run(() => WritePng(pngPath, BoxBlur(LoadTexture(xnbPath, gameDirectory, null), radius)));
+
+    public Task<XnbTexturePixels> LoadTextureRegionAsync(
+        string xnbPath,
+        string gameDirectory,
+        int x,
+        int y,
+        int width,
+        int height)
+        => Task.Run(() => LoadTexture(xnbPath, gameDirectory, new TextureRegion(x, y, width, height)));
+
+    public Task<XnbTextureSize> GetTextureSizeAsync(string xnbPath, string gameDirectory)
+        => Task.Run(() =>
+        {
+            var texture = LoadTexture(xnbPath, gameDirectory, null);
+            return new XnbTextureSize(texture.Width, texture.Height);
+        });
+
+    public Task WritePngAsync(string pngPath, XnbTexturePixels texture)
+        => Task.Run(() => WritePng(pngPath, texture));
+
     public Task ExportPngRegionAsync(
         string xnbPath,
         string pngPath,
@@ -25,6 +47,9 @@ public sealed class XnbTextureService
         => Task.Run(() => ExportPng(xnbPath, pngPath, gameDirectory, new TextureRegion(x, y, width, height)));
 
     private static void ExportPng(string xnbPath, string pngPath, string gameDirectory, TextureRegion? region)
+        => WritePng(pngPath, LoadTexture(xnbPath, gameDirectory, region));
+
+    private static XnbTexturePixels LoadTexture(string xnbPath, string gameDirectory, TextureRegion? region)
     {
         using var input = File.OpenRead(xnbPath);
         using var header = new BinaryReader(input, Encoding.UTF8, true);
@@ -61,7 +86,7 @@ public sealed class XnbTextureService
                 texture = Crop(texture, region);
             }
 
-            WritePng(pngPath, texture);
+            return texture;
         }
         finally
         {
@@ -93,7 +118,7 @@ public sealed class XnbTextureService
             ?? throw new InvalidOperationException("无法创建 XNB 解码流。");
     }
 
-    private static TextureData ReadTexture(Stream payload)
+    private static XnbTexturePixels ReadTexture(Stream payload)
     {
         using var reader = new BinaryReader(payload, Encoding.UTF8, true);
         var readerCount = reader.Read7BitEncodedInt();
@@ -133,10 +158,10 @@ public sealed class XnbTextureService
             throw new EndOfStreamException("素材 XNB 的像素数据不完整。");
         }
 
-        return new TextureData(width, height, pixels);
+        return new XnbTexturePixels(width, height, pixels);
     }
 
-    private static TextureData Crop(TextureData texture, TextureRegion region)
+    private static XnbTexturePixels Crop(XnbTexturePixels texture, TextureRegion region)
     {
         if (region.X < 0 || region.Y < 0 || region.Width <= 0 || region.Height <= 0
             || region.X + region.Width > texture.Width
@@ -156,10 +181,10 @@ public sealed class XnbTextureService
                 region.Width * 4);
         }
 
-        return new TextureData(region.Width, region.Height, pixels);
+        return new XnbTexturePixels(region.Width, region.Height, pixels);
     }
 
-    private static void WritePng(string path, TextureData texture)
+    private static void WritePng(string path, XnbTexturePixels texture)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         using var output = File.Create(path);
@@ -188,6 +213,127 @@ public sealed class XnbTextureService
 
         WriteChunk(output, "IDAT", compressed.ToArray());
         WriteChunk(output, "IEND", []);
+    }
+
+    private static XnbTexturePixels BoxBlur(XnbTexturePixels texture, int radius)
+    {
+        if (radius <= 0)
+        {
+            return texture;
+        }
+
+        var temp = new byte[texture.Pixels.Length];
+        var output = new byte[texture.Pixels.Length];
+        BlurHorizontal(texture.Pixels, temp, texture.Width, texture.Height, radius);
+        BlurVertical(temp, output, texture.Width, texture.Height, radius);
+        return new XnbTexturePixels(texture.Width, texture.Height, output);
+    }
+
+    private static void BlurHorizontal(byte[] source, byte[] target, int width, int height, int radius)
+    {
+        for (var y = 0; y < height; y++)
+        {
+            var rowOffset = y * width * 4;
+            var end = Math.Min(width - 1, radius);
+            var count = end + 1;
+            var red = 0;
+            var green = 0;
+            var blue = 0;
+            var alpha = 0;
+
+            for (var x = 0; x <= end; x++)
+            {
+                var index = rowOffset + x * 4;
+                red += source[index];
+                green += source[index + 1];
+                blue += source[index + 2];
+                alpha += source[index + 3];
+            }
+
+            for (var x = 0; x < width; x++)
+            {
+                var index = rowOffset + x * 4;
+                target[index] = (byte)(red / count);
+                target[index + 1] = (byte)(green / count);
+                target[index + 2] = (byte)(blue / count);
+                target[index + 3] = (byte)(alpha / count);
+
+                var addX = x + radius + 1;
+                if (addX < width)
+                {
+                    var addIndex = rowOffset + addX * 4;
+                    red += source[addIndex];
+                    green += source[addIndex + 1];
+                    blue += source[addIndex + 2];
+                    alpha += source[addIndex + 3];
+                    count++;
+                }
+
+                var removeX = x - radius;
+                if (removeX >= 0)
+                {
+                    var removeIndex = rowOffset + removeX * 4;
+                    red -= source[removeIndex];
+                    green -= source[removeIndex + 1];
+                    blue -= source[removeIndex + 2];
+                    alpha -= source[removeIndex + 3];
+                    count--;
+                }
+            }
+        }
+    }
+
+    private static void BlurVertical(byte[] source, byte[] target, int width, int height, int radius)
+    {
+        for (var x = 0; x < width; x++)
+        {
+            var end = Math.Min(height - 1, radius);
+            var count = end + 1;
+            var red = 0;
+            var green = 0;
+            var blue = 0;
+            var alpha = 0;
+
+            for (var y = 0; y <= end; y++)
+            {
+                var index = (y * width + x) * 4;
+                red += source[index];
+                green += source[index + 1];
+                blue += source[index + 2];
+                alpha += source[index + 3];
+            }
+
+            for (var y = 0; y < height; y++)
+            {
+                var index = (y * width + x) * 4;
+                target[index] = (byte)(red / count);
+                target[index + 1] = (byte)(green / count);
+                target[index + 2] = (byte)(blue / count);
+                target[index + 3] = (byte)(alpha / count);
+
+                var addY = y + radius + 1;
+                if (addY < height)
+                {
+                    var addIndex = (addY * width + x) * 4;
+                    red += source[addIndex];
+                    green += source[addIndex + 1];
+                    blue += source[addIndex + 2];
+                    alpha += source[addIndex + 3];
+                    count++;
+                }
+
+                var removeY = y - radius;
+                if (removeY >= 0)
+                {
+                    var removeIndex = (removeY * width + x) * 4;
+                    red -= source[removeIndex];
+                    green -= source[removeIndex + 1];
+                    blue -= source[removeIndex + 2];
+                    alpha -= source[removeIndex + 3];
+                    count--;
+                }
+            }
+        }
     }
 
     private static void WriteChunk(Stream output, string type, byte[] data)
@@ -220,6 +366,9 @@ public sealed class XnbTextureService
         return crc;
     }
 
-    private sealed record TextureData(int Width, int Height, byte[] Pixels);
     private sealed record TextureRegion(int X, int Y, int Width, int Height);
 }
+
+public sealed record XnbTexturePixels(int Width, int Height, byte[] Pixels);
+
+public sealed record XnbTextureSize(int Width, int Height);

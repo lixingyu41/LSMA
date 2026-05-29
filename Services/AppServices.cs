@@ -31,10 +31,10 @@ public sealed class AppServices
         NpcNames = new NpcLocalizationService(Logging);
         XnbTextures = new XnbTextureService();
         GameIcons = new GameIconService(State, XnbTextures, NpcNames, Logging);
-        SaveParser = new SaveParserService(Logging, NpcNames);
+        SaveParser = new SaveParserService(Logging, NpcNames, GuideCatalog);
         SaveBackups = new SaveBackupService(State, RunLock, Settings, Files, Logging);
         GuideData = new GuideDataService();
-        GuideRecommendations = new GuideRecommendationService(GuideData);
+        GuideRecommendations = new GuideRecommendationService(GuideData, GuideCatalog);
         NexusCredentials = new NexusCredentialService();
         Nexus = new NexusClient(Logging);
         NexusFavorites = new NexusFavoriteService(Logging);
@@ -46,7 +46,7 @@ public sealed class AppServices
         Home = new HomeViewModel(State, Settings, GameLocator, GameIcons, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
         Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, NexusCredentials, Nexus, NexusFavorites, Platform, Dialogs, UiDispatcher);
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
-        Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
+        Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
         Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Platform, Dialogs);
     }

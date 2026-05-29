@@ -360,6 +360,7 @@
         </Setter>
     </Style>
     <Style x:Key="PaletteRadioStyle" TargetType="RadioButton" BasedOn="{StaticResource ChoiceRadioStyle}">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Padding" Value="13" />

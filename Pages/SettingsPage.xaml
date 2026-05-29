@@ -9,7 +9,7 @@
                 <Grid ColumnSpacing="24">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="184" />
+                        <ColumnDefinition Width="220" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="7" VerticalAlignment="Center">
                         <TextBlock Text="LSMA" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
@@ -42,13 +42,25 @@
                                 </Border.RenderTransform>
                                 <TextBlock Text="当前版本暂未启用在线检查" Foreground="{StaticResource AccentBrush}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <Button
-                                Height="40"
-                                VerticalAlignment="Bottom"
-                                Content="检查更新"
-                                Click="CheckUpdates_Click"
-                                Style="{StaticResource SubtleButtonStyle}"
-                                HorizontalAlignment="Stretch" />
+                            <Grid VerticalAlignment="Bottom" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button
+                                    Height="40"
+                                    Content="赞赏"
+                                    Click="Donate_Click"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    HorizontalAlignment="Stretch" />
+                                <Button
+                                    Grid.Column="1"
+                                    Height="40"
+                                    Content="检查更新"
+                                    Click="CheckUpdates_Click"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    HorizontalAlignment="Stretch" />
+                            </Grid>
                         </Grid>
                     </StackPanel>
                 </Grid>
@@ -130,7 +142,7 @@
                     </StackPanel>
                     <TextBlock Text="配色方案" Style="{StaticResource MutedTextStyle}" Margin="0,10,0,0" />
                     <TextBlock Text="每种方案会同时调整背景、卡片、边框、标题栏与强调色。" Style="{StaticResource MutedTextStyle}" />
-                    <Grid ColumnSpacing="10">
+                    <Grid ColumnSpacing="20" HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />

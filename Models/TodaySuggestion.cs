@@ -1,3 +1,5 @@
+using Microsoft.UI.Xaml;
+
 namespace LSMA.Models;
 
 public sealed class TodaySuggestion
@@ -6,6 +8,10 @@ public sealed class TodaySuggestion
     public string Description { get; init; } = string.Empty;
     public string Category { get; init; } = string.Empty;
     public string? IconUri { get; init; }
+    public string SearchQuery { get; init; } = string.Empty;
+    public string EffectiveSearchQuery => string.IsNullOrWhiteSpace(SearchQuery) ? Title : SearchQuery;
+    public Visibility ImageVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility GlyphVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Visible : Visibility.Collapsed;
     public string IconGlyph => Category switch
     {
         "日历" => "\uE787",

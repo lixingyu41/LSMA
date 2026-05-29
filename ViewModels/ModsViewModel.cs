@@ -529,6 +529,7 @@ public sealed class ModsViewModel : ViewModelBase
             OnPropertyChanged(nameof(UpdateCount));
             FeedbackMessage = $"更新检查完成，发现 {_allMods.Count(mod => mod.HasUpdate)} 个可更新模组。";
             OnPropertyChanged(nameof(FeedbackMessage));
+            App.Current.Services.Home.Refresh();
         }
         catch (NexusApiException exception)
         {

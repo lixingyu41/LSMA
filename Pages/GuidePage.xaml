@@ -3,12 +3,17 @@
     x:Class="LSMA.Pages.GuidePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        HorizontalContentAlignment="Stretch">
         <StackPanel Padding="30,22,30,30" Spacing="18" HorizontalAlignment="Stretch">
             <Grid ColumnSpacing="18">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="320" /></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="320" />
+                </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding SaveContext}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
-                <AutoSuggestBox Grid.Column="1" PlaceholderText="搜索物品、鱼类、人物和节日" QuerySubmitted="Search_QuerySubmitted" VerticalAlignment="Center" />
+                <AutoSuggestBox x:Name="SearchBox" Grid.Column="1" PlaceholderText="搜索物品、鱼类、人物和节日" QuerySubmitted="Search_QuerySubmitted" VerticalAlignment="Center" />
             </Grid>
 
             <Border Style="{StaticResource CardStyle}" Visibility="{Binding EmptyVisibility}">
@@ -20,26 +25,49 @@
 
             <StackPanel Visibility="{Binding SuggestionVisibility}" Spacing="12">
                 <TextBlock Text="今日建议" Style="{StaticResource SectionTitleStyle}" />
-                <ItemsControl ItemsSource="{Binding Suggestions}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
+                <ItemsRepeater ItemsSource="{Binding Suggestions}" HorizontalAlignment="Stretch">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout MinItemWidth="320" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource CardStyle}" Padding="17">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="75" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="{Binding IconGlyph}" FontSize="25" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                                    <StackPanel Grid.Column="2" Spacing="4">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" />
-                                        <TextBlock Text="{Binding Description}" Style="{StaticResource BodyTextStyle}" />
+                            <Border Style="{StaticResource CardStyle}" MinHeight="150" Padding="16">
+                                <Grid ColumnSpacing="12" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Button
+                                        Width="38"
+                                        Height="38"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        Tag="{Binding EffectiveSearchQuery}"
+                                        ToolTipService.ToolTip="{Binding EffectiveSearchQuery}"
+                                        Click="SearchAction_Click"
+                                        VerticalAlignment="Top">
+                                        <Grid Width="38" Height="38">
+                                            <Border Visibility="{Binding GlyphVisibility}" CornerRadius="8" Background="{ThemeResource AccentSoftBrush}">
+                                                <FontIcon Glyph="{Binding IconGlyph}" FontSize="20" Foreground="{StaticResource AccentBrush}" />
+                                            </Border>
+                                            <Image Source="{Binding IconUri}" Visibility="{Binding ImageVisibility}" Width="34" Height="34" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap" MaxLines="2" />
                                     </StackPanel>
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Description}" Style="{StaticResource BodyTextStyle}" MaxLines="2" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel Spacing="6">
                         <TextBlock Text="目标规划" Style="{StaticResource SectionTitleStyle}" />
@@ -50,102 +78,275 @@
 
             <StackPanel Visibility="{Binding SearchVisibility}" Spacing="12">
                 <TextBlock Text="{Binding SearchSummary}" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
-                <ItemsControl ItemsSource="{Binding SearchResults}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
+                <ItemsRepeater ItemsSource="{Binding SearchResults}" HorizontalAlignment="Stretch">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Orientation="Vertical" Spacing="12" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource CardStyle}" Padding="12">
-                                <Grid ColumnSpacing="12">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="{Binding IconGlyph}" Visibility="{Binding GlyphVisibility}" FontSize="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
-                                    <Image Source="{Binding IconUri}" Visibility="{Binding ImageVisibility}" Width="32" Height="32" Stretch="Uniform" />
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
-                                </Grid>
+                            <Border Style="{StaticResource CardStyle}" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            Width="64"
+                                            Height="64"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Tag="{Binding SearchQuery}"
+                                            ToolTipService.ToolTip="{Binding SearchQuery}"
+                                            Click="SearchAction_Click"
+                                            VerticalAlignment="Top">
+                                            <Grid Width="64" Height="64">
+                                                <Border Visibility="{Binding GlyphVisibility}" CornerRadius="12" Background="{ThemeResource AccentSoftBrush}">
+                                                    <FontIcon Glyph="{Binding IconGlyph}" FontSize="28" Foreground="{StaticResource AccentBrush}" />
+                                                </Border>
+                                                <Image Source="{Binding IconUri}" Visibility="{Binding ImageVisibility}" Width="58" Height="58" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Spacing="5">
+                                            <TextBlock Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" FontSize="12" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="20" TextWrapping="Wrap" MaxLines="2" />
+                                            <TextBlock Text="{Binding Detail}" Visibility="{Binding DetailVisibility}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" MaxLines="3" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <ItemsRepeater ItemsSource="{Binding Sections}" Visibility="{Binding SectionsVisibility}">
+                                        <ItemsRepeater.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Spacing="8" Margin="0,2,0,8">
+                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource AccentBrush}" FontSize="13" FontWeight="SemiBold" />
+                                                    <ItemsRepeater ItemsSource="{Binding Lines}" Visibility="{Binding LinesVisibility}">
+                                                        <ItemsRepeater.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" MaxLines="2" />
+                                                            </DataTemplate>
+                                                        </ItemsRepeater.ItemTemplate>
+                                                    </ItemsRepeater>
+                                                    <ItemsRepeater ItemsSource="{Binding Actions}" Visibility="{Binding ActionsVisibility}">
+                                                        <ItemsRepeater.Layout>
+                                                            <UniformGridLayout MinItemWidth="190" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
+                                                        </ItemsRepeater.Layout>
+                                                        <ItemsRepeater.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button
+                                                                    Tag="{Binding Query}"
+                                                                    Click="SearchAction_Click"
+                                                                    Style="{StaticResource NeutralButtonStyle}"
+                                                                    HorizontalAlignment="Stretch"
+                                                                    HorizontalContentAlignment="Stretch"
+                                                                    Padding="9,7">
+                                                                    <Grid ColumnSpacing="8">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="30" />
+                                                                            <ColumnDefinition Width="*" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <Grid Width="28" Height="28" VerticalAlignment="Center">
+                                                                            <Border Visibility="{Binding GlyphVisibility}" CornerRadius="6" Background="{ThemeResource AccentSoftBrush}">
+                                                                                <FontIcon Glyph="{Binding IconGlyph}" FontSize="14" Foreground="{StaticResource AccentBrush}" />
+                                                                            </Border>
+                                                                            <Image Source="{Binding IconUri}" Visibility="{Binding ImageVisibility}" Width="26" Height="26" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        </Grid>
+                                                                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="1" />
+                                                                            <TextBlock Text="{Binding Detail}" Visibility="{Binding DetailVisibility}" Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" MaxLines="1" />
+                                                                        </StackPanel>
+                                                                    </Grid>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsRepeater.ItemTemplate>
+                                                    </ItemsRepeater>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
             </StackPanel>
 
-            <StackPanel Visibility="{Binding StructuredVisibility}" Spacing="12">
-            <TextBlock Text="结构化查询" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
-            <Grid ColumnSpacing="12" RowSpacing="12">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel Spacing="9">
-                        <TextBlock Text="最近节日" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding Festivals}">
-                            <ItemsControl.ItemTemplate><DataTemplate>
-                                <Grid Margin="0,4" ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding Name}" />
-                                        <TextBlock Text="{Binding DateText}" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" Text="{Binding CountdownText}" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
-                                </Grid>
-                            </DataTemplate></ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-                    <StackPanel Spacing="9">
-                        <TextBlock Text="{Binding FishHeading}" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding Fish}">
-                            <ItemsControl.ItemTemplate><DataTemplate>
-                                <Grid Margin="0,4" ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
-                                    <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
-                                </Grid>
-                            </DataTemplate></ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-                <Border Grid.Row="1" Style="{StaticResource CardStyle}">
-                    <StackPanel Spacing="9">
-                        <TextBlock Text="作物收益" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding Crops}">
-                            <ItemsControl.ItemTemplate><DataTemplate>
-                                <Grid Margin="0,4" ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding Name}" />
-                                        <TextBlock Text="{Binding GrowthText}" Style="{StaticResource MutedTextStyle}" />
-                                        <TextBlock Text="{Binding RawPriceText}" Style="{StaticResource MutedTextStyle}" />
-                                        <TextBlock Text="{Binding ArtisanPriceText}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate></ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Text="农耕人：农作产品价值 +10%；工匠：精工制品价值 +40%。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardStyle}" Visibility="{Binding BundleVisibility}">
-                    <StackPanel Spacing="9">
-                        <TextBlock Text="社区中心" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding Bundles}">
-                            <ItemsControl.ItemTemplate><DataTemplate>
-                                <Grid Margin="0,4" ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
-                                    <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" /></StackPanel>
-                                </Grid>
-                            </DataTemplate></ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-            </Grid>
-            <TextBlock Text="资料与图标由本机游戏内容生成，鱼类按当前季节与天气筛选。" Style="{StaticResource MutedTextStyle}" />
+            <StackPanel Visibility="{Binding StructuredVisibility}" Spacing="18">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="作物收益" Style="{StaticResource SectionTitleStyle}" />
+                    <ItemsRepeater ItemsSource="{Binding Crops}" HorizontalAlignment="Stretch">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="320" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource CardStyle}" MinHeight="208" Padding="14">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="42" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            Width="38"
+                                            Height="38"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Tag="{Binding SearchQuery}"
+                                            ToolTipService.ToolTip="{Binding SearchQuery}"
+                                            Click="SearchAction_Click"
+                                            VerticalAlignment="Top">
+                                            <Image Source="{Binding IconUri}" Width="34" Height="34" Stretch="Uniform" />
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="1" />
+                                            <TextBlock Text="{Binding GrowthText}" Style="{StaticResource MutedTextStyle}" MaxLines="1" />
+                                            <TextBlock Text="{Binding HarvestText}" Style="{StaticResource MutedTextStyle}" MaxLines="1" />
+                                            <TextBlock Text="{Binding ProfitText}" Style="{StaticResource MutedTextStyle}" MaxLines="1" />
+                                            <TextBlock Text="{Binding RawPriceText}" Style="{StaticResource BodyTextStyle}" MaxLines="1" />
+                                            <TextBlock Text="{Binding ArtisanPriceText}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" MaxLines="2" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="{Binding FishHeading}" Style="{StaticResource SectionTitleStyle}" />
+                    <ScrollViewer MaxHeight="460" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsRepeater ItemsSource="{Binding Fish}" HorizontalAlignment="Stretch">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout MinItemWidth="320" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource CardStyle}" MinHeight="186" Padding="14">
+                                        <Grid RowSpacing="8">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="38" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button
+                                                    Width="36"
+                                                    Height="36"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderBrush="Transparent"
+                                                    Tag="{Binding SearchQuery}"
+                                                    ToolTipService.ToolTip="{Binding SearchQuery}"
+                                                    Click="SearchAction_Click"
+                                                    VerticalAlignment="Top">
+                                                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="Uniform" />
+                                                </Button>
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="1" />
+                                                    <TextBlock Text="{Binding SeasonWeatherText}" Style="{StaticResource MutedTextStyle}" MaxLines="1" />
+                                                </StackPanel>
+                                                <Border Grid.Column="2" Visibility="{Binding BadgeVisibility}" Background="{ThemeResource AccentSoftBrush}" CornerRadius="8" Padding="8,3" VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding BadgeText}" Foreground="{StaticResource AccentBrush}" FontSize="12" FontWeight="SemiBold" />
+                                                </Border>
+                                            </Grid>
+                                            <TextBlock Grid.Row="1" Text="{Binding CategoryText}" Style="{StaticResource BodyTextStyle}" MaxLines="1" />
+                                            <TextBlock Grid.Row="2" Text="{Binding PriceText}" Style="{StaticResource MutedTextStyle}" MaxLines="1" />
+                                            <TextBlock Grid.Row="3" Text="{Binding SmokedPriceText}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" MaxLines="2" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                    </ScrollViewer>
+                </StackPanel>
+
+                <StackPanel Spacing="10">
+                    <TextBlock Text="最近节日" Style="{StaticResource SectionTitleStyle}" />
+                    <ItemsRepeater ItemsSource="{Binding Festivals}" HorizontalAlignment="Stretch">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="320" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource CardStyle}" MinHeight="154" Padding="14">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="42" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            Width="38"
+                                            Height="38"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Tag="{Binding SearchQuery}"
+                                            ToolTipService.ToolTip="{Binding SearchQuery}"
+                                            Click="SearchAction_Click"
+                                            VerticalAlignment="Top">
+                                            <Image Source="{Binding IconUri}" Width="34" Height="34" Stretch="Uniform" />
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Spacing="3">
+                                            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" FontSize="12" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding CountdownText}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="1" />
+                                            <TextBlock Text="{Binding DateText}" Style="{StaticResource MutedTextStyle}" MaxLines="1" />
+                                            <TextBlock Text="{Binding Detail}" Visibility="{Binding DetailVisibility}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" MaxLines="2" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+
+                <StackPanel Spacing="10" Visibility="{Binding BundleVisibility}">
+                    <TextBlock Text="社区中心" Style="{StaticResource SectionTitleStyle}" />
+                    <ItemsRepeater ItemsSource="{Binding Bundles}" HorizontalAlignment="Stretch">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="320" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource CardStyle}" MinHeight="168" Padding="14">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="42" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            Width="38"
+                                            Height="38"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Tag="{Binding SearchQuery}"
+                                            ToolTipService.ToolTip="{Binding SearchQuery}"
+                                            Click="SearchAction_Click"
+                                            VerticalAlignment="Top">
+                                            <Image Source="{Binding IconUri}" Width="34" Height="34" Stretch="Uniform" />
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="1" />
+                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" MaxLines="3" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding ProgressText}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" VerticalAlignment="Top" Margin="8,0,0,0" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+
+                <TextBlock Text="资料与图标由本机游戏内容生成，鱼类按当前季节与天气筛选。" Style="{StaticResource MutedTextStyle}" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

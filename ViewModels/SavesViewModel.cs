@@ -14,13 +14,11 @@ public sealed class SavesViewModel : ViewModelBase
     private readonly SaveParserService _parser;
     private readonly GameIconService _icons;
     private readonly SaveBackupService _backups;
-    private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
     private readonly AutomaticScanMonitor _automaticScanMonitor;
     private SaveInfo? _selectedSave;
     private SaveBackupEntry? _selectedBackup;
     private bool _automaticScanningStarted;
-    private bool _isFriendshipExpanded;
 
     public SavesViewModel(
         AppStateService state,
@@ -28,7 +26,6 @@ public sealed class SavesViewModel : ViewModelBase
         SaveParserService parser,
         GameIconService icons,
         SaveBackupService backups,
-        PlatformService platform,
         DialogService dialogs,
         UiDispatcherService dispatcher)
     {
@@ -37,14 +34,11 @@ public sealed class SavesViewModel : ViewModelBase
         _parser = parser;
         _icons = icons;
         _backups = backups;
-        _platform = platform;
         _dialogs = dialogs;
         _automaticScanMonitor = new AutomaticScanMonitor(dispatcher, ScanAutomaticallyAsync);
         BackupCommand = new AsyncRelayCommand(BackupSelectedAsync, CanBackup);
         BackupAllCommand = new AsyncRelayCommand(BackupAllAsync, CanBackupAll);
         RestoreCommand = new AsyncRelayCommand(RestoreSelectedAsync, CanRestore);
-        OpenBackupsCommand = new AsyncRelayCommand(() => _platform.OpenFolderAsync(AppPaths.SaveBackups));
-        ToggleFriendshipsCommand = new RelayCommand(() => IsFriendshipExpanded = !IsFriendshipExpanded);
         _state.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(AppStateService.IsGameRunning) or nameof(AppStateService.GameDirectory))
@@ -65,8 +59,6 @@ public sealed class SavesViewModel : ViewModelBase
     public IAsyncRelayCommand BackupCommand { get; }
     public IAsyncRelayCommand BackupAllCommand { get; }
     public IAsyncRelayCommand RestoreCommand { get; }
-    public IAsyncRelayCommand OpenBackupsCommand { get; }
-    public IRelayCommand ToggleFriendshipsCommand { get; }
 
     public SaveInfo? SelectedSave
     {
@@ -76,11 +68,9 @@ public sealed class SavesViewModel : ViewModelBase
             if (SetProperty(ref _selectedSave, value))
             {
                 _state.CurrentSave = value;
-                IsFriendshipExpanded = false;
                 OnPropertyChanged(nameof(DetailVisibility));
                 OnPropertyChanged(nameof(BackupStatus));
-                OnPropertyChanged(nameof(SelectedSaveStats));
-                OnPropertyChanged(nameof(FriendshipsToggleVisibility));
+                OnPropertyChanged(nameof(SaveBackgroundVisibility));
                 LoadBackupEntries();
                 Refresh();
                 _ = App.Current.Services.Guide.RefreshAsync();
@@ -105,6 +95,9 @@ public sealed class SavesViewModel : ViewModelBase
     public Visibility AvailableVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DetailVisibility => SelectedSave is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility SaveBackgroundVisibility => string.IsNullOrWhiteSpace(SelectedSave?.BackgroundImageUri)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
     public string BackupStatus => SelectedSave?.LatestBackup is { } date
         ? $"最近备份：{FormatRelativeTime(date)}"
         : "尚无备份";
@@ -125,35 +118,6 @@ public sealed class SavesViewModel : ViewModelBase
         return $"{(int)(span.TotalDays / 365)}年前";
     }
     public string SavesCountDisplay => $"共发现 {Saves.Count} 个存档";
-    public string SelectedSaveStats => SelectedSave is null
-        ? string.Empty
-        : $"{SelectedSave.DateDisplay} · {SelectedSave.MoneyDisplay} · 总收入 {SelectedSave.TotalIncomeDisplay} · {SelectedSave.PlayTimeDisplay} · 剩余 {SelectedSave.RemainingDaysInSeason} 天";
-
-    public bool IsFriendshipExpanded
-    {
-        get => _isFriendshipExpanded;
-        set
-        {
-            if (SetProperty(ref _isFriendshipExpanded, value))
-            {
-                OnPropertyChanged(nameof(RestFriendshipsVisibility));
-                OnPropertyChanged(nameof(FriendshipsToggleText));
-                OnPropertyChanged(nameof(FriendshipsToggleVisibility));
-            }
-        }
-    }
-
-    public Visibility RestFriendshipsVisibility => IsFriendshipExpanded ? Visibility.Visible : Visibility.Collapsed;
-
-    public Visibility FriendshipsToggleVisibility => SelectedSave is { HasMoreFriendships: true }
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
-    public string FriendshipsToggleText => IsFriendshipExpanded
-        ? "收起"
-        : SelectedSave is { HasMoreFriendships: true }
-            ? $"展开全部（+{SelectedSave.RestFriendships.Count()} 人）"
-            : "展开全部";
 
     public void Refresh()
     {
@@ -212,7 +176,7 @@ public sealed class SavesViewModel : ViewModelBase
                 var save = await _parser.ParseAsync(source);
                 if (save is not null)
                 {
-                    _icons.ApplySaveIcons(save);
+                    await _icons.ApplySaveIconsAsync(save);
                     save.LatestBackup = _backups.GetLatestBackup(save.FolderName);
                     results.Add(save);
                 }

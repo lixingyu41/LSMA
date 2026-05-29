@@ -35,12 +35,15 @@ public sealed class GuideViewModel : ViewModelBase
     public ObservableCollection<CropRecord> Crops { get; } = [];
     public ObservableCollection<BundleRecord> Bundles { get; } = [];
     public ObservableCollection<GuideSearchResult> SearchResults { get; } = [];
-    public Visibility EmptyVisibility => _state.CurrentSave is null ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility SuggestionVisibility => _state.CurrentSave is null ? Visibility.Collapsed : Visibility.Visible;
+    public bool IsSearchActive => !string.IsNullOrWhiteSpace(_query);
+    public Visibility EmptyVisibility => _state.CurrentSave is null && !IsSearchActive ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility SuggestionVisibility => _state.CurrentSave is not null && !IsSearchActive ? Visibility.Visible : Visibility.Collapsed;
     public Visibility SearchVisibility => string.IsNullOrWhiteSpace(_query) ? Visibility.Collapsed : Visibility.Visible;
     public Visibility StructuredVisibility => string.IsNullOrWhiteSpace(_query) ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility BundleVisibility => _state.CurrentSave?.CommunityCenterProgress >= 100
-        ? Visibility.Collapsed
+    public Visibility BundleVisibility => _state.CurrentSave is { } save
+        ? _catalog.GetCommunityBundles(save).Count > 0 || save.CommunityCenterProgress < 100
+            ? Visibility.Visible
+            : Visibility.Collapsed
         : Visibility.Visible;
     public string FishHeading => _state.CurrentSave is null ? "可钓鱼类" : $"{_state.CurrentSave.DateDisplay}可钓鱼类";
     public string SearchSummary => $"“{_query}”的游戏内容结果：{SearchResults.Count} 项";
@@ -49,49 +52,188 @@ public sealed class GuideViewModel : ViewModelBase
         : $"{_state.CurrentSave.FarmerName} · {_state.CurrentSave.DateDisplay}";
     public string GoalSuggestion => _state.CurrentSave is null
         ? "未发现可分析的存档。"
-        : _state.CurrentSave.CommunityCenterProgress < 100
-            ? "优先补齐当前季节可获得的社区中心物品。"
+        : _catalog.GetCommunityBundles(_state.CurrentSave).Count > 0
+            ? "优先补齐当前献祭缺项。"
             : "社区中心进度良好，可规划收入与好感目标。";
 
     public async Task SearchAsync(string query)
     {
         _query = query?.Trim() ?? string.Empty;
 
-        // Load icons for catalog results
-        if (!string.IsNullOrWhiteSpace(_query))
-        {
-            foreach (var result in _catalog.Search(_query))
-            {
-                result.IconUri = result.IconTexture is { Length: > 0 } texture && result.IconSpriteIndex is { } spriteIndex
-                    ? await _icons.GetTextureIconAsync(texture, spriteIndex)
-                    : result.ObjectId is { } objectId
-                    ? await _icons.GetObjectIconAsync(objectId)
-                    : result.NpcId is { } npcId ? _icons.GetPortraitUri(npcId) : null;
-            }
-        }
-
         Refresh();
         SearchNpcGifts();
+        await EnsureSearchResultIconsAsync();
+        Replace(SearchResults, SearchResults.ToList());
+        OnPropertyChanged(nameof(SearchSummary));
     }
 
     private void SearchNpcGifts()
     {
         if (string.IsNullOrWhiteSpace(_query)) return;
 
+        var giftQueries = GiftQueryTerms(_query).ToList();
         foreach (var gift in _data.NpcGifts
             .Where(g => g.Npc.Contains(_query, StringComparison.CurrentCultureIgnoreCase)
-                || g.Loves.Contains(_query, StringComparison.CurrentCultureIgnoreCase)
-                || g.Likes.Contains(_query, StringComparison.CurrentCultureIgnoreCase)))
+                || giftQueries.Any(query => GiftFieldsContain(g, query))))
         {
             gift.IconUri ??= _icons.GetPortraitUri(gift.NpcId);
-            SearchResults.Add(new GuideSearchResult
+            var result = SearchResults.FirstOrDefault(item => item.NpcId == gift.NpcId || item.Title == gift.Npc);
+            if (result is null)
             {
-                Category = "礼物",
-                Title = $"{gift.Npc} ({gift.Birthday})",
-                Detail = $"喜爱：{gift.Loves}\n喜欢：{gift.Likes}",
-                NpcId = gift.NpcId
-            });
+                result = new GuideSearchResult
+                {
+                    Category = "人物",
+                    Title = gift.Npc,
+                    Detail = $"{gift.Birthday} 生日 · 喜爱：{gift.Loves}",
+                    NpcId = gift.NpcId,
+                    IconUri = gift.IconUri
+                };
+                SearchResults.Add(result);
+            }
+
+            if (!gift.Npc.Equals(_query, StringComparison.CurrentCultureIgnoreCase)
+                && GiftMatchReason(gift, giftQueries) is { } matchReason)
+            {
+                AddMatchReason(result, matchReason);
+            }
+
+            AddGiftSection(result, "喜爱 +80", gift.Loves);
+            AddGiftSection(result, "喜欢 +45", gift.Likes);
+            AddGiftSection(result, "中立 +20", gift.Neutral);
+            AddGiftSection(result, "不喜欢 -20", gift.Dislikes);
+            AddGiftSection(result, "讨厌 -40", gift.Hates);
         }
+    }
+
+    private static bool GiftFieldsContain(NpcGiftRecord gift, string query)
+    {
+        return gift.Loves.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            || gift.Likes.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            || gift.Neutral.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            || gift.Dislikes.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+            || gift.Hates.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static IEnumerable<string> GiftQueryTerms(string query)
+    {
+        yield return query;
+        foreach (var alias in query switch
+        {
+            "黄水仙" => ["水仙花"],
+            "野山葵" => ["辣根"],
+            "粘土" => ["黏土"],
+            "黏土" => ["粘土"],
+            _ => Array.Empty<string>()
+        })
+        {
+            yield return alias;
+        }
+    }
+
+    private static string? GiftMatchReason(NpcGiftRecord gift, IReadOnlyList<string> queries)
+    {
+        var query = queries.FirstOrDefault(value => gift.Loves.Contains(value, StringComparison.CurrentCultureIgnoreCase));
+        if (query is not null)
+        {
+            return $"喜爱礼物包含：{query}";
+        }
+
+        query = queries.FirstOrDefault(value => gift.Likes.Contains(value, StringComparison.CurrentCultureIgnoreCase));
+        if (query is not null)
+        {
+            return $"喜欢礼物包含：{query}";
+        }
+
+        query = queries.FirstOrDefault(value => gift.Neutral.Contains(value, StringComparison.CurrentCultureIgnoreCase));
+        if (query is not null)
+        {
+            return $"中立礼物包含：{query}";
+        }
+
+        query = queries.FirstOrDefault(value => gift.Dislikes.Contains(value, StringComparison.CurrentCultureIgnoreCase));
+        if (query is not null)
+        {
+            return $"不喜欢礼物包含：{query}";
+        }
+
+        query = queries.FirstOrDefault(value => gift.Hates.Contains(value, StringComparison.CurrentCultureIgnoreCase));
+        return query is not null
+            ? $"讨厌礼物包含：{query}"
+            : null;
+    }
+
+    private static void AddMatchReason(GuideSearchResult result, string reason)
+    {
+        if (result.Sections.Any(section => section.Title == "匹配原因"
+            && section.Lines.Any(line => line.Equals(reason, StringComparison.CurrentCultureIgnoreCase))))
+        {
+            return;
+        }
+
+        var section = result.Sections.FirstOrDefault(section => section.Title == "匹配原因");
+        if (section is null)
+        {
+            section = new GuideSearchSection { Title = "匹配原因" };
+            result.Sections.Insert(0, section);
+        }
+
+        section.Lines.Add(reason);
+    }
+
+    private async Task EnsureSearchResultIconsAsync()
+    {
+        foreach (var result in SearchResults)
+        {
+            result.IconUri = result.IconTexture is { Length: > 0 } texture && result.IconSpriteIndex is { } spriteIndex
+                ? await _icons.GetTextureIconAsync(texture, spriteIndex, result.IconWidth, result.IconHeight)
+                : result.ObjectId is { } objectId
+                    ? await _icons.GetObjectIconAsync(objectId)
+                    : result.NpcId is { } npcId ? _icons.GetPortraitUri(npcId) : result.IconUri;
+
+            foreach (var action in result.Sections.SelectMany(section => section.Actions))
+            {
+                if (action.IconTexture is { Length: > 0 } actionTexture && action.IconSpriteIndex is { } actionSpriteIndex)
+                {
+                    action.IconUri = await _icons.GetTextureIconAsync(actionTexture, actionSpriteIndex, action.IconWidth, action.IconHeight);
+                }
+                else if ((action.ObjectId ?? _catalog.FindObjectIdByName(action.Query)) is { } id)
+                {
+                    action.IconUri = await _icons.GetObjectIconAsync(id);
+                }
+            }
+        }
+    }
+
+    private void AddGiftSection(GuideSearchResult result, string title, string rawItems)
+    {
+        if (result.Sections.Any(section => section.Title == title))
+        {
+            return;
+        }
+
+        var actions = SplitGiftItems(rawItems)
+            .Select(item => new GuideSearchAction
+            {
+                Label = item,
+                Query = item,
+                ObjectId = _catalog.FindObjectIdByName(item)
+            })
+            .ToList();
+        if (actions.Count == 0)
+        {
+            return;
+        }
+
+        var section = new GuideSearchSection { Title = title };
+        section.Actions.AddRange(actions);
+        result.Sections.Add(section);
+    }
+
+    private static IEnumerable<string> SplitGiftItems(string value)
+    {
+        return value
+            .Split([',', '，', '、'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => item.Length > 0);
     }
 
     public async Task RefreshAsync()
@@ -99,6 +241,16 @@ public sealed class GuideViewModel : ViewModelBase
         foreach (var fish in _catalog.GetFishToday(_state.CurrentSave))
         {
             await _icons.GetObjectIconAsync(fish.ObjectId);
+        }
+
+        foreach (var crop in _catalog.GetCropsForCurrentSeason(_state.CurrentSave))
+        {
+            await _icons.GetObjectIconAsync(crop.ObjectId);
+        }
+
+        foreach (var bundle in _catalog.GetCommunityBundles(_state.CurrentSave))
+        {
+            await _icons.GetObjectIconAsync(bundle.ObjectId);
         }
 
         await SearchAsync(_query);
@@ -138,23 +290,53 @@ public sealed class GuideViewModel : ViewModelBase
             fish.IconUri = _icons.GetObjectIconUri(fish.ObjectId);
         }
 
+        var crops = _catalog.GetCropsForCurrentSeason(_state.CurrentSave);
+        foreach (var crop in crops)
+        {
+            crop.IconUri = _icons.GetObjectIconUri(crop.ObjectId);
+        }
+
+        var bundles = _catalog.GetCommunityBundles(_state.CurrentSave);
+        foreach (var bundle in bundles)
+        {
+            bundle.IconUri = _icons.GetObjectIconUri(bundle.ObjectId);
+        }
+
         Replace(Suggestions, _recommendations.Generate(_state.CurrentSave));
         Replace(Festivals, festivals);
-        Replace(Fish, fishToday.Count > 0 ? fishToday : _data.Fish);
-        Replace(Crops, _data.Crops);
-        Replace(Bundles, _data.Bundles);
+        Replace(Fish, (fishToday.Count > 0 ? fishToday : _data.Fish)
+            .OrderByDescending(fish => fish.SalePrice)
+            .ThenByDescending(fish => fish.IsLegendary)
+            .ThenBy(fish => fish.SortStartMinutes)
+            .ThenBy(fish => fish.Location)
+            .ThenBy(fish => fish.Name));
+        Replace(Crops, crops.Count > 0 ? crops : _data.Crops);
+        Replace(Bundles, bundles.Count > 0 ? bundles : _data.Bundles);
         Replace(SearchResults, _catalog.Search(_query));
         foreach (var result in SearchResults)
         {
             result.IconUri = result.IconTexture is { Length: > 0 } texture && result.IconSpriteIndex is { } spriteIndex
-                ? _icons.GetTextureIconUri(texture, spriteIndex)
+                ? _icons.GetTextureIconUri(texture, spriteIndex, result.IconWidth, result.IconHeight)
                 : result.ObjectId is { } objectId
                 ? _icons.GetObjectIconUri(objectId)
                 : result.NpcId is { } npcId ? _icons.GetPortraitUri(npcId) : null;
+
+            foreach (var action in result.Sections.SelectMany(section => section.Actions))
+            {
+                if (action.IconTexture is { Length: > 0 } actionTexture && action.IconSpriteIndex is { } actionSpriteIndex)
+                {
+                    action.IconUri = _icons.GetTextureIconUri(actionTexture, actionSpriteIndex, action.IconWidth, action.IconHeight);
+                }
+                else if ((action.ObjectId ?? _catalog.FindObjectIdByName(action.Query)) is { } id)
+                {
+                    action.IconUri = _icons.GetObjectIconUri(id);
+                }
+            }
         }
 
         OnPropertyChanged(nameof(EmptyVisibility));
         OnPropertyChanged(nameof(SuggestionVisibility));
+        OnPropertyChanged(nameof(IsSearchActive));
         OnPropertyChanged(nameof(SearchVisibility));
         OnPropertyChanged(nameof(StructuredVisibility));
         OnPropertyChanged(nameof(BundleVisibility));

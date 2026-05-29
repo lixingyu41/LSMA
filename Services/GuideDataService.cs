@@ -15,9 +15,9 @@ public sealed class GuideDataService
 
     public IReadOnlyList<FishRecord> Fish { get; } =
     [
-        new() { ObjectId = 143, Name = "鲶鱼", Season = "春季 / 秋季", Weather = "雨天", Location = "河流", Time = "6:00 - 24:00", CommunityCenterNeeded = true },
-        new() { ObjectId = 698, Name = "鲟鱼", Season = "夏季 / 冬季", Weather = "任意", Location = "山区湖泊", Time = "6:00 - 19:00", CommunityCenterNeeded = true },
-        new() { ObjectId = 150, Name = "红鲷鱼", Season = "夏季 / 秋季", Weather = "雨天", Location = "海洋", Time = "6:00 - 19:00", CommunityCenterNeeded = true }
+        new() { ObjectId = 143, Name = "鲶鱼", Season = "春季 / 秋季", Weather = "雨天", Location = "河流", Time = "6:00 - 24:00", SortStartMinutes = 360, CommunityCenterNeeded = true },
+        new() { ObjectId = 698, Name = "鲟鱼", Season = "夏季 / 冬季", Weather = "任意", Location = "山区湖泊", Time = "6:00 - 19:00", SortStartMinutes = 360, CommunityCenterNeeded = true },
+        new() { ObjectId = 150, Name = "红鲷鱼", Season = "夏季 / 秋季", Weather = "雨天", Location = "海洋", Time = "6:00 - 19:00", SortStartMinutes = 360, CommunityCenterNeeded = true }
     ];
 
     public IReadOnlyList<CropRecord> Crops { get; } =

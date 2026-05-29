@@ -66,10 +66,15 @@ public sealed class HomeViewModel : ViewModelBase
     public Visibility ConnectedVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
     public Visibility LogDetailVisibility => _state.LogSummary.HasLog ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility BusyVisibility => IsBusy ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ReadyVisibility => Health == HealthLevel.Ready ? Visibility.Visible : Visibility.Collapsed;
     public Visibility AttentionVisibility => Health == HealthLevel.Attention ? Visibility.Visible : Visibility.Collapsed;
     public Visibility BlockedVisibility => Health == HealthLevel.Blocked ? Visibility.Visible : Visibility.Collapsed;
     public Visibility StableRecoveryVisibility => _state.LogSummary.HasCrash && _availableSnapshot is not null ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ModAttentionVisibility => ModErrorCount > 0 || ModUpdateCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility LogAttentionVisibility => _state.LogSummary.HasCrash || _state.LogSummary.ErrorCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility HomeBackgroundVisibility => Visibility.Visible;
+    public string HomeBackgroundImageUri => "ms-appx:///Assets/Home/stardew-valley-steam-library-hero-2x.jpg";
     public string ConnectionText => _state.IsGameConfigured ? "已连接游戏" : "未找到星露谷物语安装目录";
     public string StatusTitle => Health switch
     {
@@ -94,9 +99,21 @@ public sealed class HomeViewModel : ViewModelBase
                         : _state.Mods.Any(mod => mod.IsEnabled && mod.Issues.Any(issue => issue.Severity == IssueSeverity.Warning))
                             ? "部分模组存在非阻断提醒，建议启动前查看。"
                         : "目录和启动程序就绪，未发现阻断问题。";
-    public string ModSummaryText => _state.Mods.Count == 0
-        ? "未发现本地模组"
-        : $"正常 {_state.Mods.Count(mod => mod.IsEnabled && mod.Issues.Count == 0)} · 问题 {_state.Mods.Count(mod => mod.Issues.Count > 0)} · 更新待检查";
+    public string ModSummaryText
+    {
+        get
+        {
+            var errors = ModErrorCount;
+            var updates = ModUpdateCount;
+            return (errors, updates) switch
+            {
+                (> 0, > 0) => $"{errors} 个错误 · {updates} 个可更新",
+                (> 0, 0) => $"{errors} 个错误",
+                (0, > 0) => $"{updates} 个可更新",
+                _ => string.Empty
+            };
+        }
+    }
     public string SaveSummaryText => _state.CurrentSave is null
         ? "未发现本机存档"
         : $"{_state.CurrentSave.FarmerName} · {_state.CurrentSave.DateDisplay}\n{(_state.CurrentSave.LatestBackup is null ? "尚无备份" : $"备份 {_state.CurrentSave.LatestBackup:MM-dd HH:mm}")}";
@@ -107,6 +124,11 @@ public sealed class HomeViewModel : ViewModelBase
     public IReadOnlyList<LogIssue> LogIssues => _state.LogSummary.Issues;
     public string MostLikelyCause => _state.LogSummary.MostLikelyCause;
     public string RecommendedAction => _state.LogSummary.RecommendedAction;
+
+    private int ModErrorCount => _state.Mods.Count(mod => mod.IsEnabled && !mod.IsArchived
+        && mod.Issues.Any(issue => issue.Severity == IssueSeverity.Error));
+
+    private int ModUpdateCount => _state.Mods.Count(mod => !mod.IsArchived && mod.HasUpdate);
 
     private HealthLevel Health
     {
@@ -140,6 +162,11 @@ public sealed class HomeViewModel : ViewModelBase
     public void Refresh()
     {
         OnPropertyChanged(string.Empty);
+        OnPropertyChanged(nameof(BusyVisibility));
+        OnPropertyChanged(nameof(ModAttentionVisibility));
+        OnPropertyChanged(nameof(LogAttentionVisibility));
+        OnPropertyChanged(nameof(HomeBackgroundVisibility));
+        OnPropertyChanged(nameof(HomeBackgroundImageUri));
         ChooseDirectoryCommand.NotifyCanExecuteChanged();
         CheckCommand.NotifyCanExecuteChanged();
         LaunchGameCommand.NotifyCanExecuteChanged();
