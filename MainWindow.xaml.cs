@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
             App.Current.Services.SettingsPage.Refresh();
         };
         App.Current.Services.Navigation.AttachFrame(ContentFrame);
+        App.Current.Services.PageAcceleration.AttachFrame(ContentFrame);
         RootLayout.Loaded += RootLayout_Loaded;
     }
 

@@ -228,6 +228,7 @@ public sealed class SaveParserService(
         }
 
         AddCollectionStats(save);
+        AddCollectionDetails(save, player);
         AddPerfectionStats(save);
         AddMonsterKillStats(save, player);
         AddFishCatchStats(save, player);
@@ -239,12 +240,31 @@ public sealed class SaveParserService(
     {
         save.CollectionStats.AddRange(
         [
-            Progress("出货与采集", save.ItemsShipped, TotalShippableItems, "已登记到收藏的出货物品"),
-            Progress("矿物", save.MineralsFound, TotalMinerals, "博物馆矿物收藏进度"),
-            Progress("古物", save.ArtifactsFound, TotalArtifacts, "博物馆古物收藏进度"),
-            Progress("烹饪", save.CookedRecipes, TotalCookingRecipes, "已制作过的食谱"),
-            Progress("鱼类", save.FishSpeciesCaught, TotalFishSpecies, "已捕获过的鱼类")
+            Progress("出货与采集", save.ItemsShipped, TotalShippableItems, "出货收藏记录农作物、采集物、动物产品和加工品，是完美度中产品与采集品项目的来源", "Shipped"),
+            Progress("矿物", save.MineralsFound, TotalMinerals, "矿物收藏来自采矿、晶球和博物馆登记，用来判断矿物图鉴是否接近完整", "Minerals"),
+            Progress("古物", save.ArtifactsFound, TotalArtifacts, "古物收藏来自蚯蚓点、钓鱼宝箱、怪物掉落和矿洞发现，主要用于博物馆补全", "Artifacts"),
+            Progress("烹饪", save.CookedRecipes, TotalCookingRecipes, "烹饪进度统计已经做过的菜谱，完美度要求制作全部烹饪食谱", "Cooking"),
+            Progress("鱼类", save.FishSpeciesCaught, TotalFishSpecies, "鱼类收藏记录捕获过的鱼和水产，完美度要求捕获全部鱼类", "Fish")
         ]);
+    }
+
+    private void AddCollectionDetails(SaveInfo save, XElement player)
+    {
+        AddCollectionDetails(save, "Shipped", player, "basicShipped");
+        AddCollectionDetails(save, "Minerals", player, "mineralsFound");
+        AddCollectionDetails(save, "Artifacts", player, "archaeologyFound");
+        AddCollectionDetails(save, "Cooking", player, "cookingRecipes");
+        AddCollectionDetails(save, "Fish", player, "fishCaught");
+    }
+
+    private void AddCollectionDetails(SaveInfo save, string collectionKey, XElement player, string dictionaryName)
+    {
+        var collected = ReadCollectedKeys(player, dictionaryName);
+        var items = catalog.GetCollectionItems(collectionKey, collected);
+        if (items.Count > 0)
+        {
+            save.CollectionItems[collectionKey] = items.ToList();
+        }
     }
 
     private static void AddPerfectionStats(SaveInfo save)
@@ -252,23 +272,23 @@ public sealed class SaveParserService(
         var friendshipTotal = save.Friendships.Count > 0 ? save.Friendships.Count : TotalGreatFriends;
         save.PerfectionStats.AddRange(
         [
-            Progress("农场上的图腾柱", save.ObelisksBuilt, TotalObelisks, "地、水、沙漠、姜岛图腾柱"),
-            Toggle("农场上有黄金时钟", save.HasGoldClock),
-            Progress("好朋友", save.GoodFriends, friendshipTotal, "达到当前关系上限的村民"),
-            Progress("找到所有星之果实", save.StardropsFound, 7, "永久体力星之果实"),
-            Progress("制作的制造设计图", save.CraftedRecipes, TotalCraftingRecipes, "至少制作过一次的配方"),
-            Progress("找到的金色核桃", save.GoldenWalnutsFound, TotalGoldenWalnuts, "姜岛金色核桃"),
-            Progress("已售出的产品和采集品", save.ItemsShipped, TotalShippableItems, "出货收藏进度"),
-            Toggle("杀怪英雄", save.IsMonsterHero),
-            Progress("农场主等级", save.FarmerLevelScore, TotalFarmerLevelScore, "五项技能折算的完美度等级"),
-            Progress("制作的烹饪食谱", save.CookedRecipes, TotalCookingRecipes, "至少烹饪过一次的食谱"),
-            Progress("捕获的鱼", save.FishSpeciesCaught, TotalFishSpecies, "鱼类收藏进度"),
+            Progress("农场上的图腾柱", save.ObelisksBuilt, TotalObelisks, "图腾柱是后期传送建筑，地、水、沙漠、姜岛四座都属于完美度目标"),
+            Toggle("农场上有黄金时钟", save.HasGoldClock, "黄金时钟是后期昂贵建筑，可以阻止农场杂草和栅栏腐坏，也是完美度目标之一"),
+            Progress("好朋友", save.GoodFriends, friendshipTotal, "好朋友统计达到当前关系上限的村民，完美度要求主要村民关系达到上限"),
+            Progress("找到所有星之果实", save.StardropsFound, 7, "星之果实会永久增加最大体力，全部找到是完美度目标之一"),
+            Progress("制作的制造设计图", save.CraftedRecipes, TotalCraftingRecipes, "制造设计图统计已经制作过的配方，完美度要求每种配方至少制作一次"),
+            Progress("找到的金色核桃", save.GoldenWalnutsFound, TotalGoldenWalnuts, "金色核桃是姜岛探索货币，可解锁道路、建筑、传送点和齐先生核桃房"),
+            Progress("已售出的产品和采集品", save.ItemsShipped, TotalShippableItems, "出货项目要求把主要产品和采集品至少出货一次，是完美度的重要组成"),
+            Toggle("杀怪英雄", save.IsMonsterHero, "杀怪英雄要求完成冒险者公会主要除害目标，会影响完美度中的战斗项目"),
+            Progress("农场主等级", save.FarmerLevelScore, TotalFarmerLevelScore, "农场主等级由五项技能综合折算，代表角色基础成长是否接近满档"),
+            Progress("制作的烹饪食谱", save.CookedRecipes, TotalCookingRecipes, "烹饪食谱要求每道菜至少制作一次，通常需要补齐配方和食材来源"),
+            Progress("捕获的鱼", save.FishSpeciesCaught, TotalFishSpecies, "捕获的鱼统计鱼类图鉴完成情况，完美度要求所有鱼类都至少钓到一次"),
             new SaveProgressInfo
             {
                 Name = "完美豁免书",
                 Value = save.PerfectionWaivers.ToString("N0"),
                 Percent = 0,
-                Detail = "齐先生完美豁免书数量"
+                Detail = "完美豁免书可在齐先生处购买，用来直接补完美度分数，适合跳过不想完成的目标"
             }
         ]);
     }
@@ -286,12 +306,14 @@ public sealed class SaveParserService(
             .OrderByDescending(item => item.Value)
             .ThenBy(item => item.Key))
         {
+            var displayName = MonsterName(name);
             save.MonsterKillStats.Add(new SaveMetricInfo
             {
-                Name = MonsterName(name),
+                Name = displayName,
                 Value = $"x{count:N0}",
-                Detail = name,
-                Glyph = "\uE7FC"
+                Detail = $"{displayName} 的累计击杀次数。击杀记录来自冒险者公会统计，可用于判断除害目标和杀怪英雄进度",
+                Glyph = "\uE7FC",
+                IconKey = name
             });
         }
     }
@@ -311,11 +333,12 @@ public sealed class SaveParserService(
         {
             var item = catalog.FindItemById(id);
             var objectId = ObjectIdFromQualifiedId(id) ?? item?.ObjectId;
+            var displayName = item?.Title ?? (objectId is { } value ? catalog.ObjectName(value) : KnownQualifiedObjectName(id));
             save.FishCatchStats.Add(new SaveMetricInfo
             {
-                Name = item?.Title ?? (objectId is { } value ? catalog.ObjectName(value) : KnownQualifiedObjectName(id)),
+                Name = displayName,
                 Value = $"x{count:N0}",
-                Detail = id,
+                Detail = $"{displayName} 的累计捕获次数。捕获记录会影响鱼类收藏和完美度中的捕获全部鱼类目标",
                 Glyph = "\uE7C5",
                 ObjectId = objectId,
                 IconTexture = item?.IconTexture,
@@ -326,25 +349,27 @@ public sealed class SaveParserService(
         }
     }
 
-    private static SaveProgressInfo Progress(string name, int current, int total, string detail)
+    private static SaveProgressInfo Progress(string name, int current, int total, string detail, string? collectionKey = null)
     {
         var safeTotal = Math.Max(1, total);
+        var percent = Math.Clamp(current / (double)safeTotal * 100, 0, 100);
         return new SaveProgressInfo
         {
             Name = name,
             Value = $"{current:N0}/{total:N0}",
-            Percent = Math.Clamp(current / (double)safeTotal * 100, 0, 100),
-            Detail = $"{detail} · {Math.Clamp(current / (double)safeTotal * 100, 0, 100):0}%"
+            Percent = percent,
+            Detail = $"{detail}。当前 {current:N0}/{total:N0}，完成度 {percent:0}%",
+            CollectionKey = collectionKey
         };
     }
 
-    private static SaveProgressInfo Toggle(string name, bool value)
+    private static SaveProgressInfo Toggle(string name, bool value, string detail)
         => new()
         {
             Name = name,
             Value = value ? "是" : "否",
             Percent = value ? 100 : 0,
-            Detail = value ? "已完成" : "未完成"
+            Detail = $"{detail}。当前状态：{(value ? "已完成" : "未完成")}"
         };
 
     private static double CalculatePerfectionProgress(SaveInfo save)
@@ -412,6 +437,11 @@ public sealed class SaveParserService(
     private static string MonsterName(string id)
     {
         var normalized = id.Replace("_dangerous", string.Empty, StringComparison.OrdinalIgnoreCase);
+        if (normalized.Equals("Sludge", StringComparison.OrdinalIgnoreCase))
+        {
+            return "污泥怪";
+        }
+
         return normalized switch
         {
             "Armored Bug" => "装甲虫",
@@ -831,6 +861,14 @@ public sealed class SaveParserService(
         => First(root, name) is { } dictionary
             ? ReadStringIntDictionary(dictionary).Count(item => item.Value > 0)
             : 0;
+
+    private static IReadOnlySet<string> ReadCollectedKeys(XElement root, string name)
+        => First(root, name) is { } dictionary
+            ? ReadStringIntDictionary(dictionary)
+                .Where(item => item.Value > 0)
+                .Select(item => item.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     private static Dictionary<string, int> ReadStringIntDictionary(XElement dictionary)
     {

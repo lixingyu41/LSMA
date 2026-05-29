@@ -22,7 +22,7 @@
             BorderThickness="0,0,0,1">
             <Grid x:Name="AppTitleBarDragRegion">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="218" />
+                    <ColumnDefinition Width="130" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="142" />
                 </Grid.ColumnDefinitions>
@@ -51,7 +51,7 @@
             IsPaneToggleButtonVisible="True"
             IsPaneOpen="True"
             CompactPaneLength="48"
-            OpenPaneLength="218"
+            OpenPaneLength="130"
             AlwaysShowHeader="False"
             IsTitleBarAutoPaddingEnabled="False"
             Background="Transparent"

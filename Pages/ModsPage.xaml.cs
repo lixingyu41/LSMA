@@ -22,28 +22,42 @@ public sealed partial class ModsPage : Page
     private Button[] _filterButtons = null!;
     private int _selectedFilterIndex = 0;
     private Storyboard? _currentAnimation;
+    private bool _filterEventsAttached;
 
     public ModsPage()
     {
         InitializeComponent();
         _vm = App.Current.Services.Mods;
         DataContext = _vm;
-        _vm.PropertyChanged += OnViewModelPropertyChanged;
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _filterButtons = [AllFilterButton, UpdateFilterButton,
-                           ProblemFilterButton, DisabledFilterButton, FavoriteFilterButton];
-        foreach (var btn in _filterButtons)
+        if (!_filterEventsAttached)
         {
-            btn.PointerEntered += FilterButton_PointerEntered;
-            btn.PointerExited += FilterButton_PointerExited;
+            _filterButtons = [AllFilterButton, UpdateFilterButton,
+                               ProblemFilterButton, DisabledFilterButton, FavoriteFilterButton];
+            foreach (var btn in _filterButtons)
+            {
+                btn.PointerEntered += FilterButton_PointerEntered;
+                btn.PointerExited += FilterButton_PointerExited;
+            }
+
+            FilterContainer.SizeChanged += OnFilterContainerSizeChanged;
+            _filterEventsAttached = true;
         }
-        FilterContainer.SizeChanged += OnFilterContainerSizeChanged;
+
+        _vm.PropertyChanged -= OnViewModelPropertyChanged;
+        _vm.PropertyChanged += OnViewModelPropertyChanged;
         UpdateFilterSelection(_vm.CurrentFilter);
         UpdateProblemCountColor();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _vm.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     private void OnFilterContainerSizeChanged(object? sender, SizeChangedEventArgs e)

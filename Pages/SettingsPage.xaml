@@ -184,6 +184,7 @@
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel Spacing="12">
                     <TextBlock Text="高级" Style="{StaticResource SectionTitleStyle}" />
+                    <ToggleSwitch Header="GPU 页面加速" OffContent="关闭" OnContent="开启" IsOn="{Binding GpuPageAccelerationEnabled, Mode=TwoWay}" />
                     <ToggleSwitch Header="启用本地素材缓存" OffContent="关闭" OnContent="开启" IsOn="{Binding LocalAssetCacheEnabled, Mode=TwoWay}" />
                     <TextBlock Text="默认关闭。素材缓存由 LSMA 自动读取游戏 XNB 并生成图片；模组安装中的 ZIP / 7z / RAR 也由 LSMA 直接读取。" Style="{StaticResource BodyTextStyle}" />
                     <StackPanel Orientation="Horizontal" Spacing="10">

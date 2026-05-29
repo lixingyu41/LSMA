@@ -70,6 +70,7 @@ public sealed class SaveInfo
     public List<SaveProgressInfo> PerfectionStats { get; } = [];
     public List<SaveMetricInfo> MonsterKillStats { get; } = [];
     public List<SaveMetricInfo> FishCatchStats { get; } = [];
+    public Dictionary<string, List<SaveCollectionItemInfo>> CollectionItems { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<int, List<bool>> CommunityBundleStates { get; } = [];
     public HashSet<string> MailFlags { get; } = new(StringComparer.OrdinalIgnoreCase);
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
@@ -113,34 +114,34 @@ public sealed class SaveInfo
     ];
     public IReadOnlyList<SaveMetricInfo> EconomyStats =>
     [
-        Metric("当前金币", MoneyDisplay, "角色当前持有金币", "\uE8C7"),
-        Metric("日均收入", AverageMoneyDisplay, "总收入 ÷ 居住天数", "\uE9D2"),
-        Metric("季度估算", SeasonEstimateDisplay, "按当前日均收入估算 28 天收益", "\uE9D2"),
-        Metric("齐宝石", QiGemsDisplay, "姜岛齐先生商店货币", "\uE970")
+        Metric("当前金币", MoneyDisplay, "角色当前可直接消费的金币，可用于购买种子、建筑、工具升级和商店物品", "\uE8C7"),
+        Metric("日均收入", AverageMoneyDisplay, "总收入按居住天数折算，用来判断当前农场赚钱效率", "\uE9D2"),
+        Metric("季度估算", SeasonEstimateDisplay, "按当前日均收入估算 28 天收益，用来粗略评估一个季节的经营规模", "\uE9D2"),
+        Metric("齐宝石", QiGemsDisplay, "齐宝石可在姜岛齐先生核桃房兑换特殊物品、配方和挑战奖励", "\uE970")
     ];
     public IReadOnlyList<SaveMetricInfo> ProgressStats =>
     [
-        Metric("社区中心", CommunityCenterDisplay, "社区中心献祭包裹完成比例", "\uE73E"),
-        Metric("收集", CollectionDisplay, "出货与收藏综合进度", "\uE8FD"),
-        Metric("精通", MasteryLevelDisplay, $"精通经验 {MasteryExpDisplay}", "\uE735"),
-        Metric("星之果实", StardropsFoundDisplay, "已找到的永久体力星之果实", "\uE735")
+        Metric("社区中心", CommunityCenterDisplay, "社区中心献祭包裹会解锁矿车、温室、巴士、桥梁修复等关键设施", "\uE73E"),
+        Metric("收集", CollectionDisplay, "出货与收藏登记会影响收藏完成度，也能帮助判断还有哪些物品没被发现", "\uE8FD"),
+        Metric("精通", MasteryLevelDisplay, $"精通是 1.6 后五项技能满级后的后期成长系统，当前精通经验 {MasteryExpDisplay}", "\uE735"),
+        Metric("星之果实", StardropsFoundDisplay, "星之果实会永久增加最大体力，是探索、耕种和采矿耐力的重要来源", "\uE735")
     ];
     public IReadOnlyList<SaveMetricInfo> FarmLifeStats =>
     [
-        Metric("农场类型", FarmType, "当前存档选择的农场地图", "\uE81E"),
-        Metric("配偶", Spouse, "当前结婚对象或室友", "\uE716"),
-        Metric("宠物", Pet, "农场宠物类型", "\uE76E"),
-        Metric("房屋等级", HouseLevelDisplay, "农舍升级进度", "\uE80F"),
-        Metric("矿洞", MineLevelDisplay, "普通矿洞最深层数，最高 120 层", "\uE81C"),
-        Metric("沙漠矿洞", SkullCavernLevelDisplay, "骷髅矿洞最深层数", "\uE7AC")
+        Metric("农场类型", FarmType, "开局选择的农场地图会影响地形、可耕种面积和可用资源分布", "\uE81E"),
+        Metric("配偶", Spouse, "当前结婚对象或室友，会影响农舍生活事件和每日互动内容", "\uE716"),
+        Metric("宠物", Pet, "农场宠物类型，宠物好感也是爷爷评价中的长期经营要素之一", "\uE76E"),
+        Metric("房屋等级", HouseLevelDisplay, "农舍升级会解锁厨房、育儿空间和更完整的生活功能", "\uE80F"),
+        Metric("矿洞", MineLevelDisplay, "普通矿洞最深层数，推进层数会解锁矿石、怪物、宝箱和电梯节点", "\uE81C"),
+        Metric("沙漠矿洞", SkullCavernLevelDisplay, "骷髅矿洞层数代表沙漠矿洞探索深度，常用于铱矿和高价值资源获取", "\uE7AC")
     ];
     public IReadOnlyList<SaveMetricInfo> ActivityStats =>
     [
-        Metric("迈出步数", StepsTakenDisplay, "角色移动步数累计", "\uE805"),
-        Metric("播种", SeedsSownDisplay, "累计种下的作物种子", "\uE8F1"),
-        Metric("钓鱼", FishCaughtDisplay, $"抛竿 {TimesFishedDisplay} 次", "\uE7C5"),
-        Metric("垃圾桶", TrashCansCheckedDisplay, $"回收垃圾 {TrashRecycledDisplay} 件", "\uE74D"),
-        Metric("已出货", ItemsShippedDisplay, "已登记到收藏的出货物品数量", "\uE7BF")
+        Metric("迈出步数", StepsTakenDisplay, "角色在存档中的移动累计，能反映这个存档的实际游玩活跃度", "\uE805"),
+        Metric("播种", SeedsSownDisplay, "累计种下的作物种子，能反映农场种植规模和经营方向", "\uE8F1"),
+        Metric("钓鱼", FishCaughtDisplay, $"累计钓上来的鱼和水产数量，抛竿记录为 {TimesFishedDisplay} 次", "\uE7C5"),
+        Metric("垃圾桶", TrashCansCheckedDisplay, $"翻找垃圾桶次数；回收垃圾 {TrashRecycledDisplay} 件", "\uE74D"),
+        Metric("已出货", ItemsShippedDisplay, "已登记到收藏的出货物品数量，影响收集进度和完美度中的出货项目", "\uE7BF")
     ];
 
     private static SaveMetricInfo Metric(string name, string value, string detail, string glyph)
@@ -159,7 +160,28 @@ public sealed class SaveProgressInfo
     public string Value { get; init; } = string.Empty;
     public double Percent { get; init; }
     public string Detail { get; init; } = string.Empty;
+    public string? CollectionKey { get; init; }
     public Visibility DetailVisibility => string.IsNullOrWhiteSpace(Detail) ? Visibility.Collapsed : Visibility.Visible;
+}
+
+public sealed class SaveCollectionItemInfo
+{
+    public string ItemId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Detail { get; init; } = string.Empty;
+    public bool IsCollected { get; init; }
+    public int? ObjectId { get; init; }
+    public string? IconTexture { get; init; }
+    public int? IconSpriteIndex { get; init; }
+    public int IconWidth { get; init; } = 16;
+    public int IconHeight { get; init; } = 16;
+    public string? IconUri { get; set; }
+    public string Glyph { get; init; } = "\uE8FD";
+    public string StatusText => IsCollected ? "已收集" : "未收集";
+    public double TileOpacity => IsCollected ? 1 : 0.48;
+    public Visibility DetailVisibility => string.IsNullOrWhiteSpace(Detail) ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility IconVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility FallbackGlyphVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Visible : Visibility.Collapsed;
 }
 
 public sealed class SaveMetricInfo
@@ -171,6 +193,7 @@ public sealed class SaveMetricInfo
     public int? ObjectId { get; init; }
     public string? IconTexture { get; init; }
     public int? IconSpriteIndex { get; init; }
+    public string? IconKey { get; init; }
     public int IconWidth { get; init; } = 16;
     public int IconHeight { get; init; } = 16;
     public string? IconUri { get; set; }

@@ -23,9 +23,11 @@ public sealed class SettingsViewModel : ViewModelBase
     private bool _backupSaveBeforeLaunch;
     private bool _backupSaveBeforeUpdate;
     private bool _localAssetCacheEnabled;
+    private bool _gpuPageAccelerationEnabled = true;
     private double _modBackupRetention = 20;
     private double _saveBackupRetention = 20;
     private string? _nexusConnectionStatus;
+    private bool _isRefreshing;
 
     public SettingsViewModel(
         AppStateService state,
@@ -136,6 +138,22 @@ public sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _localAssetCacheEnabled, value);
     }
 
+    public bool GpuPageAccelerationEnabled
+    {
+        get => _gpuPageAccelerationEnabled;
+        set
+        {
+            if (SetProperty(ref _gpuPageAccelerationEnabled, value))
+            {
+                App.Current.Services.PageAcceleration.Apply(value);
+                if (!_isRefreshing)
+                {
+                    _ = _settings.UpdateAsync(settings => settings.GpuPageAccelerationEnabled = value);
+                }
+            }
+        }
+    }
+
     public double ModBackupRetention
     {
         get => _modBackupRetention;
@@ -177,7 +195,10 @@ public sealed class SettingsViewModel : ViewModelBase
         {
             if (SetProperty(ref _launchViaSteam, value))
             {
-                _ = _settings.UpdateAsync(s => s.LaunchViaSteam = value);
+                if (!_isRefreshing)
+                {
+                    _ = _settings.UpdateAsync(s => s.LaunchViaSteam = value);
+                }
             }
         }
     }
@@ -195,12 +216,22 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public void Refresh()
     {
-        BackupSaveBeforeLaunch = _settings.Current.BackupSaveBeforeLaunch;
-        BackupSaveBeforeUpdate = _settings.Current.BackupSaveBeforeUpdate;
-        LocalAssetCacheEnabled = _settings.Current.LocalAssetCacheEnabled;
-        ModBackupRetention = _settings.Current.ModBackupRetention;
-        SaveBackupRetention = _settings.Current.SaveBackupRetention;
-        LaunchViaSteam = _settings.Current.LaunchViaSteam;
+        _isRefreshing = true;
+        try
+        {
+            BackupSaveBeforeLaunch = _settings.Current.BackupSaveBeforeLaunch;
+            BackupSaveBeforeUpdate = _settings.Current.BackupSaveBeforeUpdate;
+            LocalAssetCacheEnabled = _settings.Current.LocalAssetCacheEnabled;
+            GpuPageAccelerationEnabled = _settings.Current.GpuPageAccelerationEnabled;
+            ModBackupRetention = _settings.Current.ModBackupRetention;
+            SaveBackupRetention = _settings.Current.SaveBackupRetention;
+            LaunchViaSteam = _settings.Current.LaunchViaSteam;
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+
         OnPropertyChanged(nameof(DirectoryStatus));
         OnPropertyChanged(nameof(DirectoryPath));
         OnPropertyChanged(nameof(CanOpenDirectoryVisibility));
@@ -418,6 +449,7 @@ public sealed class SettingsViewModel : ViewModelBase
             settings.ModBackupRetention = Math.Clamp((int)ModBackupRetention, 1, 200);
             settings.SaveBackupRetention = Math.Clamp((int)SaveBackupRetention, 1, 200);
             settings.LocalAssetCacheEnabled = LocalAssetCacheEnabled;
+            settings.GpuPageAccelerationEnabled = GpuPageAccelerationEnabled;
         });
         FeedbackMessage = "备份与高级选项已保存。";
         Refresh();

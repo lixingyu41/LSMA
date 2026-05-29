@@ -117,7 +117,7 @@ public sealed class SavesViewModel : ViewModelBase
         if (span.TotalDays < 365) return $"{(int)(span.TotalDays / 30)}个月前";
         return $"{(int)(span.TotalDays / 365)}年前";
     }
-    public string SavesCountDisplay => $"共发现 {Saves.Count} 个存档";
+    public string SavesCountDisplay => $"存档: {Saves.Count}个";
 
     public void Refresh()
     {

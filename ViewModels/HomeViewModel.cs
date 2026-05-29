@@ -161,12 +161,30 @@ public sealed class HomeViewModel : ViewModelBase
 
     public void Refresh()
     {
-        OnPropertyChanged(string.Empty);
+        OnPropertyChanged(nameof(MissingDirectoryVisibility));
+        OnPropertyChanged(nameof(ConnectedVisibility));
+        OnPropertyChanged(nameof(RunningVisibility));
+        OnPropertyChanged(nameof(LogDetailVisibility));
         OnPropertyChanged(nameof(BusyVisibility));
+        OnPropertyChanged(nameof(ReadyVisibility));
+        OnPropertyChanged(nameof(AttentionVisibility));
+        OnPropertyChanged(nameof(BlockedVisibility));
+        OnPropertyChanged(nameof(StableRecoveryVisibility));
         OnPropertyChanged(nameof(ModAttentionVisibility));
         OnPropertyChanged(nameof(LogAttentionVisibility));
-        OnPropertyChanged(nameof(HomeBackgroundVisibility));
-        OnPropertyChanged(nameof(HomeBackgroundImageUri));
+        OnPropertyChanged(nameof(ConnectionText));
+        OnPropertyChanged(nameof(StatusTitle));
+        OnPropertyChanged(nameof(StatusDetail));
+        OnPropertyChanged(nameof(ModSummaryText));
+        OnPropertyChanged(nameof(SaveSummaryText));
+        OnPropertyChanged(nameof(SuggestionSummaryText));
+        OnPropertyChanged(nameof(LogSummaryText));
+        OnPropertyChanged(nameof(LogIssues));
+        OnPropertyChanged(nameof(MostLikelyCause));
+        OnPropertyChanged(nameof(RecommendedAction));
+        OnPropertyChanged(nameof(IsBusy));
+        OnPropertyChanged(nameof(ProgressText));
+        OnPropertyChanged(nameof(FeedbackMessage));
         ChooseDirectoryCommand.NotifyCanExecuteChanged();
         CheckCommand.NotifyCanExecuteChanged();
         LaunchGameCommand.NotifyCanExecuteChanged();

@@ -31,6 +31,7 @@ public sealed class GameIconService(
             ["Frost Jelly"] = new("Green Slime", 16, 16),
             ["Green Slime"] = new("Green Slime", 16, 16),
             ["Grub"] = new("Grub", 16, 16),
+            ["Sludge"] = new("Green Slime", 16, 16),
             ["Iridium Golem"] = new("Iridium Golem", 16, 32),
             ["Lava Crab"] = new("Lava Crab", 16, 16),
             ["Magma Sparker"] = new("Magma Sparker", 16, 16),
@@ -221,7 +222,19 @@ public sealed class GameIconService(
 
         foreach (var monster in save.MonsterKillStats)
         {
-            monster.IconUri = await GetMonsterIconAsync(monster.Detail);
+            monster.IconUri = await GetMonsterIconAsync(monster.IconKey ?? monster.Detail);
+        }
+
+        foreach (var item in save.CollectionItems.Values.SelectMany(items => items))
+        {
+            if (item.ObjectId is { } objectId)
+            {
+                item.IconUri = await GetObjectIconAsync(objectId);
+            }
+            else if (item.IconTexture is { Length: > 0 } texture && item.IconSpriteIndex is { } spriteIndex)
+            {
+                item.IconUri = await GetTextureIconAsync(texture, spriteIndex, item.IconWidth, item.IconHeight);
+            }
         }
 
         foreach (var friendship in save.Friendships)
@@ -259,7 +272,8 @@ public sealed class GameIconService(
             return null;
         }
 
-        if (_monsterIcons.TryGetValue(monsterId, out var cached))
+        var normalizedId = monsterId.Replace("_dangerous", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+        if (_monsterIcons.TryGetValue(normalizedId, out var cached))
         {
             return cached;
         }
@@ -269,14 +283,14 @@ public sealed class GameIconService(
             return null;
         }
 
-        var definition = MonsterIconDefinitions.TryGetValue(monsterId, out var mapped)
+        var definition = MonsterIconDefinitions.TryGetValue(normalizedId, out var mapped)
             ? mapped
-            : new MonsterIconDefinition(monsterId, 16, 16);
+            : new MonsterIconDefinition(normalizedId, 16, 16);
         var output = Path.Combine(
             AppPaths.AssetCache,
             "InterfaceIcons",
             "Monsters",
-            $"{SafeFileName(monsterId)}.png");
+            $"{SafeFileName(normalizedId)}.png");
         var sources = new[]
         {
             Path.Combine(game.Path, "Content", "Characters", "Monsters", $"{definition.TextureName}.xnb"),
@@ -295,11 +309,11 @@ public sealed class GameIconService(
                     definition.Y,
                     definition.Width,
                     definition.Height);
-                return _monsterIcons[monsterId] = ToUri(output);
+                return _monsterIcons[normalizedId] = ToUri(output);
             }
             catch (Exception exception)
             {
-                await logging.ErrorAsync($"生成怪物图标失败：{monsterId}", exception);
+                await logging.ErrorAsync($"生成怪物图标失败：{normalizedId}", exception);
                 return null;
             }
         }

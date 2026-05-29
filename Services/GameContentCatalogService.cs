@@ -19,6 +19,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
     private readonly Dictionary<string, int> _objectIdsByName = new(StringComparer.CurrentCultureIgnoreCase);
     private readonly Dictionary<int, string> _objectNamesById = [];
     private readonly Dictionary<string, GuideSearchResult> _itemResultsByQualifiedId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<CollectionCatalogItem>> _collectionItems = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task PrepareAsync()
     {
@@ -30,6 +31,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         _objectIdsByName.Clear();
         _objectNamesById.Clear();
         _itemResultsByQualifiedId.Clear();
+        _collectionItems.Clear();
         if (state.GameDirectory is not { } game)
         {
             return;
@@ -98,6 +100,40 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         }
 
         return null;
+    }
+
+    public IReadOnlyList<SaveCollectionItemInfo> GetCollectionItems(
+        string collectionKey,
+        IReadOnlySet<string> collectedIds)
+    {
+        if (!_collectionItems.TryGetValue(collectionKey, out var items) || items.Count == 0)
+        {
+            return [];
+        }
+
+        var collected = collectedIds
+            .SelectMany(CollectionKeysFor)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return items
+            .GroupBy(item => item.ItemId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(item => !IsCollectionItemCollected(item, collected))
+            .ThenBy(item => item.SortKey)
+            .ThenBy(item => item.Name)
+            .Select(item => new SaveCollectionItemInfo
+            {
+                ItemId = item.ItemId,
+                Name = item.Name,
+                Detail = item.Detail,
+                IsCollected = IsCollectionItemCollected(item, collected),
+                ObjectId = item.ObjectId,
+                IconTexture = item.IconTexture,
+                IconSpriteIndex = item.IconSpriteIndex,
+                IconWidth = item.IconWidth,
+                IconHeight = item.IconHeight
+            })
+            .ToList();
     }
 
     private static string SearchText(GuideSearchResult item)
@@ -413,6 +449,61 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             : _bundleDefinitions.Where(bundle => save.CommunityBundleStates.ContainsKey(bundle.Id));
     }
 
+    private void AddCollectionCatalogItem(string collectionKey, CollectionCatalogItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Name))
+        {
+            return;
+        }
+
+        if (!_collectionItems.TryGetValue(collectionKey, out var items))
+        {
+            items = [];
+            _collectionItems[collectionKey] = items;
+        }
+
+        if (!items.Any(existing => existing.ItemId.Equals(item.ItemId, StringComparison.OrdinalIgnoreCase)))
+        {
+            items.Add(item);
+        }
+    }
+
+    private static bool IsCollectionItemCollected(
+        CollectionCatalogItem item,
+        IReadOnlySet<string> collectedIds)
+    {
+        return CollectionKeysFor(item.ItemId).Any(collectedIds.Contains)
+            || item.ObjectId is { } objectId && CollectionKeysFor(objectId.ToString()).Any(collectedIds.Contains);
+    }
+
+    private static IEnumerable<string> CollectionKeysFor(string itemId)
+    {
+        var normalized = itemId.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            yield break;
+        }
+
+        yield return normalized;
+        if (normalized.StartsWith("(O)", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return normalized[3..];
+        }
+        else
+        {
+            yield return $"(O){normalized}";
+        }
+    }
+
+    private static bool IsMineralCollectionItem(string type, int category)
+        => category is -12 or -2 || type.Contains("Mineral", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsArtifactCollectionItem(string type, int category)
+        => type.Contains("Arch", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsFishCollectionItem(string type, int category)
+        => category == -4 || type.Contains("Fish", StringComparison.OrdinalIgnoreCase);
+
     private void Load(string gamePath)
     {
         var monoGame = Assembly.LoadFrom(Path.Combine(gamePath, "MonoGame.Framework.dll"));
@@ -542,6 +633,37 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             catalogItemsByQualifiedId[id] = reference;
             itemResultsByQualifiedId[reference.ItemId] = objectResult;
             itemResultsByQualifiedId[id] = objectResult;
+            var itemType = GetString(value, "Type");
+            var itemCategory = GetInt(value, "Category");
+            var collectionItem = new CollectionCatalogItem(
+                reference.ItemId,
+                name,
+                objectResult.Detail,
+                reference.ObjectId,
+                reference.IconTexture,
+                reference.IconSpriteIndex,
+                reference.IconWidth,
+                reference.IconHeight,
+                reference.ObjectId ?? int.MaxValue);
+            if (!GetBool(value, "ExcludeFromShippingCollection"))
+            {
+                AddCollectionCatalogItem("Shipped", collectionItem);
+            }
+
+            if (IsMineralCollectionItem(itemType, itemCategory))
+            {
+                AddCollectionCatalogItem("Minerals", collectionItem);
+            }
+
+            if (IsArtifactCollectionItem(itemType, itemCategory))
+            {
+                AddCollectionCatalogItem("Artifacts", collectionItem);
+            }
+
+            if (IsFishCollectionItem(itemType, itemCategory))
+            {
+                AddCollectionCatalogItem("Fish", collectionItem);
+            }
 
             _searchIndex.Add(objectResult);
         }
@@ -753,6 +875,11 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             }
         }
 
+        foreach (var item in LoadRecipeCollectionItems(cookingRecipes, objectNamesById))
+        {
+            AddCollectionCatalogItem("Cooking", item);
+        }
+
         foreach (var result in LoadRecipeSearchResults(cookingRecipes, objectNamesById, "菜谱").ToList())
         {
             if (result.ObjectId is { } objectId && objectResultsById.TryGetValue(objectId, out var objectResult))
@@ -860,6 +987,18 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
                 CommunityCenterNeeded = false
             };
             _fish.Add(record);
+            AddCollectionCatalogItem(
+                "Fish",
+                new CollectionCatalogItem(
+                    $"(O){id}",
+                    name,
+                    record.Detail,
+                    id,
+                    null,
+                    null,
+                    16,
+                    16,
+                    id));
             var fishResult = new GuideSearchResult
             {
                 Category = "鱼类",
@@ -2201,6 +2340,42 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         }
     }
 
+    private static IEnumerable<CollectionCatalogItem> LoadRecipeCollectionItems(
+        IReadOnlyDictionary<string, string> recipeData,
+        IReadOnlyDictionary<string, string> objectNamesById)
+    {
+        foreach (var (recipeKey, raw) in recipeData)
+        {
+            var fields = raw.Split('/');
+            if (fields.Length < 3)
+            {
+                continue;
+            }
+
+            var outputTokens = fields[2].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var outputId = outputTokens.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(outputId) || !objectNamesById.TryGetValue(outputId, out var outputName))
+            {
+                continue;
+            }
+
+            var ingredients = ParseRecipeIngredients(fields[0], objectNamesById).ToList();
+            int? objectId = int.TryParse(outputId, out var parsedObjectId) ? parsedObjectId : null;
+            yield return new CollectionCatalogItem(
+                recipeKey,
+                outputName,
+                ingredients.Count > 0
+                    ? $"食材：{string.Join("、", ingredients.Select(item => item.DisplayText))}"
+                    : "烹饪食谱",
+                objectId,
+                null,
+                null,
+                16,
+                16,
+                objectId ?? int.MaxValue);
+        }
+    }
+
     private static IEnumerable<RecipeIngredientDefinition> ParseRecipeIngredients(
         string raw,
         IReadOnlyDictionary<string, string> objectNamesById)
@@ -2574,6 +2749,17 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             _ => $"{quality} 星"
         };
     }
+
+    private sealed record CollectionCatalogItem(
+        string ItemId,
+        string Name,
+        string Detail,
+        int? ObjectId,
+        string? IconTexture,
+        int? IconSpriteIndex,
+        int IconWidth,
+        int IconHeight,
+        int SortKey);
 
     private sealed record RecipeIngredientDefinition(string Id, string Name, int Stack, int? ObjectId)
     {

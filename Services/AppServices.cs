@@ -12,6 +12,7 @@ public sealed class AppServices
         Files = new FileSystemSafeService(Logging);
         UiDispatcher = new UiDispatcherService();
         Settings = new SettingsService(Logging);
+        PageAcceleration = new PageAccelerationService();
         State = new AppStateService();
         Navigation = new NavigationService();
         Dialogs = new DialogService();
@@ -55,6 +56,7 @@ public sealed class AppServices
     public FileSystemSafeService Files { get; }
     public UiDispatcherService UiDispatcher { get; }
     public SettingsService Settings { get; }
+    public PageAccelerationService PageAcceleration { get; }
     public AppStateService State { get; }
     public NavigationService Navigation { get; }
     public DialogService Dialogs { get; }
@@ -101,6 +103,7 @@ public sealed class AppServices
         }
 
         App.Current.ApplyAppearance(Settings.Current.Theme, Settings.Current.Palette);
+        PageAcceleration.Apply(Settings.Current.GpuPageAccelerationEnabled);
     }
 
     public async Task InitializeAsync()

@@ -33,8 +33,7 @@
                     Background="Transparent"
                     BorderBrush="{ThemeResource CardBorderBrush}"
                     BorderThickness="0,0,0,1"
-                    Padding="0,0,0,8"
-                    ToolTipService.ToolTip="{Binding Detail}">
+                    Padding="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding Name}" Style="{StaticResource MutedTextStyle}" />
@@ -70,6 +69,7 @@
                     CornerRadius="8"
                     Padding="10"
                     MinHeight="72"
+                    Tapped="CollectionTile_Tapped"
                     ToolTipService.ToolTip="{Binding Detail}">
                     <Grid RowSpacing="6">
                         <Grid.RowDefinitions>
@@ -88,6 +88,43 @@
                     </Grid>
                 </Border>
             </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="CollectionDialogItemTemplate">
+            <Border
+                Width="198"
+                MinHeight="68"
+                Margin="4"
+                Padding="9"
+                Background="{ThemeResource CardBackgroundBrush}"
+                BorderBrush="{ThemeResource CardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Opacity="{Binding TileOpacity}">
+                <Grid ColumnSpacing="9">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="34" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="32" Height="32" CornerRadius="6" Background="{ThemeResource AccentSoftBrush}" VerticalAlignment="Top">
+                        <Grid>
+                            <Image Source="{Binding IconUri}" Width="28" Height="28" Stretch="Uniform" Visibility="{Binding IconVisibility}" />
+                            <FontIcon Glyph="{Binding Glyph}" FontSize="16" Foreground="{StaticResource AccentBrush}" Visibility="{Binding FallbackGlyphVisibility}" />
+                        </Grid>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="3">
+                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock
+                            Text="{Binding Detail}"
+                            Style="{StaticResource MutedTextStyle}"
+                            FontSize="11"
+                            MaxLines="2"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{Binding DetailVisibility}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
         </DataTemplate>
 
         <DataTemplate x:Key="MetricRowTemplate">
@@ -122,7 +159,8 @@
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="8"
-                    MinHeight="58">
+                    MinHeight="58"
+                    ToolTipService.ToolTip="{Binding Detail}">
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="30" />
@@ -141,7 +179,7 @@
         </DataTemplate>
     </Page.Resources>
 
-    <Grid Padding="25,12,20,2" RowSpacing="14">
+    <Grid Padding="25,12,20,2" RowSpacing="2">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -153,7 +191,6 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
@@ -181,26 +218,80 @@
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock
-                        Text="{Binding BackupStatus}"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource MutedTextStyle}"
-                        ToolTipService.ToolTip="{Binding BackupToolTip}" />
-                    <ComboBox
-                        ItemsSource="{Binding BackupEntries}"
-                        SelectedItem="{Binding SelectedBackup, Mode=TwoWay}"
-                        DisplayMemberPath="DisplayName"
-                        PlaceholderText="选择备份"
-                        Width="130"
-                        Height="32" />
-                    <Button Content="恢复" Command="{Binding RestoreCommand}" Style="{StaticResource DangerButtonStyle}" />
-                </StackPanel>
+                <Button Grid.Column="2" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="14,8">
+                    <Button.Content>
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <SymbolIcon Symbol="Save" />
+                            <TextBlock Text="备份" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button.Content>
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                            <Flyout.FlyoutPresenterStyle>
+                                <Style TargetType="FlyoutPresenter">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                </Style>
+                            </Flyout.FlyoutPresenterStyle>
+                            <Border Style="{StaticResource CardStyle}" Padding="14" Width="320">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="存档备份" Style="{StaticResource SectionTitleStyle}" FontSize="17" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Text="{Binding BackupStatus}"
+                                            Style="{StaticResource MutedTextStyle}"
+                                            FontSize="12"
+                                            TextTrimming="CharacterEllipsis"
+                                            MaxWidth="150"
+                                            ToolTipService.ToolTip="{Binding BackupToolTip}" />
+                                    </Grid>
 
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Content="备份当前" Command="{Binding BackupCommand}" Style="{StaticResource AccentButtonStyle}" />
-                    <Button Content="备份全部" Command="{Binding BackupAllCommand}" Style="{StaticResource AccentButtonStyle}" />
-                </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="可恢复备份" Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                        <ComboBox
+                                            ItemsSource="{Binding BackupEntries}"
+                                            SelectedItem="{Binding SelectedBackup, Mode=TwoWay}"
+                                            DisplayMemberPath="DisplayName"
+                                            PlaceholderText="选择备份"
+                                            HorizontalAlignment="Stretch"
+                                            Height="34" />
+                                        <Button
+                                            Content="恢复所选备份"
+                                            Command="{Binding RestoreCommand}"
+                                            Style="{StaticResource DangerButtonStyle}"
+                                            HorizontalAlignment="Stretch" />
+                                    </StackPanel>
+
+                                    <Border Height="1" Background="{ThemeResource CardBorderBrush}" Opacity="0.85" />
+
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button
+                                            Content="备份当前"
+                                            Command="{Binding BackupCommand}"
+                                            Style="{StaticResource NeutralButtonStyle}"
+                                            HorizontalAlignment="Stretch" />
+                                        <Button
+                                            Grid.Column="1"
+                                            Content="备份全部"
+                                            Command="{Binding BackupAllCommand}"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            HorizontalAlignment="Stretch" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
             </Grid>
         </Border>
 
@@ -230,7 +321,7 @@
             HorizontalScrollMode="Disabled"
             HorizontalContentAlignment="Stretch"
             Canvas.ZIndex="1000">
-            <StackPanel x:Name="DetailContent" Spacing="16" Visibility="{Binding DetailVisibility}" Margin="0,30,0,0" HorizontalAlignment="Left">
+            <StackPanel x:Name="DetailContent" Spacing="16" Visibility="{Binding DetailVisibility}" Margin="0,2,0,0" HorizontalAlignment="Left">
                 <Border x:Name="HeroCard" Style="{StaticResource CardStyle}" Padding="0" MinHeight="188" HorizontalAlignment="Stretch" MaxWidth="1180">
                     <Grid Padding="18" ColumnSpacing="18" RowSpacing="14">
                         <Grid.ColumnDefinitions>
@@ -427,41 +518,42 @@
                             <ItemsControl ItemsSource="{Binding SelectedSave.Friendships}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="0,5" ColumnSpacing="10">
+                                        <Grid Margin="0,5" ColumnSpacing="10" MinHeight="34">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="34" />
                                                 <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="UniformToFill" VerticalAlignment="Center" />
-                                            <StackPanel Grid.Column="1">
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal" Spacing="5">
-                                                    <TextBlock Text="{Binding Name}" />
-                                                    <TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" />
+                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
-                                                <ItemsControl ItemsSource="{Binding HeartSlots}" Margin="0,5,0,0">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Horizontal" Spacing="1" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Grid Width="24" Height="20">
-                                                                <Image Source="{Binding IconUri}" Width="24" Height="20" Stretch="Fill" Opacity="{Binding HeartOpacity}" />
-                                                                <Image Source="{Binding FullIconUri}" Width="24" Height="20" Stretch="Fill" Visibility="{Binding PartialVisibility}">
-                                                                    <Image.Clip>
-                                                                        <RectangleGeometry Rect="0,0,24,20">
-                                                                            <RectangleGeometry.Transform>
-                                                                                <ScaleTransform ScaleX="{Binding FillPercent}" CenterX="0" />
-                                                                            </RectangleGeometry.Transform>
-                                                                        </RectangleGeometry>
-                                                                    </Image.Clip>
-                                                                </Image>
-                                                            </Grid>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
                                             </StackPanel>
+                                            <ItemsControl Grid.Column="2" ItemsSource="{Binding HeartSlots}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="1" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Width="18" Height="15">
+                                                            <Image Source="{Binding IconUri}" Width="18" Height="15" Stretch="Fill" Opacity="{Binding HeartOpacity}" />
+                                                            <Image Source="{Binding FullIconUri}" Width="18" Height="15" Stretch="Fill" Visibility="{Binding PartialVisibility}">
+                                                                <Image.Clip>
+                                                                    <RectangleGeometry Rect="0,0,18,15">
+                                                                        <RectangleGeometry.Transform>
+                                                                            <ScaleTransform ScaleX="{Binding FillPercent}" CenterX="0" />
+                                                                        </RectangleGeometry.Transform>
+                                                                    </RectangleGeometry>
+                                                                </Image.Clip>
+                                                            </Image>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -471,5 +563,12 @@
                 </Grid>
             </StackPanel>
         </ScrollViewer>
+
+        <Canvas
+            x:Name="BubbleOverlay"
+            Grid.Row="2"
+            Visibility="{Binding AvailableVisibility}"
+            IsHitTestVisible="False"
+            Canvas.ZIndex="2000" />
     </Grid>
 </Page>

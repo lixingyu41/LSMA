@@ -3,6 +3,7 @@ using System.Linq;
 using LSMA.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.Foundation;
@@ -12,9 +13,7 @@ namespace LSMA.Pages;
 public sealed partial class SavesPage : Page
 {
     private const double HiddenOffset = 20;
-    private const double MinDetailTopMargin = 30;
-    private const double BubbleTopClearance = 8;
-    private const double MaxDetailTopMargin = 160;
+    private const double MinDetailTopMargin = 2;
     private const double MaxDetailContentWidth = 1180;
     private static readonly Duration AnimationDuration = new(TimeSpan.FromMilliseconds(190));
 
@@ -42,28 +41,52 @@ public sealed partial class SavesPage : Page
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
-        AttachCardBubbles();
+        QueueBubbleRefresh();
         DetailContent.SizeChanged += OnDetailContentSizeChanged;
         DetailScrollViewer.SizeChanged += OnDetailScrollViewerSizeChanged;
+        DetailScrollViewer.ViewChanged += OnDetailScrollViewerViewChanged;
+        DetailScrollViewer.PointerEntered += (_, _) => QueueBubbleRefresh();
         UpdateResponsiveLayout();
         QueueDetailTopMarginUpdate();
     }
 
     private void OnDetailContentSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        AttachCardBubbles();
+        QueueBubbleRefresh();
         QueueDetailTopMarginUpdate();
     }
 
     private void OnDetailScrollViewerSizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateResponsiveLayout();
+        if (_activeBubble is { } active)
+        {
+            ArrangeBubble(active);
+        }
+
         QueueDetailTopMarginUpdate();
+    }
+
+    private void OnDetailScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (_activeBubble is { } active)
+        {
+            ArrangeBubble(active);
+        }
     }
 
     private void QueueDetailTopMarginUpdate()
     {
         DispatcherQueue.TryEnqueue(UpdateDetailTopMargin);
+    }
+
+    private void QueueBubbleRefresh()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            AttachCardBubbles();
+            DispatcherQueue.TryEnqueue(AttachCardBubbles);
+        });
     }
 
     private void AttachCardBubbles()
@@ -155,9 +178,10 @@ public sealed partial class SavesPage : Page
         host.Animation.Begin();
     }
 
-    private static bool ArrangeBubble(BubbleHost host)
+    private bool ArrangeBubble(BubbleHost host)
     {
         host.Wrapper.UpdateLayout();
+        BubbleOverlay.UpdateLayout();
 
         var cardWidth = host.Card.ActualWidth;
         var cardHeight = host.Card.ActualHeight;
@@ -172,79 +196,24 @@ public sealed partial class SavesPage : Page
         host.Bubble.Padding = new Thickness(12, 8, 12, cardHeight / 2);
         host.Bubble.Measure(new Size(cardWidth, double.PositiveInfinity));
 
-        Canvas.SetLeft(host.Bubble, 0);
-        Canvas.SetTop(host.Bubble, cardHeight / 2 - host.Bubble.DesiredSize.Height);
+        var origin = host.Card.TransformToVisual(BubbleOverlay).TransformPoint(new Point(0, 0));
+        Canvas.SetLeft(host.Bubble, origin.X);
+        Canvas.SetTop(host.Bubble, origin.Y + cardHeight / 2 - host.Bubble.DesiredSize.Height);
         return true;
     }
 
     private void UpdateDetailTopMargin()
     {
-        DetailContent.UpdateLayout();
-
-        var topMargin = MinDetailTopMargin;
-        foreach (var host in FindFirstRowHosts())
-        {
-            host.Wrapper.UpdateLayout();
-
-            var cardWidth = host.Card.ActualWidth;
-            var cardHeight = host.Card.ActualHeight;
-            if (cardWidth <= 0 || cardHeight <= 0)
-            {
-                continue;
-            }
-
-            host.Bubble.Width = cardWidth;
-            host.Bubble.CornerRadius = host.Card.CornerRadius;
-            host.Bubble.Padding = new Thickness(12, 8, 12, cardHeight / 2);
-            RefreshBubbleText(host);
-            host.Bubble.Measure(new Size(cardWidth, double.PositiveInfinity));
-
-            if (!TryGetTop(host, out var cardTop))
-            {
-                continue;
-            }
-
-            var bubbleAboveCard = host.Bubble.DesiredSize.Height - cardHeight / 2;
-            var requiredExtra = Math.Max(0, bubbleAboveCard - cardTop + BubbleTopClearance);
-            topMargin = Math.Max(topMargin, MinDetailTopMargin + requiredExtra);
-        }
-
-        topMargin = Math.Min(Math.Ceiling(topMargin), MaxDetailTopMargin);
-        if (Math.Abs(DetailContent.Margin.Top - topMargin) < 1)
+        if (Math.Abs(DetailContent.Margin.Top - MinDetailTopMargin) < 1)
         {
             return;
         }
 
         DetailContent.Margin = new Thickness(
             DetailContent.Margin.Left,
-            topMargin,
+            MinDetailTopMargin,
             DetailContent.Margin.Right,
             DetailContent.Margin.Bottom);
-    }
-
-    private IEnumerable<BubbleHost> FindFirstRowHosts()
-    {
-        var firstTop = double.PositiveInfinity;
-        var positions = new List<(BubbleHost Host, double Top)>();
-
-        foreach (var host in _bubbleHosts.Where(IsUsableBubbleHost))
-        {
-            if (!TryGetTop(host, out var top))
-            {
-                continue;
-            }
-
-            firstTop = Math.Min(firstTop, top);
-            positions.Add((host, top));
-        }
-
-        foreach (var item in positions)
-        {
-            if (Math.Abs(item.Top - firstTop) < 1)
-            {
-                yield return item.Host;
-            }
-        }
     }
 
     private void UpdateResponsiveLayout()
@@ -296,26 +265,6 @@ public sealed partial class SavesPage : Page
         Grid.SetColumnSpan(secondColumn, twoColumns ? 1 : 2);
     }
 
-    private static bool IsUsableBubbleHost(BubbleHost host)
-        => host.Wrapper.IsLoaded
-            && host.Wrapper.ActualWidth > 0
-            && host.Wrapper.ActualHeight > 0
-            && host.Card.IsLoaded;
-
-    private bool TryGetTop(BubbleHost host, out double top)
-    {
-        try
-        {
-            top = host.Wrapper.TransformToVisual(DetailContent).TransformPoint(new Point(0, 0)).Y;
-            return !double.IsNaN(top) && !double.IsInfinity(top);
-        }
-        catch
-        {
-            top = 0;
-            return false;
-        }
-    }
-
     private static void RefreshBubbleText(BubbleHost host)
     {
         var text = host.Card.DataContext switch
@@ -327,7 +276,67 @@ public sealed partial class SavesPage : Page
         host.Text.Text = text;
     }
 
-    private static BubbleHost? TryCreateBubbleHost(Border card, string text)
+    private async void CollectionTile_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SaveProgressInfo { CollectionKey: { Length: > 0 } key } progress }
+            || App.Current.Services.Saves.SelectedSave is not { } save
+            || !save.CollectionItems.TryGetValue(key, out var items)
+            || items.Count == 0)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (_activeBubble is { } active)
+        {
+            HideBubble(active);
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = progress.Name,
+            CloseButtonText = "关闭",
+            DefaultButton = ContentDialogButton.Close,
+            Content = CreateCollectionDialogContent(items)
+        };
+        await dialog.ShowAsync();
+    }
+
+    private FrameworkElement CreateCollectionDialogContent(IReadOnlyList<SaveCollectionItemInfo> items)
+    {
+        var width = ActualWidth > 0
+            ? Math.Clamp(ActualWidth - 96, 360, 720)
+            : 680;
+        var height = ActualHeight > 0
+            ? Math.Clamp(ActualHeight - 220, 320, 560)
+            : 520;
+        var panel = new StackPanel
+        {
+            Width = width,
+            Spacing = 12
+        };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"{items.Count(item => item.IsCollected):N0}/{items.Count:N0} 已收集",
+            Style = (Style)Application.Current.Resources["MutedTextStyle"]
+        });
+
+        panel.Children.Add(new GridView
+        {
+            ItemsSource = items,
+            ItemTemplate = (DataTemplate)Resources["CollectionDialogItemTemplate"],
+            SelectionMode = ListViewSelectionMode.None,
+            IsItemClickEnabled = false,
+            MaxHeight = height,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        });
+
+        return panel;
+    }
+
+    private BubbleHost? TryCreateBubbleHost(Border card, string text)
     {
         if (card.Parent is not Panel row)
         {
@@ -366,13 +375,10 @@ public sealed partial class SavesPage : Page
             Child = bubbleText
         };
 
-        var bubbleLayer = new Canvas { IsHitTestVisible = false };
-        bubbleLayer.Children.Add(bubble);
-        Canvas.SetZIndex(bubbleLayer, 0);
-        Canvas.SetZIndex(card, 1);
+        BubbleOverlay.Children.Add(bubble);
+        Canvas.SetZIndex(bubble, 1);
 
         var wrapper = new Grid { Margin = margin };
-        wrapper.Children.Add(bubbleLayer);
         wrapper.Children.Add(card);
 
         Grid.SetColumn(wrapper, column);
