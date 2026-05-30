@@ -49,7 +49,7 @@ public sealed class AppServices
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
         Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
-        Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Platform, Dialogs);
+        Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Settings, Platform, Dialogs);
     }
 
     public LoggingService Logging { get; }

@@ -127,20 +127,4 @@ public sealed class PlatformService(LoggingService logging)
         Clipboard.SetContent(package);
         Clipboard.Flush();
     }
-
-    public async Task<string?> GetClipboardTextAsync()
-    {
-        try
-        {
-            var content = Clipboard.GetContent();
-            return content.Contains(StandardDataFormats.Text)
-                ? await content.GetTextAsync()
-                : null;
-        }
-        catch (Exception exception)
-        {
-            await logging.ErrorAsync("无法读取剪贴板文本", exception);
-            return null;
-        }
-    }
 }

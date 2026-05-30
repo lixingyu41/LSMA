@@ -16,6 +16,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
     private readonly NexusDownloadService _downloadsService;
+    private readonly SettingsService _settings;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
     private List<NexusModInfo> _loadedOnlineMods = [];
@@ -25,7 +26,6 @@ public sealed class DownloadsViewModel : ViewModelBase
     private string _onlinePanelTitle = "趋势";
     private List<NexusFavorite> _favoriteValues = [];
     private CancellationTokenSource? _downloadCancellation;
-    private CancellationTokenSource? _browserTokenWatcher;
     private bool _isDownloading;
     private string _onlineSortValue = "趋势";
     private bool _hasLoaded;
@@ -36,6 +36,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         NexusClient nexus,
         NexusFavoriteService favoritesService,
         NexusDownloadService downloadsService,
+        SettingsService settings,
         PlatformService platform,
         DialogService dialogs)
     {
@@ -43,6 +44,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         _nexus = nexus;
         _favoritesService = favoritesService;
         _downloadsService = downloadsService;
+        _settings = settings;
         _platform = platform;
         _dialogs = dialogs;
 
@@ -50,7 +52,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedOnlineMod is not null);
         OpenNexusCommand = new AsyncRelayCommand<NexusModInfo?>(OpenNexusAsync, mod => mod is not null);
         LoadFilesCommand = new AsyncRelayCommand(LoadFilesAsync, () => SelectedOnlineMod is not null && !IsBusy);
-        DownloadFileCommand = new AsyncRelayCommand(DownloadSelectedFileAsync, () => SelectedOnlineFile is not null && !IsBusy);
+        DownloadFileCommand = new AsyncRelayCommand(DownloadLatestFileAsync, () => SelectedOnlineMod is not null && !IsBusy);
         CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
         BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, _ => !IsBusy);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
@@ -83,6 +85,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             if (SetProperty(ref _selectedOnlineMod, value))
             {
                 OnlineFiles.Clear();
+                SelectedOnlineFile = null;
                 OnPropertyChanged(nameof(FavoriteButtonText));
                 NotifyCommands();
             }
@@ -301,6 +304,10 @@ public sealed class DownloadsViewModel : ViewModelBase
         var key = RequireNexusKey();
         if (key is null || SelectedOnlineMod is not { } mod) return;
 
+        IsBusy = true;
+        ProgressText = "正在刷新所有历史版本...";
+        Refresh();
+        NotifyCommands();
         try
         {
             OnlineFiles.Clear();
@@ -309,19 +316,79 @@ public sealed class DownloadsViewModel : ViewModelBase
                 OnlineFiles.Add(file);
             }
             SelectedOnlineFile = OnlineFiles.FirstOrDefault();
+            FeedbackMessage = OnlineFiles.Count > 0
+                ? $"已加载 {OnlineFiles.Count} 个历史版本。"
+                : "该模组没有可下载文件。";
+            OnPropertyChanged(nameof(FeedbackMessage));
         }
         catch (NexusApiException exception)
         {
             await _dialogs.ShowMessageAsync("Nexus", exception.Message);
         }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+            NotifyCommands();
+        }
     }
 
-    private async Task DownloadSelectedFileAsync()
+    private async Task DownloadLatestFileAsync()
     {
         var key = RequireNexusKey();
-        if (key is null || SelectedOnlineMod is not { } mod || SelectedOnlineFile is not { } file) return;
+        if (key is null || SelectedOnlineMod is not { } mod) return;
+
+        NexusFileInfo? file;
+        IsBusy = true;
+        ProgressText = "正在获取最新文件...";
+        Refresh();
+        NotifyCommands();
+        try
+        {
+            var files = await _nexus.GetFilesAsync(mod.ModId, key);
+            file = SelectLatestFile(files);
+            if (file is null)
+            {
+                FeedbackMessage = "该模组没有可下载文件。";
+                OnPropertyChanged(nameof(FeedbackMessage));
+                return;
+            }
+
+            OnlineFiles.Clear();
+            OnlineFiles.Add(file);
+            SelectedOnlineFile = file;
+        }
+        catch (NexusApiException exception)
+        {
+            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+            NotifyCommands();
+        }
 
         await DownloadItemAsync(CreateQueueItem(mod, file), key);
+    }
+
+    private static NexusFileInfo? SelectLatestFile(IReadOnlyList<NexusFileInfo> files)
+    {
+        var preferredFiles = files
+            .Where(file => string.Equals(file.CategoryName, "MAIN", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (preferredFiles.Count == 0)
+        {
+            preferredFiles = files.ToList();
+        }
+
+        return preferredFiles
+            .OrderByDescending(file => file.UploadedTimestamp)
+            .ThenByDescending(file => file.FileId)
+            .FirstOrDefault();
     }
 
     public async Task HandleNxmLinkAsync(string link)
@@ -340,7 +407,7 @@ public sealed class DownloadsViewModel : ViewModelBase
                 return;
             }
 
-            await _dialogs.ShowMessageAsync("下载链接无效", "Nexus 返回的链接不是最终下载令牌；请点左侧 Slow download，或复制 nxm:// 开头的链接。");
+            await _dialogs.ShowMessageAsync("下载链接无效", "该链接不是 Nexus 下载令牌；请直接在下载页点击“下载最新”。");
             return;
         }
 
@@ -432,12 +499,29 @@ public sealed class DownloadsViewModel : ViewModelBase
         catch (NexusApiException exception) when (exception.RequiresBrowserDownload && token is null)
         {
             item.State = DownloadState.Pending;
-            item.Error = "等待 Nexus 下载链接";
-            FeedbackMessage = "已打开 Nexus 文件页。点 Vortex 后如出现 Free/Premium 卡片，请点左侧 Slow download。";
+            item.Error = "等待 Nexus 确认";
+            ProgressText = "等待 Nexus 确认...";
+            FeedbackMessage = "LSMA 正在自动完成 Nexus 下载确认。";
             OnPropertyChanged(nameof(FeedbackMessage));
-            StartBrowserTokenWatcher(item, key);
-            await _platform.OpenUriAsync(CreateNexusFilePageUrl(item.ModId, item.FileId));
-            await _dialogs.ShowMessageAsync("需要浏览器确认", "登录 Nexus 后点该文件的 Vortex；若出现 Free/Premium 卡片，点左侧 Slow download。");
+            Refresh();
+            var browserToken = await _dialogs.ShowNexusDownloadBrowserAsync(
+                CreateNexusDownloadPopupUrl(item.FileId),
+                item.ModId,
+                item.FileId,
+                _credentials.GetWebLogin(),
+                _settings.Current.NexusDownloadDebugStepMode,
+                _settings.Current.NexusDownloadDebugShowWebViewMode,
+                UpdateNexusDownloadProgress,
+                _downloadCancellation.Token);
+            if (browserToken is null)
+            {
+                item.State = DownloadState.Canceled;
+                FeedbackMessage = "下载确认已取消。";
+                OnPropertyChanged(nameof(FeedbackMessage));
+                return;
+            }
+
+            await DownloadPendingBrowserItemAsync(item, key, browserToken, CancellationToken.None);
         }
         catch (Exception exception)
         {
@@ -455,63 +539,15 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
     }
 
-    private static string CreateNexusFilePageUrl(long modId, long fileId)
-        => $"https://www.nexusmods.com/{GameDomain}/mods/{modId}?tab=files&file_id={fileId}";
+    private static string CreateNexusDownloadPopupUrl(long fileId)
+        => $"https://www.nexusmods.com/Core/Libs/Common/Widgets/DownloadPopUp?id={fileId}&game_id={StardewGameId}&nmm=1";
 
-    private void StartBrowserTokenWatcher(DownloadQueueItem item, string key)
+    private void UpdateNexusDownloadProgress(string message)
     {
-        _browserTokenWatcher?.Cancel();
-        _browserTokenWatcher?.Dispose();
-        _browserTokenWatcher = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-        _ = WatchClipboardForNxmAsync(item, key, _browserTokenWatcher.Token);
-    }
-
-    private async Task WatchClipboardForNxmAsync(DownloadQueueItem item, string key, CancellationToken cancellationToken)
-    {
-        string? lastSeen = null;
-        try
-        {
-            await Task.Delay(1000, cancellationToken);
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var value = (await _platform.GetClipboardTextAsync())?.Trim();
-                if (!string.IsNullOrWhiteSpace(value) && !string.Equals(value, lastSeen, StringComparison.Ordinal))
-                {
-                    lastSeen = value;
-                    if (NexusDownloadToken.TryParse(value, out var token)
-                        && token is not null
-                        && token.ModId == item.ModId
-                        && token.FileId == item.FileId
-                        && string.Equals(token.GameDomain, GameDomain, StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (token.IsExpired)
-                        {
-                            FeedbackMessage = "Nexus 下载链接已过期，请重新复制 Mod Manager Download 链接。";
-                            OnPropertyChanged(nameof(FeedbackMessage));
-                            return;
-                        }
-
-                        await DownloadPendingBrowserItemAsync(item, key, token, cancellationToken);
-                        return;
-                    }
-
-                    if (NexusRequirementsPopupLink.TryParse(value, out var popup)
-                        && popup is not null
-                        && popup.FileId == item.FileId
-                        && popup.GameId == StardewGameId)
-                    {
-                        FeedbackMessage = "已识别 Nexus 依赖确认页；在浏览器左侧 Free 卡片底部点 Slow download。";
-                        OnPropertyChanged(nameof(FeedbackMessage));
-                        await _platform.OpenUriAsync(popup.Uri.AbsoluteUri);
-                    }
-                }
-
-                await Task.Delay(1000, cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        ProgressText = message;
+        FeedbackMessage = message;
+        OnPropertyChanged(nameof(FeedbackMessage));
+        Refresh();
     }
 
     private async Task DownloadPendingBrowserItemAsync(
@@ -564,14 +600,12 @@ public sealed class DownloadsViewModel : ViewModelBase
             return;
         }
 
-        await _platform.OpenUriAsync(popup.Uri.AbsoluteUri);
-        await _dialogs.ShowMessageAsync("继续下载", "浏览器页面打开后，点左侧 Free 卡片底部的 Slow download。");
+        await _dialogs.ShowMessageAsync("继续下载", "请回到下载页选择同一个文件后点“下载最新”，LSMA 会自动完成 Nexus 确认。");
     }
 
     private void CancelDownload()
     {
         _downloadCancellation?.Cancel();
-        _browserTokenWatcher?.Cancel();
     }
 
     private string? RequireNexusKey()

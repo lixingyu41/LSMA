@@ -60,6 +60,8 @@ public sealed class NexusFileInfo
     public string? Version { get; set; }
     [JsonPropertyName("category_name")]
     public string? CategoryName { get; set; }
+    [JsonPropertyName("uploaded_timestamp")]
+    public long UploadedTimestamp { get; set; }
     [JsonPropertyName("file_name")]
     public string? FileName { get; set; }
     public string DisplayText => $"{(string.IsNullOrWhiteSpace(Name) ? "未命名文件" : Name)} · {(string.IsNullOrWhiteSpace(Version) ? "-" : Version)}";

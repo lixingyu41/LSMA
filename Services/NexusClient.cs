@@ -64,6 +64,7 @@ public sealed class NexusClient(LoggingService logging)
             .OfType<NexusFileInfo>()
             .Where(file => file.FileId > 0)
             .OrderByDescending(file => string.Equals(file.CategoryName, "MAIN", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(file => file.UploadedTimestamp)
             .ThenByDescending(file => file.FileId)
             .ToList();
     }

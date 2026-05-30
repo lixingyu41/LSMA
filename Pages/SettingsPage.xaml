@@ -91,13 +91,28 @@
                     </Border>
                     <TextBlock Text="{Binding NexusStatus}" Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Text="{Binding NexusRateLimitStatus}" Style="{StaticResource MutedTextStyle}" />
-                    <TextBlock Text="非 Premium 下载会打开 Nexus 文件页，登录后点击 Mod Manager Download 回到 LSMA。" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="API 授权码用于读取模组信息；网页登录账号用于自动完成非 Premium 下载确认。" Style="{StaticResource MutedTextStyle}" />
                     <PasswordBox Password="{Binding NexusKeyInput, Mode=TwoWay}" PlaceholderText="粘贴 Nexus 个人授权码" PasswordRevealMode="Peek" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="保存授权码" Command="{Binding SaveNexusKeyCommand}" Style="{StaticResource AccentButtonStyle}" />
                         <Button Content="测试连接" Command="{Binding TestNexusConnectionCommand}" Style="{StaticResource SubtleButtonStyle}" />
                         <Button Content="清除" Command="{Binding ClearNexusKeyCommand}" Style="{StaticResource DangerButtonStyle}" />
                     </StackPanel>
+                    <TextBlock Text="{Binding NexusLoginStatus}" Foreground="{StaticResource AccentBrush}" Margin="0,8,0,0" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Text="{Binding NexusLoginUserInput, Mode=TwoWay}" PlaceholderText="Nexus 邮箱或用户名" />
+                        <PasswordBox Grid.Column="1" Password="{Binding NexusLoginPasswordInput, Mode=TwoWay}" PlaceholderText="Nexus 密码" PasswordRevealMode="Peek" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="保存网页登录" Command="{Binding SaveNexusLoginCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        <Button Content="清除网页登录" Command="{Binding ClearNexusLoginCommand}" Style="{StaticResource DangerButtonStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch Header="Nexus 下载调试分步" OffContent="关闭" OnContent="开启" IsOn="{Binding NexusDownloadDebugStepMode, Mode=TwoWay}" />
+                    <ToggleSwitch Header="Nexus 下载调试显示窗口" OffContent="关闭" OnContent="开启" IsOn="{Binding NexusDownloadDebugShowWebViewMode, Mode=TwoWay}" />
                 </StackPanel>
             </Border>
 

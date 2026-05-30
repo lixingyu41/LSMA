@@ -20,10 +20,14 @@ public sealed class SettingsViewModel : ViewModelBase
     private readonly AssetCacheService _assetCache;
     private readonly GameIconService _gameIcons;
     private string _nexusKeyInput = string.Empty;
+    private string _nexusLoginUserInput = string.Empty;
+    private string _nexusLoginPasswordInput = string.Empty;
     private bool _backupSaveBeforeLaunch;
     private bool _backupSaveBeforeUpdate;
     private bool _localAssetCacheEnabled;
     private bool _gpuPageAccelerationEnabled = true;
+    private bool _nexusDownloadDebugStepMode;
+    private bool _nexusDownloadDebugShowWebViewMode;
     private double _modBackupRetention = 20;
     private double _saveBackupRetention = 20;
     private string? _nexusConnectionStatus;
@@ -71,6 +75,8 @@ public sealed class SettingsViewModel : ViewModelBase
         SaveNexusKeyCommand = new AsyncRelayCommand(SaveNexusKeyAsync, CanSaveNexus);
         ClearNexusKeyCommand = new AsyncRelayCommand(ClearNexusKeyAsync, () => _credentials.HasCredential && !IsBusy);
         TestNexusConnectionCommand = new AsyncRelayCommand(TestNexusConnectionAsync, () => _credentials.HasCredential && !IsBusy);
+        SaveNexusLoginCommand = new AsyncRelayCommand(SaveNexusLoginAsync, CanSaveNexusLogin);
+        ClearNexusLoginCommand = new AsyncRelayCommand(ClearNexusLoginAsync, () => _credentials.HasWebLogin && !IsBusy);
         SaveBackupSettingsCommand = new AsyncRelayCommand(SaveBackupSettingsAsync, CanInteract);
         ClearCacheCommand = new AsyncRelayCommand(ClearCacheAsync, CanInteract);
         BuildAssetCacheCommand = new AsyncRelayCommand(BuildAssetCacheAsync, CanInteract);
@@ -99,6 +105,8 @@ public sealed class SettingsViewModel : ViewModelBase
     public IAsyncRelayCommand SaveNexusKeyCommand { get; }
     public IAsyncRelayCommand ClearNexusKeyCommand { get; }
     public IAsyncRelayCommand TestNexusConnectionCommand { get; }
+    public IAsyncRelayCommand SaveNexusLoginCommand { get; }
+    public IAsyncRelayCommand ClearNexusLoginCommand { get; }
     public IAsyncRelayCommand SaveBackupSettingsCommand { get; }
     public IAsyncRelayCommand ClearCacheCommand { get; }
     public IAsyncRelayCommand BuildAssetCacheCommand { get; }
@@ -138,6 +146,30 @@ public sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _localAssetCacheEnabled, value);
     }
 
+    public string NexusLoginUserInput
+    {
+        get => _nexusLoginUserInput;
+        set
+        {
+            if (SetProperty(ref _nexusLoginUserInput, value))
+            {
+                SaveNexusLoginCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string NexusLoginPasswordInput
+    {
+        get => _nexusLoginPasswordInput;
+        set
+        {
+            if (SetProperty(ref _nexusLoginPasswordInput, value))
+            {
+                SaveNexusLoginCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
     public bool GpuPageAccelerationEnabled
     {
         get => _gpuPageAccelerationEnabled;
@@ -150,6 +182,30 @@ public sealed class SettingsViewModel : ViewModelBase
                 {
                     _ = _settings.UpdateAsync(settings => settings.GpuPageAccelerationEnabled = value);
                 }
+            }
+        }
+    }
+
+    public bool NexusDownloadDebugStepMode
+    {
+        get => _nexusDownloadDebugStepMode;
+        set
+        {
+            if (SetProperty(ref _nexusDownloadDebugStepMode, value) && !_isRefreshing)
+            {
+                _ = _settings.UpdateAsync(settings => settings.NexusDownloadDebugStepMode = value);
+            }
+        }
+    }
+
+    public bool NexusDownloadDebugShowWebViewMode
+    {
+        get => _nexusDownloadDebugShowWebViewMode;
+        set
+        {
+            if (SetProperty(ref _nexusDownloadDebugShowWebViewMode, value) && !_isRefreshing)
+            {
+                _ = _settings.UpdateAsync(settings => settings.NexusDownloadDebugShowWebViewMode = value);
             }
         }
     }
@@ -172,6 +228,7 @@ public sealed class SettingsViewModel : ViewModelBase
     public Visibility NexusTutorialVisibility => _credentials.HasCredential ? Visibility.Collapsed : Visibility.Visible;
     public string NexusStatus => _nexusConnectionStatus
         ?? (_credentials.HasCredential ? "授权码已安全保存在 Windows 凭据中" : "尚未保存授权码");
+    public string NexusLoginStatus => _credentials.HasWebLogin ? "网页登录账号已安全保存在 Windows 凭据中" : "尚未保存网页登录账号";
     public string NexusRateLimitStatus => _nexus.RateLimitStatus;
     public string VersionDisplay
     {
@@ -223,6 +280,8 @@ public sealed class SettingsViewModel : ViewModelBase
             BackupSaveBeforeUpdate = _settings.Current.BackupSaveBeforeUpdate;
             LocalAssetCacheEnabled = _settings.Current.LocalAssetCacheEnabled;
             GpuPageAccelerationEnabled = _settings.Current.GpuPageAccelerationEnabled;
+            NexusDownloadDebugStepMode = _settings.Current.NexusDownloadDebugStepMode;
+            NexusDownloadDebugShowWebViewMode = _settings.Current.NexusDownloadDebugShowWebViewMode;
             ModBackupRetention = _settings.Current.ModBackupRetention;
             SaveBackupRetention = _settings.Current.SaveBackupRetention;
             LaunchViaSteam = _settings.Current.LaunchViaSteam;
@@ -237,6 +296,7 @@ public sealed class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanOpenDirectoryVisibility));
         OnPropertyChanged(nameof(NexusTutorialVisibility));
         OnPropertyChanged(nameof(NexusStatus));
+        OnPropertyChanged(nameof(NexusLoginStatus));
         OnPropertyChanged(nameof(NexusRateLimitStatus));
         OnPropertyChanged(nameof(VersionDisplay));
         OnPropertyChanged(nameof(IsSmapiSelected));
@@ -322,6 +382,39 @@ public sealed class SettingsViewModel : ViewModelBase
         _credentials.Clear();
         _nexusConnectionStatus = null;
         FeedbackMessage = "授权码已清除。";
+        Refresh();
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveNexusLoginAsync()
+    {
+        var userName = NexusLoginUserInput.Trim();
+        var password = NexusLoginPasswordInput;
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+        {
+            return;
+        }
+
+        try
+        {
+            _credentials.SaveWebLogin(userName, password);
+            NexusLoginUserInput = string.Empty;
+            NexusLoginPasswordInput = string.Empty;
+            FeedbackMessage = "Nexus 网页登录账号已保存到 Windows 凭据。";
+            Refresh();
+        }
+        catch (Exception)
+        {
+            await _dialogs.ShowMessageAsync("保存失败", "无法写入 Windows 凭据，请检查系统账户状态。");
+        }
+    }
+
+    private async Task ClearNexusLoginAsync()
+    {
+        _credentials.ClearWebLogin();
+        NexusLoginUserInput = string.Empty;
+        NexusLoginPasswordInput = string.Empty;
+        FeedbackMessage = "Nexus 网页登录账号已清除。";
         Refresh();
         await Task.CompletedTask;
     }
@@ -450,6 +543,8 @@ public sealed class SettingsViewModel : ViewModelBase
             settings.SaveBackupRetention = Math.Clamp((int)SaveBackupRetention, 1, 200);
             settings.LocalAssetCacheEnabled = LocalAssetCacheEnabled;
             settings.GpuPageAccelerationEnabled = GpuPageAccelerationEnabled;
+            settings.NexusDownloadDebugStepMode = NexusDownloadDebugStepMode;
+            settings.NexusDownloadDebugShowWebViewMode = NexusDownloadDebugShowWebViewMode;
         });
         FeedbackMessage = "备份与高级选项已保存。";
         Refresh();
@@ -515,6 +610,8 @@ public sealed class SettingsViewModel : ViewModelBase
         SaveNexusKeyCommand.NotifyCanExecuteChanged();
         ClearNexusKeyCommand.NotifyCanExecuteChanged();
         TestNexusConnectionCommand.NotifyCanExecuteChanged();
+        SaveNexusLoginCommand.NotifyCanExecuteChanged();
+        ClearNexusLoginCommand.NotifyCanExecuteChanged();
         SaveBackupSettingsCommand.NotifyCanExecuteChanged();
         ClearCacheCommand.NotifyCanExecuteChanged();
         BuildAssetCacheCommand.NotifyCanExecuteChanged();
@@ -524,4 +621,8 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private bool CanInteract() => !IsBusy;
     private bool CanSaveNexus() => !IsBusy && !string.IsNullOrWhiteSpace(NexusKeyInput);
+    private bool CanSaveNexusLogin()
+        => !IsBusy
+            && !string.IsNullOrWhiteSpace(NexusLoginUserInput)
+            && !string.IsNullOrWhiteSpace(NexusLoginPasswordInput);
 }
