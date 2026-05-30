@@ -44,6 +44,12 @@ public sealed class NexusModInfo
     public string StatusText => $"版本 {Version} · {Downloads:N0} 次下载";
 }
 
+public sealed class NexusModSearchResult
+{
+    public List<NexusModInfo> Mods { get; init; } = [];
+    public int TotalCount { get; init; }
+}
+
 public sealed class NexusFilesResponse
 {
     [JsonPropertyName("files")]
@@ -100,6 +106,7 @@ public enum DownloadState
     Failed,
     Canceled,
     AwaitingInstall,
+    InstallFailed,
     Installed
 }
 
@@ -119,6 +126,7 @@ public sealed class DownloadQueueItem
         DownloadState.Downloading => "下载中",
         DownloadState.Downloaded => "已下载",
         DownloadState.AwaitingInstall => "待安装",
+        DownloadState.InstallFailed => "安装失败",
         DownloadState.Installed => "已安装",
         DownloadState.Failed => "下载失败",
         DownloadState.Canceled => "已取消",

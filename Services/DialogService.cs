@@ -95,7 +95,6 @@ public sealed class DialogService
         };
         var webView = new WebView2
         {
-            Source = new Uri(startUrl),
             MinWidth = 980,
             MinHeight = 620,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -211,7 +210,15 @@ public sealed class DialogService
                 return false;
             }
 
-            ShowBrowser("已阻止 Cloudflare 帮助页跳转；继续等待登录页验证。");
+            if (keepWebViewVisible)
+            {
+                ShowBrowser("已阻止 Cloudflare 帮助页跳转；继续等待登录页验证。");
+            }
+            else
+            {
+                HideBrowser("已阻止 Cloudflare 帮助页跳转；继续等待登录页验证。");
+            }
+
             return true;
         }
 
@@ -248,6 +255,7 @@ public sealed class DialogService
 
         var debugStepRunning = false;
         var automationReadyAt = DateTimeOffset.UtcNow.AddSeconds(3);
+        var initialNavigationStarted = false;
         async Task WaitForAutomationReadyAsync()
         {
             var wait = automationReadyAt - DateTimeOffset.UtcNow;
@@ -256,7 +264,16 @@ public sealed class DialogService
                 return;
             }
 
-            ShowBrowser($"WebView 已打开，等待页面稳定 {Math.Ceiling(wait.TotalSeconds)} 秒后再操作。");
+            var message = $"WebView 已打开，等待页面稳定 {Math.Ceiling(wait.TotalSeconds)} 秒后再操作。";
+            if (keepWebViewVisible)
+            {
+                ShowBrowser(message);
+            }
+            else
+            {
+                HideBrowser(message);
+            }
+
             await Task.Delay(wait, cancellationToken);
         }
 
@@ -323,17 +340,6 @@ public sealed class DialogService
             args.Cancel = TryBlockCloudflareHelp(args.Uri)
                 || TryAccept(args.Uri, cancelNavigation: true);
         };
-        webView.Loaded += async (_, _) =>
-        {
-            try
-            {
-                await webView.EnsureCoreWebView2Async();
-            }
-            catch (Exception exception)
-            {
-                result.TrySetException(exception);
-            }
-        };
         webView.CoreWebView2Initialized += (sender, args) =>
         {
             if (args.Exception is not null)
@@ -390,6 +396,12 @@ public sealed class DialogService
                 schemeArgs.Cancel = TryBlockCloudflareHelp(schemeArgs.Uri)
                     || TryAccept(schemeArgs.Uri, cancelNavigation: true);
             };
+            if (!initialNavigationStarted)
+            {
+                initialNavigationStarted = true;
+                webView.CoreWebView2.Navigate(startUrl);
+            }
+
             automationReadyAt = DateTimeOffset.UtcNow.AddSeconds(3);
             if (debugStepMode)
             {
@@ -407,11 +419,31 @@ public sealed class DialogService
                 _ = RunAutomationAfterInitialDelayAsync();
             }
         };
+        webView.Loaded += async (_, _) =>
+        {
+            try
+            {
+                await webView.EnsureCoreWebView2Async();
+            }
+            catch (Exception exception)
+            {
+                result.TrySetException(exception);
+            }
+        };
 
         await using var registration = cancellationToken.Register(() =>
         {
             result.TrySetCanceled(cancellationToken);
         });
+
+        try
+        {
+            await webView.EnsureCoreWebView2Async();
+        }
+        catch (Exception exception)
+        {
+            result.TrySetException(exception);
+        }
 
         try
         {
@@ -612,7 +644,9 @@ public sealed class DialogService
         loginSubmittedUrl: "",
         loginAttempts: 0,
         closedLightboxAt: 0,
-        awaitingSlowDownloadUntil: 0
+        awaitingSlowDownloadUntil: 0,
+        cloudflareWaitStartedAt: 0,
+        loginCloudflareWaitStartedAt: 0
     };
     const now = Date.now();
     const readSessionValue = key => {
@@ -693,6 +727,11 @@ public sealed class DialogService
             && !isMediaTarget(hit);
     };
     const findSlowDownload = () => {
+        const direct = queryAll("a,button,[role=button],input[type=button],input[type=submit]").find(isSafeSlowTarget);
+        if (direct) {
+            return direct;
+        }
+
         for (const node of textNodes()) {
             if (normalizeText(node.nodeValue) !== "slow download") continue;
             const target = node.parentElement?.closest?.("a,button,[role=button],input[type=button],input[type=submit]");
@@ -785,14 +824,14 @@ public sealed class DialogService
     const isDownloadPopupPage = location.pathname.toLowerCase().includes("/core/libs/common/widgets/downloadpopup");
     const visibleActionCount = queryAll("a,button,input,iframe,[role=button],mod-file-download").filter(visible).length;
     if (isDownloadPopupPage && document.readyState !== "complete" && visibleActionCount === 0) {
-        return `SHOW|Nexus Slow download 页面仍在加载；状态=${document.readyState}`;
+        return `HIDE|Nexus Slow download 页面仍在加载；状态=${document.readyState}`;
     }
 
     if (isDownloadPopupPage && visibleActionCount === 0 && bodyText.trim().length === 0) {
         const blankStartedAt = Number(readSessionValue("__lsmaBlankDownloadPopupAt") || now);
         writeSessionValue("__lsmaBlankDownloadPopupAt", String(blankStartedAt));
         const elapsedSeconds = ((now - blankStartedAt) / 1000) | 0;
-        return `SHOW|Nexus Slow download 页面为空白，等待页面自行完成渲染；已等待 ${elapsedSeconds} 秒。`;
+        return `HIDE|Nexus Slow download 页面为空白，等待页面自行完成渲染；已等待 ${elapsedSeconds} 秒。`;
     }
 
     removeSessionValue("__lsmaBlankDownloadPopupAt");
@@ -826,8 +865,9 @@ public sealed class DialogService
             })[0] || document.body
         : null;
     if (requirementDialog) {
-        location.href = `/Core/Libs/Common/Widgets/DownloadPopUp?id=${expectedFileId}&game_id=1303&nmm=1`;
-        return "HIDE|检测到前置确认弹窗，已改走 Slow download 页面";
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+        return "HIDE|检测到前置确认弹窗，已关闭并继续查找 Slow download";
     }
 
     const imageViewer = queryAll(".pswp, .pswp__bg, .mfp-wrap, .fancybox-container, .lg-outer, .lg-backdrop, [class*='lightbox'], [class*='media-viewer'], [class*='image-viewer'], [class*='fslightbox']")
@@ -896,8 +936,15 @@ public sealed class DialogService
         && ((cloudflareText && !hasDownloadEntry)
             || ((cloudflareFrame || cloudflareBox) && !cloudflareComplete));
     if (cloudflarePending) {
-        return `SHOW|等待 Cloudflare 验证完成；完成后 LSMA 会继续。位置=${locationLabel}`;
+        state.cloudflareWaitStartedAt ||= now;
+        const elapsedSeconds = ((now - state.cloudflareWaitStartedAt) / 1000) | 0;
+        if (elapsedSeconds >= 25) {
+            return `SHOW|需要手动完成 Cloudflare 验证；已等待 ${elapsedSeconds} 秒。`;
+        }
+
+        return `HIDE|等待 Cloudflare 验证完成；已等待 ${elapsedSeconds} 秒。`;
     }
+    state.cloudflareWaitStartedAt = 0;
 
     const manualCaptcha = queryAll("iframe[src*='hcaptcha'], iframe[src*='recaptcha'], [class*='captcha'], [id*='captcha']").find(visible);
     if (!passwordInput && (manualCaptcha || bodyText.includes("verification code") || bodyText.includes("two-factor") || bodyText.includes("authenticator") || bodyText.includes("one-time code"))) {
@@ -927,13 +974,20 @@ public sealed class DialogService
 
             const fillElapsed = now - state.loginFilledAt;
             if (loginCloudflarePending) {
-                return "SHOW|已填写 Nexus 登录信息，等待 Cloudflare 验证完成；不会点击 Cloudflare 区域。";
+                state.loginCloudflareWaitStartedAt ||= now;
+                const elapsedSeconds = ((now - state.loginCloudflareWaitStartedAt) / 1000) | 0;
+                if (elapsedSeconds >= 25) {
+                    return `SHOW|已填写 Nexus 登录信息，需要手动完成 Cloudflare 验证；已等待 ${elapsedSeconds} 秒。`;
+                }
+
+                return `HIDE|已填写 Nexus 登录信息，等待 Cloudflare 验证完成；已等待 ${elapsedSeconds} 秒。`;
             }
+            state.loginCloudflareWaitStartedAt = 0;
             if (manualCaptcha || bodyText.includes("verification code") || bodyText.includes("two-factor") || bodyText.includes("authenticator") || bodyText.includes("one-time code")) {
                 return "SHOW|已填写 Nexus 登录信息，需要验证码或二次验证；请在此窗口完成后 LSMA 会自动继续。";
             }
             if (fillElapsed < 7000) {
-                return `SHOW|已填写 Nexus 登录信息，等待 Cloudflare 初始化；${(fillElapsed / 1000) | 0}/7 秒。`;
+                return `HIDE|已填写 Nexus 登录信息，等待 Cloudflare 初始化；${(fillElapsed / 1000) | 0}/7 秒。`;
             }
 
             const loginForm = passwordInput.closest("form");
@@ -967,7 +1021,7 @@ public sealed class DialogService
                     .filter(enabled)
                     .find(element => !isCloudflareTarget(element));
             if (!submit) {
-                return "SHOW|已填写 Nexus 登录信息，等待真实登录按钮可用；不会点击 Cloudflare 区域。";
+                return "HIDE|已填写 Nexus 登录信息，等待真实登录按钮可用；不会点击 Cloudflare 区域。";
             }
 
             if (state.loginAttempts >= 3) {
@@ -1036,21 +1090,16 @@ public sealed class DialogService
     }
 
     if (isStardewModPage) {
-        if (state.lastAction === "open-download-popup" && state.lastUrl === location.href && now - state.lastClickAt < 5000) {
-            return "HIDE|正在等待 Slow download 页面打开，暂不重复跳转。";
+        if (bodyText.includes("slow download")) {
+            return `HIDE|模组文件页已出现 Slow download 文本，等待按钮渲染；位置=${locationLabel}`;
         }
 
-        state.lastAction = "open-download-popup";
-        state.lastUrl = location.href;
-        state.lastClickAt = now;
-        location.assign(new URL(`/Core/Libs/Common/Widgets/DownloadPopUp?id=${expectedFileId}&game_id=1303&nmm=1`, location.origin).toString());
-        return "HIDE|正在打开 Slow download 页面";
+        return scrollDown("正在模组文件页查找 Slow download");
     }
 
     const modManager = actionCandidates.find(element =>
         /^mod manager download$/.test(labelOf(element))
-        || /^vortex$/.test(labelOf(element))
-        || hrefOf(element).includes("nmm=1"));
+        || /^vortex$/.test(labelOf(element)));
     if (modManager) return click("manager", modManager, "已自动点击 Nexus 模组管理器下载入口");
     if (bodyText.includes("slow download")) {
         return `HIDE|检测到 Slow download 文本但按钮不可点；上次目标=${state.lastTargetText || "-"}；次数=${state.clickCount}；位置=${locationLabel}`;

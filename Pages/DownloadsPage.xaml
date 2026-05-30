@@ -18,12 +18,10 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBox Text="{Binding OnlineQuery, Mode=TwoWay}" PlaceholderText="搜索模组" Width="220" />
-                <Button Content="搜索" Command="{Binding SearchOnlineCommand}" Style="{StaticResource SubtleButtonStyle}" />
-                <ComboBox ItemsSource="{Binding OnlineSortOptions}" SelectedItem="{Binding SelectedOnlineSort, Mode=TwoWay}" MinWidth="140" PlaceholderText="排序" />
-                <Button Content="刷新" Command="{Binding RefreshCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                <TextBox Text="{Binding OnlineQuery, Mode=TwoWay}" PlaceholderText="搜索模组或 Nexus ID" Width="260" Height="36" KeyDown="OnlineSearchBox_KeyDown" />
+                <ComboBox ItemsSource="{Binding OnlineCategories}" SelectedItem="{Binding SelectedOnlineCategory, Mode=TwoWay}" DisplayMemberPath="Name" MinWidth="160" Height="36" PlaceholderText="分类" />
+                <Button Content="刷新" Command="{Binding RefreshCommand}" Style="{StaticResource SubtleButtonStyle}" MinHeight="36" />
             </StackPanel>
-            <TextBlock Grid.Column="1" Text="{Binding OnlinePanelTitle}" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" />
         </Grid>
 
         <Grid Grid.Row="1" ColumnSpacing="14">
@@ -34,8 +32,12 @@
 
             <!-- Mod list -->
             <Border Background="Transparent" BorderThickness="0" Padding="4,0,0,0">
-                <StackPanel>
-                <ListView ItemsSource="{Binding OnlineMods}" SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}">
+                <ListView x:Name="OnlineModsList"
+                          ItemsSource="{Binding OnlineMods}"
+                          SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}"
+                          Loaded="OnlineModsList_Loaded"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollMode="Enabled">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Border Background="{ThemeResource CardBackgroundBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,3,8,3">
@@ -58,11 +60,6 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-                <Button Content="加载更多" Command="{Binding LoadMoreCommand}"
-                        Style="{StaticResource SubtleButtonStyle}"
-                        HorizontalAlignment="Center" Margin="0,8,8,4"
-                        Visibility="{Binding LoadMoreVisibility}" />
-                </StackPanel>
             </Border>
 
             <!-- Detail panel -->
@@ -91,7 +88,6 @@
 
                         <Button Content="下载最新" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
                         <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
-                        <TextBlock Text="{Binding ProgressText}" Style="{StaticResource MutedTextStyle}" />
                         <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                 </ScrollViewer>

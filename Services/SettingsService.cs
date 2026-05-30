@@ -30,6 +30,12 @@ public sealed class SettingsService(LoggingService logging)
                 Current.NexusBindings = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
                 needsSave = true;
             }
+            else
+            {
+                Current.NexusBindings = Current.NexusBindings
+                    .GroupBy(binding => binding.Key, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+            }
 
             var modRetention = Math.Clamp(Current.ModBackupRetention, 1, 200);
             var saveRetention = Math.Clamp(Current.SaveBackupRetention, 1, 200);

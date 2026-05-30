@@ -16,6 +16,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
     private readonly NexusDownloadService _downloadsService;
+    private readonly ModPackageService _packages;
     private readonly SettingsService _settings;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
@@ -23,19 +24,21 @@ public sealed class DownloadsViewModel : ViewModelBase
     private NexusModInfo? _selectedOnlineMod;
     private NexusFileInfo? _selectedOnlineFile;
     private string _onlineQuery = string.Empty;
-    private string _onlinePanelTitle = "趋势";
     private List<NexusFavorite> _favoriteValues = [];
     private CancellationTokenSource? _downloadCancellation;
     private bool _isDownloading;
-    private string _onlineSortValue = "趋势";
     private bool _hasLoaded;
     private int _currentPage = 1;
+    private bool _categoriesLoaded;
+    private NexusCategory? _selectedOnlineCategory;
+    private static readonly NexusCategory AllCategories = new() { CategoryId = 0, Name = "全部分类" };
 
     public DownloadsViewModel(
         NexusCredentialService credentials,
         NexusClient nexus,
         NexusFavoriteService favoritesService,
         NexusDownloadService downloadsService,
+        ModPackageService packages,
         SettingsService settings,
         PlatformService platform,
         DialogService dialogs)
@@ -44,31 +47,34 @@ public sealed class DownloadsViewModel : ViewModelBase
         _nexus = nexus;
         _favoritesService = favoritesService;
         _downloadsService = downloadsService;
+        _packages = packages;
         _settings = settings;
         _platform = platform;
         _dialogs = dialogs;
 
-        SearchOnlineCommand = new RelayCommand(ApplyOnlineFilter);
+        OnlineCategories.Add(AllCategories);
+        _selectedOnlineCategory = AllCategories;
+
+        SearchOnlineCommand = new AsyncRelayCommand(SearchOnlineAsync, () => !IsBusy);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedOnlineMod is not null);
         OpenNexusCommand = new AsyncRelayCommand<NexusModInfo?>(OpenNexusAsync, mod => mod is not null);
         LoadFilesCommand = new AsyncRelayCommand(LoadFilesAsync, () => SelectedOnlineMod is not null && !IsBusy);
         DownloadFileCommand = new AsyncRelayCommand(DownloadLatestFileAsync, () => SelectedOnlineMod is not null && !IsBusy);
         CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
-        BrowseCommand = new AsyncRelayCommand<string>(BrowseAsync, _ => !IsBusy);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
         LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync, () => HasMorePages && !IsBusy);
     }
 
-    public List<string> OnlineSortOptions { get; } = ["趋势", "最多下载", "最多支持", "最近更新", "最新上架"];
+    public ObservableCollection<NexusCategory> OnlineCategories { get; } = [];
 
-    public string SelectedOnlineSort
+    public NexusCategory? SelectedOnlineCategory
     {
-        get => _onlineSortValue;
+        get => _selectedOnlineCategory;
         set
         {
-            if (SetProperty(ref _onlineSortValue, value))
+            if (SetProperty(ref _selectedOnlineCategory, value) && _categoriesLoaded)
             {
-                ApplyOnlineFilter();
+                _ = ReloadOnlineAsync();
             }
         }
     }
@@ -110,21 +116,14 @@ public sealed class DownloadsViewModel : ViewModelBase
         set => SetProperty(ref _onlineQuery, value);
     }
 
-    public string OnlinePanelTitle
-    {
-        get => _onlinePanelTitle;
-        private set => SetProperty(ref _onlinePanelTitle, value);
-    }
-
     public string FavoriteButtonText => SelectedOnlineMod?.IsFavorite == true ? "已收藏" : "收藏";
 
-    public IRelayCommand SearchOnlineCommand { get; }
+    public IAsyncRelayCommand SearchOnlineCommand { get; }
     public IAsyncRelayCommand ToggleFavoriteCommand { get; }
     public IAsyncRelayCommand<NexusModInfo?> OpenNexusCommand { get; }
     public IAsyncRelayCommand LoadFilesCommand { get; }
     public IAsyncRelayCommand DownloadFileCommand { get; }
     public IRelayCommand CancelDownloadCommand { get; }
-    public IAsyncRelayCommand<string> BrowseCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
     public IAsyncRelayCommand LoadMoreCommand { get; }
 
@@ -136,6 +135,58 @@ public sealed class DownloadsViewModel : ViewModelBase
         if (!_hasLoaded)
         {
             await AutoBrowseAsync();
+        }
+    }
+
+    public async Task FocusModAsync(long modId)
+    {
+        var key = RequireNexusKey();
+        if (key is null)
+        {
+            return;
+        }
+
+        _hasLoaded = true;
+        IsBusy = true;
+        ProgressText = "正在加载更新模组...";
+        Refresh();
+        NotifyCommands();
+        try
+        {
+            var mod = await _nexus.GetModAsync(modId, key);
+            _favoriteValues = await _favoritesService.LoadAsync();
+            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
+
+            _loadedOnlineMods = [mod];
+            OnlineQuery = string.Empty;
+            HasMorePages = false;
+            OnlineMods.Clear();
+            OnlineMods.Add(mod);
+            SelectedOnlineMod = mod;
+
+            OnlineFiles.Clear();
+            foreach (var file in await _nexus.GetFilesAsync(mod.ModId, key))
+            {
+                OnlineFiles.Add(file);
+            }
+
+            SelectedOnlineFile = SelectLatestFile(OnlineFiles);
+            FeedbackMessage = OnlineFiles.Count > 0
+                ? $"已加载 {mod.Name}，可直接下载更新文件。"
+                : "该模组没有可下载文件。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            OnPropertyChanged(nameof(LoadMoreVisibility));
+        }
+        catch (NexusApiException exception)
+        {
+            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+            NotifyCommands();
         }
     }
 
@@ -152,7 +203,9 @@ public sealed class DownloadsViewModel : ViewModelBase
             Refresh();
             try
             {
-                await SetupOnlinePanelAsync("趋势", key);
+                await EnsureCategoriesAsync();
+                _currentPage = 1;
+                await LoadOnlinePageAsync(key, append: false);
                 _hasLoaded = true;
                 return;
             }
@@ -170,33 +223,43 @@ public sealed class DownloadsViewModel : ViewModelBase
                 IsBusy = false;
                 ProgressText = string.Empty;
                 Refresh();
+                NotifyCommands();
             }
         }
     }
 
     private async Task RefreshAsync()
+        => await ReloadOnlineAsync();
+
+    private async Task SearchOnlineAsync()
+        => await ReloadOnlineAsync();
+
+    private async Task ReloadOnlineAsync()
     {
-        _hasLoaded = false;
+        if (IsBusy)
+        {
+            return;
+        }
+
+        var key = RequireNexusKey();
+        if (key is null)
+        {
+            return;
+        }
+
         _currentPage = 1;
         _loadedOnlineMods = [];
         _favoriteValues = [];
         HasMorePages = true;
-        await AutoBrowseAsync();
-    }
-
-    private async Task LoadMoreAsync()
-    {
-        if (!HasMorePages) return;
-        _currentPage++;
-        var key = RequireNexusKey();
-        if (key is null) return;
-
         IsBusy = true;
-        ProgressText = "加载更多...";
+        ProgressText = "正在加载...";
         Refresh();
+        NotifyCommands();
         try
         {
-            await SetupOnlinePanelAsync(OnlinePanelTitle, key, append: true);
+            await EnsureCategoriesAsync();
+            await LoadOnlinePageAsync(key, append: false);
+            _hasLoaded = true;
         }
         catch (NexusApiException exception)
         {
@@ -207,48 +270,29 @@ public sealed class DownloadsViewModel : ViewModelBase
             IsBusy = false;
             ProgressText = string.Empty;
             Refresh();
+            NotifyCommands();
         }
     }
 
-    private async Task SetupOnlinePanelAsync(string? feed, string key, bool append = false)
+    private async Task LoadMoreAsync()
     {
-        var newMods = (feed switch
-        {
-            "最新" => await _nexus.GetLatestAddedAsync(key, append ? _currentPage : 1),
-            "最近更新" => await _nexus.GetLatestUpdatedAsync(key, append ? _currentPage : 1),
-            _ => await _nexus.GetTrendingAsync(key, append ? _currentPage : 1)
-        }).ToList();
-        HasMorePages = newMods.Count >= PageSize;
-
-        if (append)
-            _loadedOnlineMods.AddRange(newMods);
-        else
-            _loadedOnlineMods = newMods;
-
-        _favoriteValues = await _favoritesService.LoadAsync();
-        foreach (var mod in _loadedOnlineMods)
-            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
-
-        OnlinePanelTitle = feed ?? "趋势";
-        OnlineMods.Clear();
-        foreach (var item in _loadedOnlineMods) OnlineMods.Add(item);
-        OnPropertyChanged(nameof(LoadMoreVisibility));
-    }
-
-    private async Task BrowseAsync(string? feed)
-    {
+        if (!HasMorePages || IsBusy) return;
+        _currentPage++;
         var key = RequireNexusKey();
         if (key is null) return;
 
         IsBusy = true;
         ProgressText = "正在加载...";
         Refresh();
+        NotifyCommands();
         try
         {
-            await SetupOnlinePanelAsync(feed, key);
+            await EnsureCategoriesAsync();
+            await LoadOnlinePageAsync(key, append: true);
         }
         catch (NexusApiException exception)
         {
+            _currentPage--;
             await _dialogs.ShowMessageAsync("Nexus", exception.Message);
         }
         finally
@@ -256,29 +300,86 @@ public sealed class DownloadsViewModel : ViewModelBase
             IsBusy = false;
             ProgressText = string.Empty;
             Refresh();
+            NotifyCommands();
         }
     }
 
-    private void ApplyOnlineFilter()
+    private async Task EnsureCategoriesAsync()
+    {
+        if (_categoriesLoaded)
+        {
+            return;
+        }
+
+        var categories = await _nexus.GetModCategoriesAsync();
+        OnlineCategories.Clear();
+        OnlineCategories.Add(AllCategories);
+        foreach (var category in categories
+            .Where(category => !string.IsNullOrWhiteSpace(category.Name))
+            .OrderBy(category => category.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            OnlineCategories.Add(category);
+        }
+
+        _categoriesLoaded = true;
+        SelectedOnlineCategory ??= AllCategories;
+    }
+
+    private async Task LoadOnlinePageAsync(string key, bool append)
     {
         var query = OnlineQuery.Trim();
-        IEnumerable<NexusModInfo> values = _loadedOnlineMods.Where(mod =>
-            string.IsNullOrWhiteSpace(query)
-            || mod.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-            || mod.Author.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-            || mod.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-            || mod.ModId.ToString().Contains(query, StringComparison.Ordinal));
-        values = SelectedOnlineSort switch
+        var offset = append ? (_currentPage - 1) * PageSize : 0;
+        List<NexusModInfo> newMods;
+        var totalCount = 0;
+
+        if (!append && long.TryParse(query, out var modId) && modId > 0)
         {
-            "最多下载" => values.OrderByDescending(mod => mod.Downloads),
-            "最多支持" => values.OrderByDescending(mod => mod.Endorsements),
-            "最近更新" => values.OrderByDescending(mod => mod.UpdatedTimestamp),
-            "最新上架" => values.OrderByDescending(mod => mod.ModId),
-            _ => values
-        };
+            newMods = [await _nexus.GetModAsync(modId, key)];
+            totalCount = newMods.Count;
+            HasMorePages = false;
+        }
+        else
+        {
+            var result = await _nexus.SearchModsAsync(query, SelectedCategoryName, offset, PageSize);
+            newMods = result.Mods.ToList();
+            totalCount = result.TotalCount;
+            HasMorePages = offset + newMods.Count < totalCount;
+        }
+
+        if (append)
+        {
+            _loadedOnlineMods.AddRange(newMods);
+        }
+        else
+        {
+            _loadedOnlineMods = newMods;
+            SelectedOnlineMod = null;
+            OnlineFiles.Clear();
+        }
+
+        _favoriteValues = await _favoritesService.LoadAsync();
+        foreach (var mod in _loadedOnlineMods)
+        {
+            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
+        }
+
         OnlineMods.Clear();
         foreach (var item in _loadedOnlineMods) OnlineMods.Add(item);
+        if (!append && OnlineMods.Count > 0)
+        {
+            SelectedOnlineMod = OnlineMods[0];
+        }
+
+        FeedbackMessage = string.IsNullOrWhiteSpace(query) || OnlineMods.Count > 0
+            ? null
+            : "Nexus 未找到匹配模组。";
+        OnPropertyChanged(nameof(FeedbackMessage));
+        OnPropertyChanged(nameof(LoadMoreVisibility));
     }
+
+    private string? SelectedCategoryName => SelectedOnlineCategory is { CategoryId: > 0 } category
+        ? category.Name
+        : null;
 
     private async Task ToggleFavoriteAsync()
     {
@@ -487,8 +588,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         try
         {
             var path = await _downloadsService.DownloadAsync(item, key, token, _downloadCancellation.Token);
-            FeedbackMessage = $"{Path.GetFileName(path)} 下载完成。";
-            OnPropertyChanged(nameof(FeedbackMessage));
+            await InstallDownloadedPackageAsync(item, path);
         }
         catch (OperationCanceledException)
         {
@@ -505,7 +605,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             OnPropertyChanged(nameof(FeedbackMessage));
             Refresh();
             var browserToken = await _dialogs.ShowNexusDownloadBrowserAsync(
-                CreateNexusDownloadPopupUrl(item.FileId),
+                CreateNexusFilePageUrl(item.ModId, item.FileId),
                 item.ModId,
                 item.FileId,
                 _credentials.GetWebLogin(),
@@ -539,8 +639,8 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
     }
 
-    private static string CreateNexusDownloadPopupUrl(long fileId)
-        => $"https://www.nexusmods.com/Core/Libs/Common/Widgets/DownloadPopUp?id={fileId}&game_id={StardewGameId}&nmm=1";
+    private static string CreateNexusFilePageUrl(long modId, long fileId)
+        => $"https://www.nexusmods.com/stardewvalley/mods/{modId}?tab=files&file_id={fileId}&nmm=1";
 
     private void UpdateNexusDownloadProgress(string message)
     {
@@ -567,8 +667,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         try
         {
             var path = await _downloadsService.DownloadAsync(item, key, token, _downloadCancellation.Token);
-            FeedbackMessage = $"{Path.GetFileName(path)} 下载完成。";
-            OnPropertyChanged(nameof(FeedbackMessage));
+            await InstallDownloadedPackageAsync(item, path);
         }
         catch (OperationCanceledException)
         {
@@ -589,6 +688,76 @@ public sealed class DownloadsViewModel : ViewModelBase
             ProgressText = string.Empty;
             Refresh();
             NotifyCommands();
+        }
+    }
+
+    private async Task InstallDownloadedPackageAsync(DownloadQueueItem item, string packagePath)
+    {
+        item.State = DownloadState.AwaitingInstall;
+        ProgressText = "正在安装模组...";
+        FeedbackMessage = $"{Path.GetFileName(packagePath)} 下载完成，正在安装。";
+        OnPropertyChanged(nameof(FeedbackMessage));
+        Refresh();
+
+        ModInstallPlan? plan = null;
+        try
+        {
+            await App.Current.Services.Mods.ScanForLaunchAsync();
+            plan = await _packages.InspectAsync(packagePath);
+            if (!plan.CanInstall)
+            {
+                var message = plan.Blockers.Count > 0
+                    ? string.Join(Environment.NewLine, plan.Blockers)
+                    : "没有识别到可安装模组。";
+                item.State = DownloadState.InstallFailed;
+                item.Error = message;
+                FeedbackMessage = $"自动安装失败：{message}";
+                OnPropertyChanged(nameof(FeedbackMessage));
+                await _dialogs.ShowMessageAsync("安装未完成", message);
+                return;
+            }
+
+            if (plan.Items.Any(value => value.ExistingMod is not null) && _settings.Current.BackupSaveBeforeUpdate)
+            {
+                ProgressText = "正在备份存档...";
+                Refresh();
+                await App.Current.Services.Saves.BackupForLaunchAsync();
+            }
+
+            ProgressText = "正在安全安装模组...";
+            Refresh();
+            var result = await _packages.InstallAsync(plan);
+            if (result.FailedCount > 0)
+            {
+                var message = string.Join(Environment.NewLine, result.Messages);
+                item.State = DownloadState.InstallFailed;
+                item.Error = message;
+                FeedbackMessage = $"自动安装失败：成功 {result.InstalledCount}，失败 {result.FailedCount}。{Environment.NewLine}{message}";
+                OnPropertyChanged(nameof(FeedbackMessage));
+                await _dialogs.ShowMessageAsync("安装未完成", message);
+                return;
+            }
+
+            item.State = DownloadState.Installed;
+            item.Error = null;
+            FeedbackMessage = $"安装完成：{result.InstalledCount} 个模组。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            await App.Current.Services.Mods.ScanForLaunchAsync();
+        }
+        catch (Exception exception)
+        {
+            item.State = DownloadState.InstallFailed;
+            item.Error = exception.Message;
+            FeedbackMessage = $"自动安装失败：{exception.Message}";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            await _dialogs.ShowMessageAsync("安装失败", exception.Message);
+        }
+        finally
+        {
+            if (plan is not null)
+            {
+                await _packages.CleanupPreparedPackageAsync(plan);
+            }
         }
     }
 
@@ -627,10 +796,13 @@ public sealed class DownloadsViewModel : ViewModelBase
 
     private void NotifyCommands()
     {
+        SearchOnlineCommand.NotifyCanExecuteChanged();
         ToggleFavoriteCommand.NotifyCanExecuteChanged();
         OpenNexusCommand.NotifyCanExecuteChanged();
         LoadFilesCommand.NotifyCanExecuteChanged();
         DownloadFileCommand.NotifyCanExecuteChanged();
         CancelDownloadCommand.NotifyCanExecuteChanged();
+        RefreshCommand.NotifyCanExecuteChanged();
+        LoadMoreCommand.NotifyCanExecuteChanged();
     }
 }

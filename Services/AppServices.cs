@@ -40,16 +40,17 @@ public sealed class AppServices
         Nexus = new NexusClient(Logging);
         NexusFavorites = new NexusFavoriteService(Logging);
         NexusDownloads = new NexusDownloadService(Nexus, Logging);
+        ModPacks = new ModPackService(State, RunLock, ModScanner, Settings, Nexus, NexusDownloads, ExternalArchives, Files, Logging);
         Cache = new CacheService(Files, Logging);
         AssetCache = new AssetCacheService(State, Settings, Files, XnbTextures, Logging);
         LastKnownGood = new LastKnownGoodService(State, RunLock, ModScanner, SaveBackups, Files, Logging);
 
         Home = new HomeViewModel(State, Settings, GameLocator, GameIcons, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
-        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, NexusCredentials, Nexus, NexusFavorites, Platform, Dialogs, UiDispatcher);
+        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, ModPacks, NexusCredentials, Nexus, NexusFavorites, Platform, Dialogs, UiDispatcher);
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
         Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
-        Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, Settings, Platform, Dialogs);
+        Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, ModPackages, Settings, Platform, Dialogs);
     }
 
     public LoggingService Logging { get; }
@@ -82,6 +83,7 @@ public sealed class AppServices
     public NexusClient Nexus { get; }
     public NexusFavoriteService NexusFavorites { get; }
     public NexusDownloadService NexusDownloads { get; }
+    public ModPackService ModPacks { get; }
     public CacheService Cache { get; }
     public XnbTextureService XnbTextures { get; }
     public GameIconService GameIcons { get; }

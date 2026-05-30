@@ -231,7 +231,6 @@ public sealed class ModPackageService(
             catch (Exception exception)
             {
                 result.FailedCount++;
-                result.Messages.Add($"{item.Name} 安装失败，已尝试恢复。");
                 string? rollbackError = null;
                 try
                 {
@@ -243,7 +242,10 @@ public sealed class ModPackageService(
                     if (holdFolder is not null && Directory.Exists(holdFolder) && item.ExistingMod is not null)
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(item.ExistingMod.FolderPath)!);
-                        Directory.Move(holdFolder, item.ExistingMod.FolderPath);
+                        await files.MoveDirectoryAsync(
+                            holdFolder,
+                            item.ExistingMod.FolderPath,
+                            Path.GetDirectoryName(item.ExistingMod.FolderPath)!);
                         rolledBack = true;
                     }
                     else if (item.ExistingMod is null && targetChanged)
@@ -261,6 +263,7 @@ public sealed class ModPackageService(
                 var failure = rollbackError is null
                     ? exception.Message
                     : $"{exception.Message}；回滚失败：{rollbackError}";
+                result.Messages.Add($"{item.Name} 安装失败：{failure}。已尝试恢复。");
                 await AppendTransactionAsync(
                     item,
                     targetFolder,

@@ -16,6 +16,7 @@ public sealed class ModsViewModel : ViewModelBase
     private readonly ModBackupService _backups;
     private readonly ModTransactionService _transactions;
     private readonly ModPackageService _packages;
+    private readonly ModPackService _modPacks;
     private readonly NexusCredentialService _credentials;
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
@@ -26,9 +27,11 @@ public sealed class ModsViewModel : ViewModelBase
     private ModInfo? _selectedMod;
     private string _filter = "全部";
     private ModInstallPlan? _pendingPlan;
+    private ModPackInfo? _selectedModPack;
     private string _nexusModIdInput = string.Empty;
     private bool _isEditingNexusBinding;
     private bool _automaticScanningStarted;
+    private bool _isModPackPanelOpen;
 
     public ModsViewModel(
         AppStateService state,
@@ -38,6 +41,7 @@ public sealed class ModsViewModel : ViewModelBase
         ModBackupService backups,
         ModTransactionService transactions,
         ModPackageService packages,
+        ModPackService modPacks,
         NexusCredentialService credentials,
         NexusClient nexus,
         NexusFavoriteService favoritesService,
@@ -52,6 +56,7 @@ public sealed class ModsViewModel : ViewModelBase
         _backups = backups;
         _transactions = transactions;
         _packages = packages;
+        _modPacks = modPacks;
         _credentials = credentials;
         _nexus = nexus;
         _favoritesService = favoritesService;
@@ -67,7 +72,18 @@ public sealed class ModsViewModel : ViewModelBase
         ChoosePackageCommand = new RelayCommand(() => App.Current.Services.Navigation.Navigate(typeof(DownloadsPage)));
         InstallPackageCommand = new AsyncRelayCommand(InstallPackageAsync, CanInstallPackage);
         CancelPackageCommand = new AsyncRelayCommand(ClearPackagePlanAsync);
+        ToggleModPackPanelCommand = new AsyncRelayCommand(ToggleModPackPanelAsync, CanUseModPacks);
+        CreateModPackCommand = new AsyncRelayCommand(CreateModPackAsync, CanModifyModPacks);
+        CaptureCurrentModsCommand = new AsyncRelayCommand(CaptureCurrentModsAsync, CanModifySelectedModPack);
+        SwitchModPackCommand = new AsyncRelayCommand(SwitchModPackAsync, CanSwitchModPack);
+        ImportModPackCommand = new AsyncRelayCommand(ImportModPackAsync, CanModifyModPacks);
+        MergeModPackCommand = new AsyncRelayCommand(MergeModPackAsync, CanModifySelectedModPack);
+        ExportModPackWithFilesCommand = new AsyncRelayCommand(() => ExportModPackAsync(true), HasSelectedModPack);
+        ExportModPackMetadataCommand = new AsyncRelayCommand(() => ExportModPackAsync(false), HasSelectedModPack);
+        DownloadMissingModPackFilesCommand = new AsyncRelayCommand(DownloadMissingModPackFilesAsync, CanDownloadMissingModPackFiles);
+        DeleteModPackCommand = new AsyncRelayCommand(DeleteModPackAsync, CanDeleteModPack);
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, CanUseOnlineNow);
+        PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, CanPrepareSelectedUpdate);
         BindNexusIdCommand = new AsyncRelayCommand(BindNexusIdAsync, () => SelectedMod is not null);
         EditNexusBindingCommand = new RelayCommand(ToggleNexusBindingEditor, () => SelectedMod is not null);
         NexusIdClickCommand = new RelayCommand(HandleNexusIdClick, () => SelectedMod is not null);
@@ -87,6 +103,8 @@ public sealed class ModsViewModel : ViewModelBase
     }
 
     public ObservableCollection<ModInfo> Mods { get; } = [];
+    public ObservableCollection<ModPackInfo> ModPacks { get; } = [];
+    public ObservableCollection<ModPackEntry> ModPackEntries { get; } = [];
     public IRelayCommand<string> FilterCommand { get; }
     public IAsyncRelayCommand EnableCommand { get; }
     public IAsyncRelayCommand DisableCommand { get; }
@@ -97,7 +115,18 @@ public sealed class ModsViewModel : ViewModelBase
     public IRelayCommand ChoosePackageCommand { get; }
     public IAsyncRelayCommand InstallPackageCommand { get; }
     public IAsyncRelayCommand CancelPackageCommand { get; }
+    public IAsyncRelayCommand ToggleModPackPanelCommand { get; }
+    public IAsyncRelayCommand CreateModPackCommand { get; }
+    public IAsyncRelayCommand CaptureCurrentModsCommand { get; }
+    public IAsyncRelayCommand SwitchModPackCommand { get; }
+    public IAsyncRelayCommand ImportModPackCommand { get; }
+    public IAsyncRelayCommand MergeModPackCommand { get; }
+    public IAsyncRelayCommand ExportModPackWithFilesCommand { get; }
+    public IAsyncRelayCommand ExportModPackMetadataCommand { get; }
+    public IAsyncRelayCommand DownloadMissingModPackFilesCommand { get; }
+    public IAsyncRelayCommand DeleteModPackCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
+    public IAsyncRelayCommand PrepareSelectedUpdateCommand { get; }
     public IAsyncRelayCommand BindNexusIdCommand { get; }
     public IRelayCommand EditNexusBindingCommand { get; }
     public ModInfo? SelectedMod
@@ -120,6 +149,22 @@ public sealed class ModsViewModel : ViewModelBase
                 OnPropertyChanged(nameof(DependencySectionVisibility));
                 OnPropertyChanged(nameof(IssuesSectionVisibility));
                 OnPropertyChanged(nameof(NoNexusIdMessageVisibility));
+                NotifyCommands();
+            }
+        }
+    }
+
+    public ModPackInfo? SelectedModPack
+    {
+        get => _selectedModPack;
+        set
+        {
+            if (SetProperty(ref _selectedModPack, value))
+            {
+                RefreshModPackEntries();
+                OnPropertyChanged(nameof(SelectedModPackVisibility));
+                OnPropertyChanged(nameof(SelectedModPackTitle));
+                OnPropertyChanged(nameof(SelectedModPackStatus));
                 NotifyCommands();
             }
         }
@@ -161,7 +206,15 @@ public sealed class ModsViewModel : ViewModelBase
     public string CurrentFilter => _filter;
     public bool HasProblems => _allMods.Any(mod => mod.Issues.Count > 0);
     public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed
+        && !_isModPackPanelOpen
         ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ModPackPanelVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed
+        && _isModPackPanelOpen
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    public Visibility SelectedModPackVisibility => SelectedModPack is null ? Visibility.Collapsed : Visibility.Visible;
+    public string SelectedModPackTitle => SelectedModPack?.Name ?? "未选择模组包";
+    public string SelectedModPackStatus => SelectedModPack?.StatusText ?? "请选择一个模组包";
     public string TaskStatus => IsBusy ? ProgressText : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
     public ModInstallPlan? PendingPlan
     {
@@ -172,6 +225,7 @@ public sealed class ModsViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(PlanVisibility));
                 OnPropertyChanged(nameof(FilterAndListVisibility));
+                OnPropertyChanged(nameof(ModPackPanelVisibility));
                 InstallPackageCommand.NotifyCanExecuteChanged();
             }
         }
@@ -183,6 +237,7 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(UnavailableVisibility));
         OnPropertyChanged(nameof(AvailableVisibility));
         OnPropertyChanged(nameof(FilterAndListVisibility));
+        OnPropertyChanged(nameof(ModPackPanelVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
         OnPropertyChanged(nameof(InstalledCount));
         OnPropertyChanged(nameof(HealthyCount));
@@ -191,6 +246,7 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(FavoriteCount));
         OnPropertyChanged(nameof(UpdateCount));
         OnPropertyChanged(nameof(TaskStatus));
+        OnPropertyChanged(nameof(SelectedModPackStatus));
         NotifyCommands();
     }
 
@@ -202,6 +258,262 @@ public sealed class ModsViewModel : ViewModelBase
     }
 
     public Task ScanForLaunchAsync() => ScanAsync();
+
+    private async Task ToggleModPackPanelAsync()
+    {
+        if (_isModPackPanelOpen)
+        {
+            _isModPackPanelOpen = false;
+            Refresh();
+            return;
+        }
+
+        if (PendingPlan is not null)
+        {
+            await ClearPackagePlanAsync();
+        }
+
+        _isModPackPanelOpen = true;
+        await LoadModPacksAsync(ensureInitialized: true);
+        Refresh();
+    }
+
+    private async Task LoadModPacksAsync(bool ensureInitialized)
+    {
+        var selectedId = SelectedModPack?.Id;
+        var catalog = ensureInitialized
+            ? await _modPacks.EnsureInitializedAsync()
+            : await _modPacks.LoadAsync();
+        SyncModPacks(catalog, selectedId);
+    }
+
+    private void SyncModPacks(ModPackCatalog catalog, string? preferredPackId = null)
+    {
+        ModPacks.Clear();
+        foreach (var pack in catalog.Packs.OrderByDescending(pack => pack.IsActive).ThenBy(pack => pack.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            ModPacks.Add(pack);
+        }
+
+        SelectedModPack = ModPacks.FirstOrDefault(pack => pack.Id == preferredPackId)
+            ?? ModPacks.FirstOrDefault(pack => pack.IsActive)
+            ?? ModPacks.FirstOrDefault();
+        OnPropertyChanged(nameof(SelectedModPackStatus));
+    }
+
+    private void RefreshModPackEntries()
+    {
+        ModPackEntries.Clear();
+        if (SelectedModPack is null)
+        {
+            return;
+        }
+
+        foreach (var entry in SelectedModPack.Entries.OrderBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            FillActiveModPackNexusId(entry);
+            ModPackEntries.Add(entry);
+        }
+    }
+
+    private void FillActiveModPackNexusId(ModPackEntry entry)
+    {
+        if (entry.NexusModId is not null || SelectedModPack?.IsActive != true)
+        {
+            return;
+        }
+
+        var current = _allMods.FirstOrDefault(mod =>
+            !mod.IsArchived
+            && !string.IsNullOrWhiteSpace(entry.UniqueId)
+            && string.Equals(mod.Manifest?.UniqueID, entry.UniqueId, StringComparison.OrdinalIgnoreCase))
+            ?? _allMods.FirstOrDefault(mod =>
+                !mod.IsArchived
+                && !string.IsNullOrWhiteSpace(entry.FolderName)
+                && string.Equals(mod.FolderName, entry.FolderName, StringComparison.OrdinalIgnoreCase));
+
+        if (current?.NexusModId is { } nexusModId)
+        {
+            entry.NexusModId = nexusModId;
+        }
+    }
+
+    private async Task CreateModPackAsync()
+    {
+        await RunModPackOperationAsync(
+            () => _modPacks.CreateEmptyPackAsync(),
+            "已创建空模组包。",
+            selectNewestWhenNoPreferred: true);
+    }
+
+    private async Task CaptureCurrentModsAsync()
+    {
+        if (SelectedModPack is not { } pack
+            || !await _dialogs.ConfirmAsync("复制当前 Mods", $"将用当前游戏 Mods 目录覆盖“{pack.Name}”的包内容，继续？", "复制"))
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.CaptureCurrentModsAsync(pack.Id),
+            "已复制当前 Mods 到模组包。",
+            pack.Id);
+    }
+
+    private async Task SwitchModPackAsync()
+    {
+        if (SelectedModPack is not { } pack
+            || !await _dialogs.ConfirmAsync("切换模组包", $"将把当前 Mods 移回当前包，并加载“{pack.Name}”。游戏未运行时才能执行。", "切换"))
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.SwitchAsync(pack.Id),
+            $"已切换到模组包：{pack.Name}。",
+            pack.Id);
+        await ScanAsync();
+    }
+
+    private async Task ImportModPackAsync()
+    {
+        var path = await _platform.ChooseModPackAsync();
+        if (path is null)
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.ImportAsync(path, null, _credentials.GetKey()),
+            "已导入为新的模组包。",
+            selectNewestWhenNoPreferred: true);
+    }
+
+    private async Task MergeModPackAsync()
+    {
+        if (SelectedModPack is not { } pack)
+        {
+            return;
+        }
+
+        var path = await _platform.ChooseModPackAsync();
+        if (path is null)
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.ImportAsync(path, pack.Id, _credentials.GetKey()),
+            $"已合并到模组包：{pack.Name}。",
+            pack.Id);
+        if (pack.IsActive)
+        {
+            await ScanAsync();
+        }
+    }
+
+    private async Task ExportModPackAsync(bool includeFiles)
+    {
+        if (SelectedModPack is not { } pack)
+        {
+            return;
+        }
+
+        var suggested = FileSystemHelper.SafeFilePart(pack.Name);
+        var path = await _platform.ChooseModPackSavePathAsync(suggested);
+        if (path is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ProgressText = includeFiles ? "正在导出带文件模组包..." : "正在导出轻量模组包...";
+        Refresh();
+        try
+        {
+            await _modPacks.ExportAsync(pack.Id, path, new ModPackExportOptions { IncludeModFiles = includeFiles });
+            FeedbackMessage = includeFiles ? "已导出带文件模组包。" : "已导出轻量模组包。";
+        }
+        catch (Exception exception)
+        {
+            await _dialogs.ShowMessageAsync("导出失败", exception.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+        }
+    }
+
+    private async Task DownloadMissingModPackFilesAsync()
+    {
+        if (SelectedModPack is not { } pack)
+        {
+            return;
+        }
+
+        var key = RequireNexusKey();
+        if (key is null)
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.DownloadMissingAsync(pack.Id, key),
+            $"已处理“{pack.Name}”的缺失模组文件。",
+            pack.Id);
+        if (pack.IsActive)
+        {
+            await ScanAsync();
+        }
+    }
+
+    private async Task DeleteModPackAsync()
+    {
+        if (SelectedModPack is not { } pack
+            || !await _dialogs.ConfirmAsync("删除模组包", $"将删除“{pack.Name}”的包记录和仓库文件，继续？", "删除"))
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.DeleteAsync(pack.Id),
+            $"已删除模组包：{pack.Name}。");
+    }
+
+    private async Task RunModPackOperationAsync(
+        Func<Task<ModPackCatalog>> operation,
+        string successText,
+        string? preferredPackId = null,
+        bool selectNewestWhenNoPreferred = false)
+    {
+        IsBusy = true;
+        ProgressText = "正在处理模组包...";
+        Refresh();
+        try
+        {
+            var catalog = await operation();
+            var selectedId = preferredPackId;
+            if (selectedId is null && selectNewestWhenNoPreferred)
+            {
+                selectedId = catalog.Packs.OrderByDescending(pack => pack.CreatedAt).FirstOrDefault()?.Id;
+            }
+
+            SyncModPacks(catalog, selectedId);
+            FeedbackMessage = successText;
+        }
+        catch (Exception exception)
+        {
+            await _dialogs.ShowMessageAsync("模组包操作失败", exception.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+        }
+    }
 
     public async Task InspectPackageAsync(string packagePath)
     {
@@ -312,6 +624,11 @@ public sealed class ModsViewModel : ViewModelBase
             ApplyFilter(_filter);
             SelectedMod = Mods.FirstOrDefault(mod => string.Equals(mod.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
                 ?? Mods.FirstOrDefault();
+            if (_isModPackPanelOpen)
+            {
+                RefreshModPackEntries();
+            }
+
             App.Current.Services.Home.Refresh();
         }
         catch (Exception exception)
@@ -543,6 +860,19 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
 
+    private async Task PrepareSelectedUpdateAsync()
+    {
+        if (SelectedMod?.NexusModId is not { } modId)
+        {
+            FeedbackMessage = "该模组未绑定 Nexus Mod ID。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            return;
+        }
+
+        App.Current.Services.Navigation.Navigate(typeof(DownloadsPage));
+        await App.Current.Services.Downloads.FocusModAsync(modId);
+    }
+
     public void NotifyFeedbackMessage(string message)
     {
         FeedbackMessage = message;
@@ -642,7 +972,18 @@ public sealed class ModsViewModel : ViewModelBase
         NexusIdClickCommand.NotifyCanExecuteChanged();
         ChoosePackageCommand.NotifyCanExecuteChanged();
         InstallPackageCommand.NotifyCanExecuteChanged();
+        ToggleModPackPanelCommand.NotifyCanExecuteChanged();
+        CreateModPackCommand.NotifyCanExecuteChanged();
+        CaptureCurrentModsCommand.NotifyCanExecuteChanged();
+        SwitchModPackCommand.NotifyCanExecuteChanged();
+        ImportModPackCommand.NotifyCanExecuteChanged();
+        MergeModPackCommand.NotifyCanExecuteChanged();
+        ExportModPackWithFilesCommand.NotifyCanExecuteChanged();
+        ExportModPackMetadataCommand.NotifyCanExecuteChanged();
+        DownloadMissingModPackFilesCommand.NotifyCanExecuteChanged();
+        DeleteModPackCommand.NotifyCanExecuteChanged();
         CheckUpdatesCommand.NotifyCanExecuteChanged();
+        PrepareSelectedUpdateCommand.NotifyCanExecuteChanged();
         BindNexusIdCommand.NotifyCanExecuteChanged();
         EditNexusBindingCommand.NotifyCanExecuteChanged();
     }
@@ -650,6 +991,14 @@ public sealed class ModsViewModel : ViewModelBase
     private bool CanModify() => _state.IsGameConfigured && !_state.IsGameRunning && !IsBusy;
     private bool CanInstallPackage() => CanModify() && PendingPlan is { CanInstall: true };
     private bool CanUseOnlineNow() => !IsBusy;
+    private bool CanPrepareSelectedUpdate() => !IsBusy && SelectedMod is { NexusModId: not null, HasUpdate: true };
+    private bool CanUseModPacks() => _state.IsGameConfigured && !IsBusy;
+    private bool CanModifyModPacks() => CanModify() && _isModPackPanelOpen;
+    private bool HasSelectedModPack() => SelectedModPack is not null && !IsBusy;
+    private bool CanModifySelectedModPack() => CanModifyModPacks() && SelectedModPack is not null;
+    private bool CanSwitchModPack() => CanModifySelectedModPack() && SelectedModPack is { CanSwitch: true };
+    private bool CanDownloadMissingModPackFiles() => CanModifySelectedModPack() && SelectedModPack is { MissingCount: > 0 };
+    private bool CanDeleteModPack() => CanModifySelectedModPack() && SelectedModPack is { IsActive: false };
     private bool HasSelected() => SelectedMod is not null && !IsBusy;
     private bool CanModifySelected() => HasSelected() && !_state.IsGameRunning && SelectedMod is { IsArchived: false };
     private bool CanEnable() => CanModifySelected() && SelectedMod is { IsEnabled: false };

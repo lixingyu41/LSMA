@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using LSMA.Models;
 using LSMA.Utilities;
@@ -56,6 +57,90 @@ public sealed class NexusClient(LoggingService logging)
 
     public Task<List<NexusCategory>> GetCategoriesAsync(string apiKey)
         => GetAsync<List<NexusCategory>>($"games/{GameDomain}/categories.json", apiKey);
+
+    public async Task<List<NexusCategory>> GetModCategoriesAsync()
+    {
+        var payload = new
+        {
+            query = """
+                query ModCategories($filter: ModsFilter, $facets: ModsFacet) {
+                  mods(filter: $filter, facets: $facets, count: 0) {
+                    facets {
+                      facet
+                      value
+                      count
+                    }
+                  }
+                }
+                """,
+            variables = new
+            {
+                filter = CreateModsFilter(null, null),
+                facets = new { categoryName = Array.Empty<string>() }
+            }
+        };
+
+        var envelope = await PostGraphQlAsync<ModFacetsGraphQlData>(payload);
+        var categories = envelope.Data?.Mods?.Facets
+            .Where(facet => string.Equals(facet.Facet, "categoryName", StringComparison.OrdinalIgnoreCase))
+            .Where(facet => !string.IsNullOrWhiteSpace(facet.Value))
+            .Select((facet, index) => new NexusCategory { CategoryId = index + 1, Name = facet.Value })
+            .OrderBy(category => category.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return categories is { Count: > 0 }
+            ? categories
+            : throw new NexusApiException("Nexus 未返回可用分类。");
+    }
+
+    public async Task<NexusModSearchResult> SearchModsAsync(
+        string? query,
+        string? categoryName,
+        int offset,
+        int count)
+    {
+        var filter = CreateModsFilter(query, categoryName);
+        var sort = string.IsNullOrWhiteSpace(query)
+            ? new object[] { new { updatedAt = new { direction = "DESC" } } }
+            : [new { relevance = new { direction = "DESC" } }, new { downloads = new { direction = "DESC" } }];
+        var payload = new
+        {
+            query = """
+                query SearchMods($filter: ModsFilter, $sort: [ModsSort!], $offset: Int, $count: Int) {
+                  mods(filter: $filter, sort: $sort, offset: $offset, count: $count) {
+                    totalCount
+                    nodes {
+                      modId
+                      name
+                      summary
+                      version
+                      author
+                      category
+                      modCategory { categoryId }
+                      updatedAt
+                      endorsements
+                      downloads
+                    }
+                  }
+                }
+                """,
+            variables = new
+            {
+                filter,
+                sort,
+                offset = Math.Max(0, offset),
+                count = Math.Clamp(count, 1, 50)
+            }
+        };
+
+        var envelope = await PostGraphQlAsync<ModsGraphQlData>(payload);
+        var page = envelope.Data?.Mods ?? throw new NexusApiException("Nexus 返回了无法读取的数据。");
+        return new NexusModSearchResult
+        {
+            Mods = page.Nodes.Select(ToNexusModInfo).Where(mod => mod.ModId > 0).ToList(),
+            TotalCount = page.TotalCount
+        };
+    }
 
     public async Task<IReadOnlyList<NexusFileInfo>> GetFilesAsync(long modId, string apiKey)
     {
@@ -155,8 +240,164 @@ public sealed class NexusClient(LoggingService logging)
         return new NexusApiException("请求被限流，LSMA 已暂停在线请求 5 分钟。", HttpStatusCode.TooManyRequests);
     }
 
+    private async Task<GraphQlEnvelope<T>> PostGraphQlAsync<T>(object payload)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.nexusmods.com/v2/graphql");
+        request.Headers.Add("Application-Name", "LSMA");
+        request.Headers.Add("Application-Version", GetVersion());
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Content = new StringContent(JsonSerializer.Serialize(payload, JsonHelper.Options), Encoding.UTF8, "application/json");
+
+        using var response = await _client.SendAsync(request);
+        ReadLimits(response);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw ToFriendlyException(response.StatusCode);
+        }
+
+        await using var content = await response.Content.ReadAsStreamAsync();
+        var envelope = await JsonSerializer.DeserializeAsync<GraphQlEnvelope<T>>(content, JsonHelper.Options)
+            ?? throw new NexusApiException("Nexus 返回了无法读取的数据。");
+        if (envelope.Errors is { Count: > 0 })
+        {
+            throw new NexusApiException(envelope.Errors[0].Message ?? "Nexus 请求失败。");
+        }
+
+        return envelope;
+    }
+
+    private static object CreateModsFilter(string? query, string? categoryName)
+    {
+        var filters = new List<object>
+        {
+            new Dictionary<string, object?>
+            {
+                ["gameDomainName"] = new[] { new { value = GameDomain, op = "EQUALS" } },
+                ["status"] = new[] { new { value = "published", op = "EQUALS" } }
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(categoryName))
+        {
+            filters.Add(new Dictionary<string, object?>
+            {
+                ["categoryName"] = new[] { new { value = categoryName, op = "EQUALS" } }
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var value = query.Trim();
+            filters.Add(new Dictionary<string, object?>
+            {
+                ["op"] = "OR",
+                ["filter"] = new object[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["name"] = new[] { new { value, op = "WILDCARD" } }
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["nameStemmed"] = new[] { new { value, op = "MATCHES" } }
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["description"] = new[] { new { value, op = "MATCHES" } }
+                    }
+                }
+            });
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["op"] = "AND",
+            ["filter"] = filters
+        };
+    }
+
+    private static NexusModInfo ToNexusModInfo(GraphQlModNode node)
+    {
+        return new NexusModInfo
+        {
+            ModId = node.ModId,
+            Name = node.Name ?? string.Empty,
+            Summary = node.Summary ?? string.Empty,
+            Version = string.IsNullOrWhiteSpace(node.Version) ? "-" : node.Version,
+            Author = string.IsNullOrWhiteSpace(node.Author) ? "未知作者" : node.Author,
+            CategoryId = node.ModCategory?.CategoryId ?? 0,
+            UpdatedTimestamp = ToUnixTimestamp(node.UpdatedAt),
+            Endorsements = node.Endorsements,
+            Downloads = node.Downloads
+        };
+    }
+
+    private static long ToUnixTimestamp(string? value)
+    {
+        return DateTimeOffset.TryParse(value, out var timestamp)
+            ? timestamp.ToUnixTimeSeconds()
+            : 0;
+    }
+
     private static string GetVersion()
         => typeof(NexusClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    private sealed class GraphQlEnvelope<T>
+    {
+        public T? Data { get; set; }
+        public List<GraphQlError>? Errors { get; set; }
+    }
+
+    private sealed class GraphQlError
+    {
+        public string? Message { get; set; }
+    }
+
+    private sealed class ModsGraphQlData
+    {
+        public ModsGraphQlPage? Mods { get; set; }
+    }
+
+    private sealed class ModFacetsGraphQlData
+    {
+        public ModFacetsGraphQlPage? Mods { get; set; }
+    }
+
+    private sealed class ModsGraphQlPage
+    {
+        public int TotalCount { get; set; }
+        public List<GraphQlModNode> Nodes { get; set; } = [];
+    }
+
+    private sealed class ModFacetsGraphQlPage
+    {
+        public List<GraphQlFacetNode> Facets { get; set; } = [];
+    }
+
+    private sealed class GraphQlFacetNode
+    {
+        public string? Facet { get; set; }
+        public string Value { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+
+    private sealed class GraphQlModNode
+    {
+        public long ModId { get; set; }
+        public string? Name { get; set; }
+        public string? Summary { get; set; }
+        public string? Version { get; set; }
+        public string? Author { get; set; }
+        public string? UpdatedAt { get; set; }
+        public int Endorsements { get; set; }
+        public long Downloads { get; set; }
+        public GraphQlModCategory? ModCategory { get; set; }
+    }
+
+    private sealed class GraphQlModCategory
+    {
+        public int CategoryId { get; set; }
+    }
 }
 
 public sealed class NexusApiException(string message, HttpStatusCode? statusCode = null) : Exception(message)

@@ -12,6 +12,8 @@ public static class AppPaths
     public static string FavoritesFile => Path.Combine(RoamingRoot, "favorites.json");
     public static string Downloads => Path.Combine(LocalRoot, "Downloads");
     public static string ModBackups => Path.Combine(LocalRoot, "Backups", "Mods");
+    public static string ModPacks => Path.Combine(LocalRoot, "ModPacks");
+    public static string ModPackCatalogFile => Path.Combine(ModPacks, "catalog.json");
     public static string SaveBackups => Path.Combine(LocalRoot, "Backups", "Saves");
     public static string FailedStates => Path.Combine(LocalRoot, "Backups", "FailedStates");
     public static string ArchivedMods => Path.Combine(LocalRoot, "Backups", "ArchivedMods");
@@ -35,6 +37,7 @@ public static class AppPaths
         RoamingRoot,
         Downloads,
         ModBackups,
+        ModPacks,
         SaveBackups,
         FailedStates,
         ArchivedMods,

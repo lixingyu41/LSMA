@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using Windows.UI;
 using LSMA.ViewModels;
 
 namespace LSMA.Pages;
@@ -23,6 +22,8 @@ public sealed partial class ModsPage : Page
     private int _selectedFilterIndex = 0;
     private Storyboard? _currentAnimation;
     private bool _filterEventsAttached;
+    private static SolidColorBrush SelectedFilterForeground =>
+        (SolidColorBrush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"];
 
     public ModsPage()
     {
@@ -109,13 +110,14 @@ public sealed partial class ModsPage : Page
     private void UpdateButtonColors(int selectedIndex)
     {
         if (_filterButtons is null) return;
-        var selectedFg = new SolidColorBrush(Color.FromArgb(255, 0, 0, 0));
+        var selectedFg = SelectedFilterForeground;
         var unselectedFg = (SolidColorBrush)Application.Current.Resources["PrimaryTextBrush"];
 
         for (int i = 0; i < _filterButtons.Length; i++)
         {
-            if (_filterButtons[i].Content is Grid outerGrid && outerGrid.Children.Count > 1
-                && outerGrid.Children[1] is Grid innerGrid && innerGrid.Children.Count > 1)
+            if (_filterButtons[i].Content is Grid outerGrid
+                && outerGrid.Children.FirstOrDefault() is Grid innerGrid
+                && innerGrid.Children.Count > 1)
             {
                 bool isSelected = i == selectedIndex;
 
@@ -131,8 +133,8 @@ public sealed partial class ModsPage : Page
                 // Update count (second child)
                 if (innerGrid.Children[1] is TextBlock countTb)
                 {
-                    if (countTb.Name == nameof(ProblemCountText))
-                        continue; // handled by UpdateProblemCountColor
+                    if (countTb.Name == nameof(ProblemCountText) && !isSelected)
+                        continue;
 
                     countTb.Foreground = isSelected ? selectedFg : unselectedFg;
                 }
@@ -188,6 +190,12 @@ public sealed partial class ModsPage : Page
 
     private void UpdateProblemCountColor()
     {
+        if (_selectedFilterIndex == FilterIndexMap["有问题"])
+        {
+            ProblemCountText.Foreground = SelectedFilterForeground;
+            return;
+        }
+
         ProblemCountText.Foreground = _vm.HasProblems
             ? (SolidColorBrush)Application.Current.Resources["DangerBrush"]
             : (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];

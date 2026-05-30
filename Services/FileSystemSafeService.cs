@@ -57,7 +57,7 @@ public sealed class FileSystemSafeService(LoggingService logging)
         }, cancellationToken);
     }
 
-    public Task MoveDirectoryAsync(string source, string destination, string permittedDestinationRoot)
+    public async Task MoveDirectoryAsync(string source, string destination, string permittedDestinationRoot)
     {
         EnsureInside(destination, permittedDestinationRoot);
         if (!Directory.Exists(source))
@@ -65,9 +65,36 @@ public sealed class FileSystemSafeService(LoggingService logging)
             throw new DirectoryNotFoundException("源目录不存在。");
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        Directory.Move(source, destination);
-        return Task.CompletedTask;
+        await Task.Run(() =>
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            if (Directory.Exists(destination))
+            {
+                throw new IOException("目标目录已存在。");
+            }
+
+            if (SameVolume(source, destination))
+            {
+                Directory.Move(source, destination);
+                return;
+            }
+
+            var staging = $"{destination}.moving_{Guid.NewGuid():N}";
+            try
+            {
+                CopyDirectory(source, staging);
+                VerifyDirectoryCopy(source, staging);
+                Directory.Move(staging, destination);
+                Directory.Delete(source, true);
+            }
+            finally
+            {
+                if (Directory.Exists(staging))
+                {
+                    Directory.Delete(staging, true);
+                }
+            }
+        });
     }
 
     public async Task RestoreDirectoryFromZipAsync(string zipPath, string targetDirectory, string permittedTargetRoot)
@@ -119,7 +146,7 @@ public sealed class FileSystemSafeService(LoggingService logging)
         Directory.CreateDirectory(AppPaths.FailedStates);
         if (Directory.Exists(sourceDirectory))
         {
-            Directory.Move(sourceDirectory, destination);
+            return MoveDirectoryAsync(sourceDirectory, destination, AppPaths.FailedStates);
         }
 
         return Task.CompletedTask;
@@ -162,5 +189,55 @@ public sealed class FileSystemSafeService(LoggingService logging)
             }
         });
         await logging.InfoAsync("已安全清理缓存目录");
+    }
+
+    private static bool SameVolume(string left, string right)
+    {
+        var leftRoot = Path.GetPathRoot(Path.GetFullPath(left));
+        var rightRoot = Path.GetPathRoot(Path.GetFullPath(right));
+        return string.Equals(leftRoot, rightRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(source, directory);
+            Directory.CreateDirectory(Path.Combine(destination, relative));
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(source, file);
+            var target = Path.Combine(destination, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, false);
+        }
+    }
+
+    private static void VerifyDirectoryCopy(string source, string destination)
+    {
+        var sourceFiles = Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
+            .Select(path => (Relative: Path.GetRelativePath(source, path), Length: new FileInfo(path).Length))
+            .OrderBy(file => file.Relative, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var destinationFiles = Directory.EnumerateFiles(destination, "*", SearchOption.AllDirectories)
+            .Select(path => (Relative: Path.GetRelativePath(destination, path), Length: new FileInfo(path).Length))
+            .OrderBy(file => file.Relative, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (sourceFiles.Count != destinationFiles.Count)
+        {
+            throw new IOException("跨盘移动校验失败：文件数量不一致。");
+        }
+
+        for (var index = 0; index < sourceFiles.Count; index++)
+        {
+            if (!string.Equals(sourceFiles[index].Relative, destinationFiles[index].Relative, StringComparison.OrdinalIgnoreCase)
+                || sourceFiles[index].Length != destinationFiles[index].Length)
+            {
+                throw new IOException("跨盘移动校验失败：文件内容不一致。");
+            }
+        }
     }
 }

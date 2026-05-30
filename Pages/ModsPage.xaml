@@ -30,6 +30,9 @@
                     <AppBarButton Label="检查更新" Command="{Binding CheckUpdatesCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon>
                     </AppBarButton>
+                    <AppBarButton Label="模组包" Command="{Binding ToggleModPackPanelCommand}">
+                        <AppBarButton.Icon><FontIcon Glyph="&#xE8B7;" /></AppBarButton.Icon>
+                    </AppBarButton>
                     <AppBarButton Label="备份目录" Command="{Binding OpenBackupsCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE8A7;" /></AppBarButton.Icon>
                     </AppBarButton>
@@ -200,6 +203,92 @@
                                     </Grid>
                                 </Grid>
                             </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="3" Grid.RowSpan="2" Style="{StaticResource CardStyle}" Visibility="{Binding ModPackPanelVisibility}">
+                    <Grid ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="330" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="模组包" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="切换时会物理换入 / 换出 Mods 目录。" Style="{StaticResource MutedTextStyle}" />
+                            </StackPanel>
+                            <ListView Grid.Row="1"
+                                      ItemsSource="{Binding ModPacks}"
+                                      SelectedItem="{Binding SelectedModPack, Mode=TwoWay}"
+                                      SelectionMode="Single">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Padding="8,6" Spacing="3">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedTextStyle}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                                <Button Content="新建空包" Command="{Binding CreateModPackCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                <Button Content="导入新包" Command="{Binding ImportModPackCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Column="1" RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="{Binding SelectedModPackTitle}" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="{Binding SelectedModPackStatus}" Style="{StaticResource MutedTextStyle}" />
+                                </StackPanel>
+                                <Button Content="关闭" Command="{Binding ToggleModPackPanelCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="切换到此包" Command="{Binding SwitchModPackCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                    <Button Content="复制当前 Mods" Command="{Binding CaptureCurrentModsCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="合并导入" Command="{Binding MergeModPackCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="下载缺失" Command="{Binding DownloadMissingModPackFilesCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="导出带文件" Command="{Binding ExportModPackWithFilesCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="导出轻量" Command="{Binding ExportModPackMetadataCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="删除" Command="{Binding DeleteModPackCommand}" Style="{StaticResource DangerButtonStyle}" />
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ListView Grid.Row="2"
+                                      ItemsSource="{Binding ModPackEntries}"
+                                      Visibility="{Binding SelectedModPackVisibility}">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="8,6" ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="220" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding UniqueId}" Style="{StaticResource MutedTextStyle}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding Version}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding NexusText}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding FileStatusText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
                         </Grid>
                     </Grid>
                 </Border>
