@@ -21,6 +21,8 @@ public static class AppPaths
     public static string Logs => Path.Combine(LocalRoot, "Logs");
     public static string LogFile => Path.Combine(Logs, "lsma.log");
     public static string Cache => Path.Combine(LocalRoot, "Cache");
+    public static string ModTranslationCacheFile => Path.Combine(Cache, "mod-translations.zh-CN.json");
+    public static string NexusModNameTranslationCacheFile => Path.Combine(Cache, "nexus-mod-name-translations.zh-CN.json");
     public static string AssetCache => Path.Combine(LocalRoot, "AssetCache", "StardewValley");
     public static string Temp => Path.Combine(LocalRoot, "Temp");
     public static string SaveSource => Path.Combine(

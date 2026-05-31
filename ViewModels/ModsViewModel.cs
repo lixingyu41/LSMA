@@ -13,6 +13,7 @@ public sealed class ModsViewModel : ViewModelBase
     private readonly GameRunLockService _runLock;
     private readonly ModScannerService _scanner;
     private readonly ModAnalyzerService _analyzer;
+    private readonly ModTranslationService _translations;
     private readonly ModBackupService _backups;
     private readonly ModTransactionService _transactions;
     private readonly ModPackageService _packages;
@@ -38,6 +39,7 @@ public sealed class ModsViewModel : ViewModelBase
         GameRunLockService runLock,
         ModScannerService scanner,
         ModAnalyzerService analyzer,
+        ModTranslationService translations,
         ModBackupService backups,
         ModTransactionService transactions,
         ModPackageService packages,
@@ -53,6 +55,7 @@ public sealed class ModsViewModel : ViewModelBase
         _runLock = runLock;
         _scanner = scanner;
         _analyzer = analyzer;
+        _translations = translations;
         _backups = backups;
         _transactions = transactions;
         _packages = packages;
@@ -75,6 +78,7 @@ public sealed class ModsViewModel : ViewModelBase
         ToggleModPackPanelCommand = new AsyncRelayCommand(ToggleModPackPanelAsync, CanUseModPacks);
         CreateModPackCommand = new AsyncRelayCommand(CreateModPackAsync, CanModifyModPacks);
         CaptureCurrentModsCommand = new AsyncRelayCommand(CaptureCurrentModsAsync, CanModifySelectedModPack);
+        RenameModPackCommand = new AsyncRelayCommand(RenameModPackAsync, CanModifySelectedModPack);
         SwitchModPackCommand = new AsyncRelayCommand(SwitchModPackAsync, CanSwitchModPack);
         ImportModPackCommand = new AsyncRelayCommand(ImportModPackAsync, CanModifyModPacks);
         MergeModPackCommand = new AsyncRelayCommand(MergeModPackAsync, CanModifySelectedModPack);
@@ -118,6 +122,7 @@ public sealed class ModsViewModel : ViewModelBase
     public IAsyncRelayCommand ToggleModPackPanelCommand { get; }
     public IAsyncRelayCommand CreateModPackCommand { get; }
     public IAsyncRelayCommand CaptureCurrentModsCommand { get; }
+    public IAsyncRelayCommand RenameModPackCommand { get; }
     public IAsyncRelayCommand SwitchModPackCommand { get; }
     public IAsyncRelayCommand ImportModPackCommand { get; }
     public IAsyncRelayCommand MergeModPackCommand { get; }
@@ -134,8 +139,23 @@ public sealed class ModsViewModel : ViewModelBase
         get => _selectedMod;
         set
         {
+            if (ReferenceEquals(_selectedMod, value))
+            {
+                return;
+            }
+
+            if (_selectedMod is not null)
+            {
+                _selectedMod.IsSelected = false;
+            }
+
             if (SetProperty(ref _selectedMod, value))
             {
+                if (value is not null)
+                {
+                    value.IsSelected = true;
+                }
+
                 NexusModIdInput = value?.NexusModId?.ToString() ?? string.Empty;
                 _isEditingNexusBinding = false;
                 OnPropertyChanged(nameof(DetailVisibility));
@@ -259,6 +279,16 @@ public sealed class ModsViewModel : ViewModelBase
 
     public Task ScanForLaunchAsync() => ScanAsync();
 
+    public async Task RefreshTranslationsAsync()
+    {
+        var selectedPath = SelectedMod?.FolderPath;
+        await _translations.ApplyAsync(_allMods);
+        ApplyFilter(_filter);
+        SelectedMod = Mods.FirstOrDefault(mod => string.Equals(mod.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
+            ?? Mods.FirstOrDefault();
+        OnPropertyChanged(nameof(SelectedMod));
+    }
+
     private async Task ToggleModPackPanelAsync()
     {
         if (_isModPackPanelOpen)
@@ -340,10 +370,35 @@ public sealed class ModsViewModel : ViewModelBase
 
     private async Task CreateModPackAsync()
     {
+        var name = await _dialogs.PromptTextAsync("新建空包", "输入模组包名称", "新模组包", "创建");
+        if (name is null)
+        {
+            return;
+        }
+
         await RunModPackOperationAsync(
-            () => _modPacks.CreateEmptyPackAsync(),
+            () => _modPacks.CreateEmptyPackAsync(name),
             "已创建空模组包。",
             selectNewestWhenNoPreferred: true);
+    }
+
+    private async Task RenameModPackAsync()
+    {
+        if (SelectedModPack is not { } pack)
+        {
+            return;
+        }
+
+        var name = await _dialogs.PromptTextAsync("重命名模组包", "输入新的模组包名称", pack.Name, "保存");
+        if (name is null)
+        {
+            return;
+        }
+
+        await RunModPackOperationAsync(
+            () => _modPacks.RenameAsync(pack.Id, name),
+            "已重命名模组包。",
+            pack.Id);
     }
 
     private async Task CaptureCurrentModsAsync()
@@ -619,6 +674,7 @@ public sealed class ModsViewModel : ViewModelBase
             var selectedPath = SelectedMod?.FolderPath;
             _runLock.Refresh();
             _allMods = _analyzer.Analyze(await _scanner.ScanAsync()).ToList();
+            await _translations.ApplyAsync(_allMods);
             _state.Mods = _allMods;
             await SyncFavoritesAsync();
             ApplyFilter(_filter);
@@ -975,6 +1031,7 @@ public sealed class ModsViewModel : ViewModelBase
         ToggleModPackPanelCommand.NotifyCanExecuteChanged();
         CreateModPackCommand.NotifyCanExecuteChanged();
         CaptureCurrentModsCommand.NotifyCanExecuteChanged();
+        RenameModPackCommand.NotifyCanExecuteChanged();
         SwitchModPackCommand.NotifyCanExecuteChanged();
         ImportModPackCommand.NotifyCanExecuteChanged();
         MergeModPackCommand.NotifyCanExecuteChanged();

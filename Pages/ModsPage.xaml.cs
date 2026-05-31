@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
+using LSMA.Models;
 using LSMA.ViewModels;
 
 namespace LSMA.Pages;
@@ -268,5 +269,21 @@ public sealed partial class ModsPage : Page
     {
         // Right-click to open folder
         _vm.OpenModFolderCommand.Execute(null);
+    }
+
+    private void ModListItem_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ModInfo mod })
+        {
+            mod.IsPointerOver = true;
+        }
+    }
+
+    private void ModListItem_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ModInfo mod })
+        {
+            mod.IsPointerOver = false;
+        }
     }
 }

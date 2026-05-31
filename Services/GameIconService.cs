@@ -198,17 +198,37 @@ public sealed class GameIconService(
             "冬季" => 414,
             _ => 24
         });
-        save.PortraitImageUri = await PrepareCustomFarmerPortraitAsync(save)
-            ?? _farmerPortraits.GetValueOrDefault(FarmerGenderKey(save.Gender))
-            ?? save.SeasonIconUri;
         save.BackgroundImageUri = _seasonBackgrounds.GetValueOrDefault(SeasonAssetKey(save.Season));
 
-        foreach (var skill in save.Skills)
+        if (save.Players.Count == 0)
+        {
+            await ApplySaveInfoIconsAsync(save, save);
+            return;
+        }
+
+        foreach (var player in save.Players)
+        {
+            await ApplySaveInfoIconsAsync(save, player);
+        }
+
+        var primary = save.Players[0];
+        save.PortraitImageUri = primary.PortraitImageUri;
+    }
+
+    private async Task ApplySaveInfoIconsAsync(SaveInfo save, SaveInfo player)
+    {
+        player.SeasonIconUri = save.SeasonIconUri;
+        player.BackgroundImageUri = save.BackgroundImageUri;
+        player.PortraitImageUri = await PrepareCustomFarmerPortraitAsync(save, player)
+            ?? _farmerPortraits.GetValueOrDefault(FarmerGenderKey(player.Gender))
+            ?? save.SeasonIconUri;
+
+        foreach (var skill in player.Skills)
         {
             skill.IconUri = GetSkillIconUri(skill.Key) ?? (skill.Key == "Mastery" ? save.SeasonIconUri : null);
         }
 
-        foreach (var fish in save.FishCatchStats)
+        foreach (var fish in player.FishCatchStats)
         {
             if (fish.ObjectId is { } objectId)
             {
@@ -220,22 +240,22 @@ public sealed class GameIconService(
             }
         }
 
-        foreach (var monster in save.MonsterKillStats)
+        foreach (var monster in player.MonsterKillStats)
         {
             monster.IconUri = await GetMonsterIconAsync(monster.IconKey ?? monster.Detail);
         }
 
-        foreach (var item in save.CollectionItems.Values.SelectMany(items => items))
+        foreach (var item in player.CollectionItems.Values.SelectMany(items => items))
         {
             await ApplyCollectionItemIconAsync(item);
         }
 
-        foreach (var item in save.ProgressDetailItems.Values.SelectMany(items => items))
+        foreach (var item in player.ProgressDetailItems.Values.SelectMany(items => items))
         {
             await ApplyCollectionItemIconAsync(item);
         }
 
-        foreach (var friendship in save.Friendships)
+        foreach (var friendship in player.Friendships)
         {
             friendship.IconUri = GetPortraitUri(friendship.NpcId);
             friendship.HeartSlots.Clear();
@@ -494,20 +514,20 @@ public sealed class GameIconService(
         }
     }
 
-    private async Task<string?> PrepareCustomFarmerPortraitAsync(SaveInfo save)
+    private async Task<string?> PrepareCustomFarmerPortraitAsync(SaveInfo save, SaveInfo player)
     {
         if (state.GameDirectory is not { } game)
         {
             return null;
         }
 
-        var gender = FarmerGenderKey(save.Gender);
+        var gender = FarmerGenderKey(player.Gender);
         var output = Path.Combine(
             AppPaths.AssetCache,
             "InterfaceIcons",
             "Saves",
             "Farmers",
-            $"v3-{SaveArtworkKey(save)}-{gender}-h{save.Hair}-{save.HairColorR:X2}{save.HairColorG:X2}{save.HairColorB:X2}-s{save.ShirtIndex}.png");
+            $"v4-{SaveArtworkKey(save)}-{PlayerArtworkKey(player)}-{gender}-h{player.Hair}-{player.HairColorR:X2}{player.HairColorG:X2}{player.HairColorB:X2}-s{player.ShirtIndex}.png");
         if (File.Exists(output))
         {
             return ToUri(output);
@@ -528,8 +548,8 @@ public sealed class GameIconService(
         {
             var portrait = await textures.LoadTextureRegionAsync(baseSource, game.Path, 0, 0, 16, 32);
             await OverlayPantsAsync(baseSource, game.Path, portrait);
-            await OverlayShirtAsync(game.Path, portrait, save.ShirtIndex);
-            await OverlayHairAsync(game.Path, portrait, save);
+            await OverlayShirtAsync(game.Path, portrait, player.ShirtIndex);
+            await OverlayHairAsync(game.Path, portrait, player);
             await OverlayArmsAsync(baseSource, game.Path, portrait);
             await textures.WritePngAsync(output, portrait);
             return ToUri(output);
@@ -675,6 +695,14 @@ public sealed class GameIconService(
         => save.UniqueGameId > 0
             ? save.UniqueGameId.ToString(CultureInfo.InvariantCulture)
             : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(save.FolderName))).Substring(0, 16);
+
+    private static string PlayerArtworkKey(SaveInfo player)
+    {
+        var key = player is SavePlayerInfo savePlayer && !string.IsNullOrWhiteSpace(savePlayer.PlayerKey)
+            ? savePlayer.PlayerKey
+            : player.FarmerName;
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key))).Substring(0, 16);
+    }
 
     private static string SeasonAssetKey(string season)
         => season switch

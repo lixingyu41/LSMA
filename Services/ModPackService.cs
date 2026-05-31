@@ -52,11 +52,25 @@ public sealed class ModPackService(
         return catalog;
     }
 
-    public async Task<ModPackCatalog> CreateEmptyPackAsync()
+    public async Task<ModPackCatalog> CreateEmptyPackAsync(string? name = null)
     {
         var catalog = await EnsureInitializedAsync();
-        var pack = CreatePack(NextPackName(catalog, "新模组包"));
+        var packName = string.IsNullOrWhiteSpace(name)
+            ? NextPackName(catalog, "新模组包")
+            : UniquePackName(catalog, NormalizePackName(name));
+        var pack = CreatePack(packName);
         catalog.Packs.Add(pack);
+        await SaveCatalogAsync(catalog);
+        ApplyActiveFlag(catalog);
+        return catalog;
+    }
+
+    public async Task<ModPackCatalog> RenameAsync(string packId, string name)
+    {
+        var catalog = await EnsureInitializedAsync();
+        var pack = RequirePack(catalog, packId);
+        pack.Name = UniquePackName(catalog, NormalizePackName(name), pack.Id);
+        pack.UpdatedAt = DateTime.Now;
         await SaveCatalogAsync(catalog);
         ApplyActiveFlag(catalog);
         return catalog;
@@ -761,20 +775,35 @@ public sealed class ModPackService(
         return $"{prefix} {index}";
     }
 
-    private static string UniquePackName(ModPackCatalog catalog, string name)
+    private static string UniquePackName(ModPackCatalog catalog, string name, string? excludedPackId = null)
     {
-        if (catalog.Packs.All(pack => !pack.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        if (catalog.Packs.All(pack =>
+                pack.Id == excludedPackId
+                || !pack.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
         {
             return name;
         }
 
         var index = 2;
-        while (catalog.Packs.Any(pack => pack.Name.Equals($"{name} {index}", StringComparison.OrdinalIgnoreCase)))
+        while (catalog.Packs.Any(pack =>
+                   pack.Id != excludedPackId
+                   && pack.Name.Equals($"{name} {index}", StringComparison.OrdinalIgnoreCase)))
         {
             index++;
         }
 
         return $"{name} {index}";
+    }
+
+    private static string NormalizePackName(string name)
+    {
+        var trimmed = name.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            throw new InvalidOperationException("模组包名称不能为空。");
+        }
+
+        return trimmed;
     }
 
     private static ModPackInfo RequirePack(ModPackCatalog catalog, string packId)

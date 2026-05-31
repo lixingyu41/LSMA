@@ -1,4 +1,7 @@
 using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 
 namespace LSMA.Models;
 
@@ -19,8 +22,14 @@ public sealed class NexusUserInfo
     public bool IsPremium { get; set; }
 }
 
-public sealed class NexusModInfo
+public sealed class NexusModInfo : ObservableObject
 {
+    private bool _isSelected;
+    private bool _isPointerOver;
+    private bool _isFavorite;
+    private bool _isInstalled;
+    private string? _translatedName;
+
     [JsonPropertyName("mod_id")]
     public long ModId { get; set; }
     [JsonPropertyName("name")]
@@ -40,8 +49,124 @@ public sealed class NexusModInfo
     [JsonPropertyName("mod_downloads")]
     public long Downloads { get; set; }
     public DateTime UpdatedAt => DateTimeOffset.FromUnixTimeSeconds(UpdatedTimestamp).LocalDateTime;
-    public bool IsFavorite { get; set; }
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set
+        {
+            if (SetProperty(ref _isFavorite, value))
+            {
+                NotifyResultStateChanged();
+            }
+        }
+    }
+
+    public bool IsInstalled
+    {
+        get => _isInstalled;
+        set
+        {
+            if (SetProperty(ref _isInstalled, value))
+            {
+                NotifyResultStateChanged();
+            }
+        }
+    }
+
+    public string ResultStateText
+    {
+        get
+        {
+            var states = new List<string>(2);
+            if (IsInstalled)
+            {
+                states.Add("已安装");
+            }
+
+            if (IsFavorite)
+            {
+                states.Add("已收藏");
+            }
+
+            return string.Join(" · ", states);
+        }
+    }
+
+    public Visibility ResultStateVisibility => string.IsNullOrWhiteSpace(ResultStateText)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
+    public string? TranslatedName
+    {
+        get => _translatedName;
+        set
+        {
+            if (SetProperty(ref _translatedName, value))
+            {
+                OnPropertyChanged(nameof(DisplayName));
+            }
+        }
+    }
+
+    public string DisplayName
+    {
+        get
+        {
+            var translated = TranslatedName?.Trim();
+            return string.IsNullOrWhiteSpace(translated)
+                || string.Equals(Name.Trim(), translated, StringComparison.CurrentCultureIgnoreCase)
+                    ? Name
+                    : $"{Name}/{translated}";
+        }
+    }
+
+    public string ModIdText => $"ID {ModId}";
     public string StatusText => $"版本 {Version} · {Downloads:N0} 次下载";
+    public string DownloadStatusText => $"{Downloads:N0} 次下载";
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (SetProperty(ref _isSelected, value))
+            {
+                NotifyListVisualStateChanged();
+            }
+        }
+    }
+
+    public bool IsPointerOver
+    {
+        get => _isPointerOver;
+        set
+        {
+            if (SetProperty(ref _isPointerOver, value))
+            {
+                NotifyListVisualStateChanged();
+            }
+        }
+    }
+
+    public double HoverLayerOpacity => IsPointerOver && !IsSelected ? 1 : 0;
+    public double SelectedLayerOpacity => IsSelected ? 1 : 0;
+    public double HoverIndicatorOpacity => IsPointerOver && !IsSelected ? 1 : 0;
+    public double SelectedIndicatorOpacity => IsSelected ? 1 : 0;
+    public Brush ListTextBrush => (Brush)Application.Current.Resources["PrimaryTextBrush"];
+
+    private void NotifyListVisualStateChanged()
+    {
+        OnPropertyChanged(nameof(HoverLayerOpacity));
+        OnPropertyChanged(nameof(SelectedLayerOpacity));
+        OnPropertyChanged(nameof(HoverIndicatorOpacity));
+        OnPropertyChanged(nameof(SelectedIndicatorOpacity));
+        OnPropertyChanged(nameof(ListTextBrush));
+    }
+
+    private void NotifyResultStateChanged()
+    {
+        OnPropertyChanged(nameof(ResultStateText));
+        OnPropertyChanged(nameof(ResultStateVisibility));
+    }
 }
 
 public sealed class NexusModSearchResult
@@ -79,6 +204,8 @@ public sealed class NexusCategory
     public int CategoryId { get; set; }
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+    public string? SearchName { get; set; }
+    public string FilterName => string.IsNullOrWhiteSpace(SearchName) ? Name : SearchName;
 }
 
 public sealed class NexusDownloadLink

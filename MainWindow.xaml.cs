@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.Foundation;
 using Windows.Graphics;
 using Windows.System;
 using Windows.UI;
@@ -16,12 +17,15 @@ namespace LSMA;
 
 public sealed partial class MainWindow : Window
 {
+    private const double LaunchOptionsPopupWidth = 230;
     private AppPalette _palette = AppPalette.Stardrop;
     private bool _layoutLoaded;
     private int _appearanceTransitionVersion;
     private Storyboard? _appearanceStoryboard;
     private TaskCompletionSource? _appearanceStoryboardCompletion;
     private bool _updatingNavigationSelection;
+    private CancellationTokenSource? _hideLaunchOptionsCts;
+    private InputNonClientPointerSource? _nonClientPointerSource;
 
     public MainWindow()
     {
@@ -41,6 +45,9 @@ public sealed partial class MainWindow : Window
         App.Current.Services.PageAcceleration.AttachFrame(ContentFrame);
         ContentFrame.Navigated += ContentFrame_Navigated;
         RegisterHistoryInput();
+        AppTitleBarDragRegion.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
+        BrandTitleArea.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
+        LaunchTitleArea.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
         RootLayout.Loaded += RootLayout_Loaded;
     }
 
@@ -147,8 +154,12 @@ public sealed partial class MainWindow : Window
     {
         RootLayout.Loaded -= RootLayout_Loaded;
         _layoutLoaded = true;
+        _nonClientPointerSource = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+        UpdateTitleBarPassthroughRegions();
+        var target = App.Current.Services.Settings.Current.DefaultLaunchTarget;
+        UpdateLaunchToggle(target == LaunchTarget.Smapi);
+        SteamCheckbox.IsChecked = App.Current.Services.Settings.Current.LaunchViaSteam;
 
-        // Restore window size
         var settings = App.Current.Services.Settings.Current;
         if (settings.WindowWidth > 0 && settings.WindowHeight > 0)
         {
@@ -181,8 +192,133 @@ public sealed partial class MainWindow : Window
 
         if (ContentFrame.CurrentSourcePageType is null)
         {
-            App.Current.Services.Navigation.Navigate(typeof(HomePage));
+            App.Current.Services.Navigation.Navigate(typeof(ModsPage));
         }
+    }
+
+    private void UpdateLaunchToggle(bool isSmapi)
+    {
+        SmapiBtn.Style = isSmapi
+            ? (Style)Application.Current.Resources["AccentButtonStyle"]
+            : (Style)Application.Current.Resources["DangerButtonStyle"];
+        VanillaBtn.Style = !isSmapi
+            ? (Style)Application.Current.Resources["AccentButtonStyle"]
+            : (Style)Application.Current.Resources["DangerButtonStyle"];
+    }
+
+    private void LaunchTitleArea_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        _hideLaunchOptionsCts?.Cancel();
+        PositionLaunchOptionsPopup();
+        LaunchOptionsPopup.IsOpen = true;
+        var target = App.Current.Services.Settings.Current.DefaultLaunchTarget;
+        UpdateLaunchToggle(target == LaunchTarget.Smapi);
+        SteamCheckbox.IsChecked = App.Current.Services.Settings.Current.LaunchViaSteam;
+        UpdateTitleBarPassthroughRegions();
+    }
+
+    private async void LaunchTitleArea_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        _hideLaunchOptionsCts?.Cancel();
+        _hideLaunchOptionsCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _hideLaunchOptionsCts.Token);
+            LaunchOptionsPopup.IsOpen = false;
+            UpdateTitleBarPassthroughRegions();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void LaunchOptionsPopup_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        _hideLaunchOptionsCts?.Cancel();
+    }
+
+    private async void LaunchOptionsPopup_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        _hideLaunchOptionsCts?.Cancel();
+        _hideLaunchOptionsCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _hideLaunchOptionsCts.Token);
+            LaunchOptionsPopup.IsOpen = false;
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private async void LaunchSmapi_Click(object sender, RoutedEventArgs e)
+    {
+        await App.Current.Services.SettingsPage.UseSmapiCommand.ExecuteAsync(null);
+        UpdateLaunchToggle(true);
+    }
+
+    private async void LaunchVanilla_Click(object sender, RoutedEventArgs e)
+    {
+        await App.Current.Services.SettingsPage.UseVanillaCommand.ExecuteAsync(null);
+        UpdateLaunchToggle(false);
+    }
+
+    private async void SteamCheckbox_Changed(object sender, RoutedEventArgs e)
+    {
+        await App.Current.Services.Settings.UpdateAsync(s => s.LaunchViaSteam = SteamCheckbox.IsChecked == true);
+    }
+
+    private async void LaunchGameBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (SteamCheckbox.IsChecked == true)
+        {
+            await Launcher.LaunchUriAsync(new Uri("steam://rungameid/413150"));
+        }
+        else
+        {
+            await App.Current.Services.Home.LaunchGameCommand.ExecuteAsync(null);
+        }
+    }
+
+    private void PositionLaunchOptionsPopup()
+    {
+        if (RootLayout.XamlRoot is null || LaunchGameBtn.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var bounds = LaunchGameBtn.TransformToVisual(RootLayout)
+            .TransformBounds(new Rect(0, 0, LaunchGameBtn.ActualWidth, LaunchGameBtn.ActualHeight));
+        var maxLeft = Math.Max(0, RootLayout.ActualWidth - LaunchOptionsPopupWidth);
+        LaunchOptionsPopup.HorizontalOffset = Math.Clamp(
+            bounds.X + (bounds.Width / 2) - (LaunchOptionsPopupWidth / 2),
+            0,
+            maxLeft);
+        LaunchOptionsPopup.VerticalOffset = Math.Max(50, bounds.Y + bounds.Height + 6);
+    }
+
+    private void UpdateTitleBarPassthroughRegions()
+    {
+        if (_nonClientPointerSource is null || RootLayout.XamlRoot is null)
+        {
+            return;
+        }
+
+        _nonClientPointerSource.SetRegionRects(
+            NonClientRegionKind.Passthrough,
+            [GetElementRect(BrandTitleArea), GetElementRect(LaunchTitleArea)]);
+    }
+
+    private static RectInt32 GetElementRect(FrameworkElement element)
+    {
+        var scale = element.XamlRoot.RasterizationScale;
+        var bounds = element.TransformToVisual(null)
+            .TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+        return new RectInt32(
+            (int)Math.Round(bounds.X * scale),
+            (int)Math.Round(bounds.Y * scale),
+            (int)Math.Round(bounds.Width * scale),
+            (int)Math.Round(bounds.Height * scale));
     }
 
     private void RegisterHistoryInput()
@@ -245,7 +381,7 @@ public sealed partial class MainWindow : Window
             "guide" => typeof(GuidePage),
             "saves" => typeof(SavesPage),
             "settings" => typeof(SettingsPage),
-            _ => typeof(HomePage)
+            _ => typeof(ModsPage)
         };
 
         var parameter = pageType == typeof(GuidePage) ? string.Empty : null;
@@ -264,7 +400,7 @@ public sealed partial class MainWindow : Window
                         ? "saves"
                         : pageType == typeof(SettingsPage)
                             ? "settings"
-                            : "home";
+                            : "mods";
 
         var target = ShellNavigation.MenuItems
             .OfType<NavigationViewItem>()

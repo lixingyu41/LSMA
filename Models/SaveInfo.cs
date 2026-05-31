@@ -2,7 +2,7 @@ using Microsoft.UI.Xaml;
 
 namespace LSMA.Models;
 
-public sealed class SaveInfo
+public class SaveInfo
 {
     public string FolderPath { get; init; } = string.Empty;
     public string FolderName { get; init; } = string.Empty;
@@ -64,6 +64,7 @@ public sealed class SaveInfo
     public string? SeasonIconUri { get; set; }
     public string? PortraitImageUri { get; set; }
     public string? BackgroundImageUri { get; set; }
+    public List<SavePlayerInfo> Players { get; } = [];
     public List<SaveSkillInfo> Skills { get; } = [];
     public List<SaveFriendshipInfo> Friendships { get; } = [];
     public List<SaveProgressInfo> CollectionStats { get; } = [];
@@ -74,6 +75,7 @@ public sealed class SaveInfo
     public Dictionary<string, List<SaveCollectionItemInfo>> ProgressDetailItems { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<int, List<bool>> CommunityBundleStates { get; } = [];
     public HashSet<string> MailFlags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool HasMultiplePlayers => Players.Count > 1;
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
     public string ListDisplay => $"{FarmName}-{FarmerName}-{Year}年{Season}{Day}日";
     public string MoneyDisplay => $"{Money:N0}g";
@@ -153,6 +155,14 @@ public sealed class SaveInfo
             Detail = detail,
             Glyph = glyph
         };
+}
+
+public sealed class SavePlayerInfo : SaveInfo
+{
+    public string PlayerKey { get; init; } = string.Empty;
+    public bool IsHost { get; init; }
+    public string RoleText => IsHost ? "房主" : "成员";
+    public string SelectorDisplay => $"{FarmerName} · {RoleText}";
 }
 
 public sealed class SaveProgressInfo

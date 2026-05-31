@@ -42,7 +42,7 @@
             <Border Grid.Row="1" Style="{StaticResource CardStyle}" Visibility="{Binding UnavailableVisibility}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="模组管理暂不可用" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="请先在首页或设置中连接游戏目录。" Style="{StaticResource BodyTextStyle}" />
+                    <TextBlock Text="请先在设置中连接游戏目录。" Style="{StaticResource BodyTextStyle}" />
                 </StackPanel>
             </Border>
 
@@ -259,6 +259,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button Content="切换到此包" Command="{Binding SwitchModPackCommand}" Style="{StaticResource AccentButtonStyle}" />
                                     <Button Content="复制当前 Mods" Command="{Binding CaptureCurrentModsCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                    <Button Content="重命名" Command="{Binding RenameModPackCommand}" Style="{StaticResource SubtleButtonStyle}" />
                                     <Button Content="合并导入" Command="{Binding MergeModPackCommand}" Style="{StaticResource SubtleButtonStyle}" />
                                     <Button Content="下载缺失" Command="{Binding DownloadMissingModPackFilesCommand}" Style="{StaticResource SubtleButtonStyle}" />
                                     <Button Content="导出带文件" Command="{Binding ExportModPackWithFilesCommand}" Style="{StaticResource SubtleButtonStyle}" />
@@ -300,19 +301,67 @@
                     </Grid.ColumnDefinitions>
                     <Border Style="{StaticResource CardStyle}" Padding="8">
                         <ListView ItemsSource="{Binding Mods}" SelectedItem="{Binding SelectedMod, Mode=TwoWay}" SelectionMode="Single">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                    <Setter Property="UseSystemFocusVisuals" Value="False" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListViewItem">
+                                                <ContentPresenter Content="{TemplateBinding Content}"
+                                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Padding="10,7" ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Author}" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Text="{Binding IssueSummary}" Style="{StaticResource MutedTextStyle}" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                                            <TextBlock Text="{Binding Version}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
-                                            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right" />
-                                        </StackPanel>
+                                    <Grid Margin="0,4,8,4"
+                                          PointerEntered="ModListItem_PointerEntered"
+                                          PointerExited="ModListItem_PointerExited">
+                                        <Border Background="{ThemeResource CardBackgroundBrush}"
+                                                BorderBrush="{ThemeResource CardBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8" />
+                                        <Border Background="{ThemeResource AccentSoftBrush}"
+                                                CornerRadius="8"
+                                                Opacity="{Binding HoverLayerOpacity}" />
+                                        <Border Background="{ThemeResource AccentSoftBrush}"
+                                                CornerRadius="8"
+                                                Opacity="{Binding SelectedLayerOpacity}" />
+                                        <Grid Padding="10,8" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid Margin="0,4,0,4">
+                                                <Border Background="{StaticResource AccentBrush}"
+                                                        CornerRadius="1.5"
+                                                        Opacity="{Binding HoverIndicatorOpacity}" />
+                                                <Border Background="{StaticResource AccentBrush}"
+                                                        CornerRadius="1.5"
+                                                        Opacity="{Binding SelectedIndicatorOpacity}" />
+                                            </Grid>
+                                            <Grid Grid.Column="1" ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="{Binding DisplayName}" Foreground="{Binding ListTextBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Author}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding IssueSummary}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" MinHeight="18" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding Version}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" />
+                                                    <TextBlock Text="{Binding StatusText}" Foreground="{Binding ListTextBrush}" HorizontalAlignment="Right" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Grid>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
@@ -329,8 +378,9 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding SelectedMod.Name}" Style="{StaticResource SectionTitleStyle}" />
-                                        <TextBlock Text="{Binding SelectedMod.Manifest.Description}" Style="{StaticResource BodyTextStyle}" />
+                                        <TextBlock Text="{Binding SelectedMod.DisplayName}" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{Binding SelectedMod.OriginalDescriptionText}" Style="{StaticResource BodyTextStyle}" Visibility="{Binding SelectedMod.OriginalDescriptionVisibility}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding SelectedMod.TranslatedDescriptionText}" Style="{StaticResource BodyTextStyle}" Visibility="{Binding SelectedMod.TranslatedDescriptionVisibility}" TextWrapping="Wrap" Margin="0,6,0,0" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
                                         <Button Content="启用" Command="{Binding EnableCommand}" Style="{StaticResource AccentButtonStyle}" Visibility="{Binding EnableVisibility}" />

@@ -124,25 +124,157 @@ public sealed class SaveParserService(
     {
         var document = XDocument.Load(source.FilePath, LoadOptions.None);
         var root = document.Root ?? throw new InvalidDataException("存档 XML 为空。");
-        var player = First(root, "player") ?? root;
+        var hostPlayer = First(root, "player") ?? root;
         var year = Integer(root, "year");
         var season = SeasonName(Value(root, "currentSeason"));
         var day = Integer(root, "dayOfMonth");
-        var deepest = Integer(player, "deepestMineLevel");
         var mailFlags = GetMailFlags(root);
         var bundleStates = ReadBundleStates(root);
+        var totalDays = StatisticsInteger(hostPlayer, root, "daysPlayed", CalculateElapsedDays(year, season, day));
+        var farmName = Value(hostPlayer, "farmName") ?? "未知农场";
+        var farmType = FarmTypeName(Integer(root, "whichFarm"));
+        var gameVersion = Value(root, "gameVersion") ?? Value(root, "version") ?? "-";
+        var weather = WeatherText(root);
+        var pet = DetectPet(hostPlayer, root);
+        var communityCenterProgress = CalculateBundleProgress(
+            mailFlags,
+            bundleStates,
+            catalog.GetBundleRequiredItemCounts());
+        var uniqueGameId = Long(root, "uniqueIDForThisGame");
+        var obelisksBuilt = CountBuildings(root, "Obelisk");
+        var hasGoldClock = HasBuilding(root, "Gold Clock");
+        var goldenWalnutsFound = Integer(root, "goldenWalnutsFound");
+        var perfectionWaivers = Integer(root, "perfectionWaivers");
+        var save = new SaveInfo
+        {
+            FolderPath = source.DirectoryPath,
+            FolderName = source.FolderName,
+            FarmName = farmName,
+            FarmType = farmType,
+            GameVersion = gameVersion,
+            Year = year,
+            Season = season,
+            Day = day,
+            TotalDays = totalDays,
+            Weather = weather,
+            Pet = pet,
+            CommunityCenterProgress = communityCenterProgress,
+            UniqueGameId = uniqueGameId,
+            ObelisksBuilt = obelisksBuilt,
+            HasGoldClock = hasGoldClock,
+            GoldenWalnutsFound = goldenWalnutsFound,
+            PerfectionWaivers = perfectionWaivers
+        };
+
+        foreach (var flag in mailFlags)
+        {
+            save.MailFlags.Add(flag);
+        }
+
+        foreach (var (id, states) in bundleStates)
+        {
+            save.CommunityBundleStates[id] = states;
+        }
+
+        foreach (var (player, isHost, index) in EnumeratePlayers(root, hostPlayer))
+        {
+            save.Players.Add(ParsePlayer(
+                source,
+                root,
+                player,
+                isHost,
+                index,
+                farmName,
+                farmType,
+                gameVersion,
+                year,
+                season,
+                day,
+                totalDays,
+                weather,
+                pet,
+                communityCenterProgress,
+                uniqueGameId,
+                obelisksBuilt,
+                hasGoldClock,
+                goldenWalnutsFound,
+                perfectionWaivers,
+                mailFlags,
+                bundleStates));
+        }
+
+        if (save.Players.Count == 0)
+        {
+            save.Players.Add(ParsePlayer(
+                source,
+                root,
+                hostPlayer,
+                true,
+                0,
+                farmName,
+                farmType,
+                gameVersion,
+                year,
+                season,
+                day,
+                totalDays,
+                weather,
+                pet,
+                communityCenterProgress,
+                uniqueGameId,
+                obelisksBuilt,
+                hasGoldClock,
+                goldenWalnutsFound,
+                perfectionWaivers,
+                mailFlags,
+                bundleStates));
+        }
+
+        CopyPrimaryPlayerToSave(save, save.Players[0]);
+        return save;
+    }
+
+    private SavePlayerInfo ParsePlayer(
+        SaveSource source,
+        XElement root,
+        XElement player,
+        bool isHost,
+        int index,
+        string farmName,
+        string farmType,
+        string gameVersion,
+        int year,
+        string season,
+        int day,
+        int totalDays,
+        string weather,
+        string pet,
+        double communityCenterProgress,
+        long uniqueGameId,
+        int obelisksBuilt,
+        bool hasGoldClock,
+        int goldenWalnutsFound,
+        int perfectionWaivers,
+        IReadOnlySet<string> sharedMailFlags,
+        IReadOnlyDictionary<int, List<bool>> bundleStates)
+    {
+        var deepest = Integer(player, "deepestMineLevel");
+        var playerMailFlags = GetMailFlags(player);
+        var effectiveMailFlags = playerMailFlags.Count > 0 ? playerMailFlags : sharedMailFlags;
         var skillLevelTotal = Integer(player, "farmingLevel")
             + Integer(player, "miningLevel")
             + Integer(player, "foragingLevel")
             + Integer(player, "fishingLevel")
             + Integer(player, "combatLevel");
-        var save = new SaveInfo
+        var save = new SavePlayerInfo
         {
             FolderPath = source.DirectoryPath,
             FolderName = source.FolderName,
+            PlayerKey = PlayerKey(player, isHost, index),
+            IsHost = isHost,
             FarmerName = Value(player, "name") ?? "未知角色",
-            FarmName = Value(player, "farmName") ?? "未知农场",
-            FarmType = FarmTypeName(Integer(root, "whichFarm")),
+            FarmName = farmName,
+            FarmType = farmType,
             Gender = Value(player, "Gender") ?? Value(player, "gender") ?? "Male",
             FacingDirection = Integer(player, "FacingDirection"),
             Hair = Integer(player, "hair"),
@@ -150,26 +282,23 @@ public sealed class SaveParserService(
             HairColorG = ColorComponent(player, "hairstyleColor", "G"),
             HairColorB = ColorComponent(player, "hairstyleColor", "B"),
             ShirtIndex = ClothingIndex(player, "shirtItem", "shirt"),
-            GameVersion = Value(root, "gameVersion") ?? Value(root, "version") ?? "-",
+            GameVersion = gameVersion,
             Year = year,
             Season = season,
             Day = day,
-            TotalDays = StatisticsInteger(player, root, "daysPlayed", CalculateElapsedDays(year, season, day)),
+            TotalDays = totalDays,
             Money = Integer(player, "money"),
             TotalMoneyEarned = Long(player, "totalMoneyEarned"),
             PlayTimeMilliseconds = Integer(player, "millisecondsPlayed"),
-            Weather = WeatherText(root),
+            Weather = weather,
             Spouse = Value(player, "spouse") is { Length: > 0 } spouse ? npcNames.Translate(spouse) : "无",
-            Pet = DetectPet(player, root),
+            Pet = pet,
             MineLevel = Math.Min(deepest, 120),
             SkullCavernLevel = Math.Max(0, deepest - 120),
             QiGems = CountInventoryItem(player, "(O)858"),
-            CommunityCenterProgress = CalculateBundleProgress(
-                mailFlags,
-                bundleStates,
-                catalog.GetBundleRequiredItemCounts()),
+            CommunityCenterProgress = communityCenterProgress,
             CollectionProgress = CalculateCollectionProgress(player),
-            UniqueGameId = Long(root, "uniqueIDForThisGame"),
+            UniqueGameId = uniqueGameId,
             StepsTaken = StatisticsLong(player, root, "stepsTaken"),
             FishCaught = StatisticsInteger(player, root, "fishCaught", 0),
             TimesFished = StatisticsInteger(player, root, "timesFished", 0),
@@ -183,21 +312,21 @@ public sealed class SaveParserService(
             CraftedRecipes = CountDictionaryPositiveValues(player, "craftingRecipes"),
             FishSpeciesCaught = CountDictionaryItems(player, "fishCaught"),
             TotalMonsterKills = StatisticsInteger(player, root, "monstersKilled", 0),
-            ObelisksBuilt = CountBuildings(root, "Obelisk"),
-            HasGoldClock = HasBuilding(root, "Gold Clock"),
-            GoldenWalnutsFound = Integer(root, "goldenWalnutsFound"),
-            PerfectionWaivers = Integer(root, "perfectionWaivers"),
+            ObelisksBuilt = obelisksBuilt,
+            HasGoldClock = hasGoldClock,
+            GoldenWalnutsFound = goldenWalnutsFound,
+            PerfectionWaivers = perfectionWaivers,
             GoodFriends = StatisticsInteger(player, root, "goodFriends", 0),
             SkillLevelTotal = skillLevelTotal,
             FarmerLevelScore = CalculateFarmerLevelScore(skillLevelTotal),
             MasteryLevel = CountMasteries(player, root),
             MasteryExp = StatisticsInteger(player, root, "MasteryExp", 0),
-            IsMonsterHero = MonsterEradicationFlags.All(mailFlags.Contains),
+            IsMonsterHero = MonsterEradicationFlags.All(effectiveMailFlags.Contains),
             HouseUpgradeLevel = Integer(player, "houseUpgradeLevel"),
             StardropsFound = EstimateStardrops(Integer(player, "maxStamina"))
         };
 
-        foreach (var flag in mailFlags)
+        foreach (var flag in effectiveMailFlags)
         {
             save.MailFlags.Add(flag);
         }
@@ -258,6 +387,101 @@ public sealed class SaveParserService(
         AddFishCatchStats(save, player);
         save.PerfectionProgress = CalculatePerfectionProgress(save);
         return save;
+    }
+
+    private static IEnumerable<(XElement Player, bool IsHost, int Index)> EnumeratePlayers(XElement root, XElement hostPlayer)
+    {
+        yield return (hostPlayer, true, 0);
+
+        var farmhands = First(root, "farmhands");
+        if (farmhands is null)
+        {
+            yield break;
+        }
+
+        var index = 1;
+        foreach (var farmhand in farmhands.Elements().Where(IsPlayerElement))
+        {
+            yield return (farmhand, false, index++);
+        }
+    }
+
+    private static bool IsPlayerElement(XElement element)
+        => element.Name.LocalName.Equals("Farmer", StringComparison.OrdinalIgnoreCase)
+            || (First(element, "name") is not null
+                && (First(element, "money") is not null || First(element, "stats") is not null));
+
+    private static string PlayerKey(XElement player, bool isHost, int index)
+    {
+        var id = Value(player, "UniqueMultiplayerID")
+            ?? Value(player, "uniqueMultiplayerID")
+            ?? Value(player, "userID")
+            ?? Value(player, "UserID");
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            return id.Trim();
+        }
+
+        var name = Value(player, "name")?.Trim();
+        return $"{(isHost ? "host" : "farmhand")}-{index}-{name}";
+    }
+
+    private static void CopyPrimaryPlayerToSave(SaveInfo save, SavePlayerInfo player)
+    {
+        save.FarmerName = player.FarmerName;
+        save.Gender = player.Gender;
+        save.FacingDirection = player.FacingDirection;
+        save.Hair = player.Hair;
+        save.HairColorR = player.HairColorR;
+        save.HairColorG = player.HairColorG;
+        save.HairColorB = player.HairColorB;
+        save.ShirtIndex = player.ShirtIndex;
+        save.Money = player.Money;
+        save.TotalMoneyEarned = player.TotalMoneyEarned;
+        save.PlayTimeMilliseconds = player.PlayTimeMilliseconds;
+        save.Spouse = player.Spouse;
+        save.MineLevel = player.MineLevel;
+        save.SkullCavernLevel = player.SkullCavernLevel;
+        save.QiGems = player.QiGems;
+        save.CollectionProgress = player.CollectionProgress;
+        save.StepsTaken = player.StepsTaken;
+        save.FishCaught = player.FishCaught;
+        save.TimesFished = player.TimesFished;
+        save.SeedsSown = player.SeedsSown;
+        save.TrashCansChecked = player.TrashCansChecked;
+        save.TrashRecycled = player.TrashRecycled;
+        save.ItemsShipped = player.ItemsShipped;
+        save.MineralsFound = player.MineralsFound;
+        save.ArtifactsFound = player.ArtifactsFound;
+        save.CookedRecipes = player.CookedRecipes;
+        save.CraftedRecipes = player.CraftedRecipes;
+        save.FishSpeciesCaught = player.FishSpeciesCaught;
+        save.TotalMonsterKills = player.TotalMonsterKills;
+        save.GoodFriends = player.GoodFriends;
+        save.SkillLevelTotal = player.SkillLevelTotal;
+        save.FarmerLevelScore = player.FarmerLevelScore;
+        save.MasteryLevel = player.MasteryLevel;
+        save.MasteryExp = player.MasteryExp;
+        save.PerfectionProgress = player.PerfectionProgress;
+        save.IsMonsterHero = player.IsMonsterHero;
+        save.HouseUpgradeLevel = player.HouseUpgradeLevel;
+        save.StardropsFound = player.StardropsFound;
+        save.Skills.AddRange(player.Skills);
+        save.Friendships.AddRange(player.Friendships);
+        save.CollectionStats.AddRange(player.CollectionStats);
+        save.PerfectionStats.AddRange(player.PerfectionStats);
+        save.MonsterKillStats.AddRange(player.MonsterKillStats);
+        save.FishCatchStats.AddRange(player.FishCatchStats);
+
+        foreach (var (key, items) in player.CollectionItems)
+        {
+            save.CollectionItems[key] = items;
+        }
+
+        foreach (var (key, items) in player.ProgressDetailItems)
+        {
+            save.ProgressDetailItems[key] = items;
+        }
     }
 
     private static void AddCollectionStats(SaveInfo save)
@@ -796,7 +1020,6 @@ public sealed class SaveParserService(
         }
 
         foreach (var stats in player.Descendants()
-            .Concat(root.Descendants())
             .Where(element => element.Name.LocalName.Equals("stats", StringComparison.OrdinalIgnoreCase)))
         {
             if (seen.Add(stats))

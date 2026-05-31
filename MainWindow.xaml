@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:LSMA"
     xmlns:pages="using:LSMA.Pages"
+    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
     Title="LSMA">
 
     <Window.SystemBackdrop>
@@ -19,29 +20,96 @@
         <Border
             Background="{ThemeResource TitleBarBackgroundBrush}"
             BorderBrush="{ThemeResource CardBorderBrush}"
-            BorderThickness="0,0,0,1">
+            BorderThickness="0,0,0,1"
+            Canvas.ZIndex="50">
             <Grid x:Name="AppTitleBarDragRegion">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="220" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="142" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" Margin="11,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
-                    <Border Width="26" Height="26" CornerRadius="8" Background="{StaticResource AccentBrush}">
-                        <TextBlock Text="L" Foreground="#252019" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                <StackPanel
+                    x:Name="BrandTitleArea"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="11,0,0,0"
+                    VerticalAlignment="Center"
+                    IsHitTestVisible="False">
+                    <Image
+                        Source="ms-appx:///Assets/Square44x44Logo.scale-200.png"
+                        Width="26"
+                        Height="26"
+                        Stretch="Uniform" />
+                    <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                        <TextBlock Text="L " Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="S" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="tardew " Foreground="{ThemeResource MutedTextBrush}" />
+                        <TextBlock Text="M" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="od " Foreground="{ThemeResource MutedTextBrush}" />
+                        <TextBlock Text="A" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="ssistant" Foreground="{ThemeResource MutedTextBrush}" />
+                    </StackPanel>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
-                    <TextBlock Text="L " Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                    <TextBlock Text="S" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                    <TextBlock Text="tardew " Foreground="{ThemeResource MutedTextBrush}" />
-                    <TextBlock Text="M" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                    <TextBlock Text="od " Foreground="{ThemeResource MutedTextBrush}" />
-                    <TextBlock Text="A" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                    <TextBlock Text="ssistant" Foreground="{ThemeResource MutedTextBrush}" />
+                <StackPanel
+                    x:Name="LaunchTitleArea"
+                    Grid.Column="1"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Center"
+                    Width="130"
+                    Margin="0,6,0,0"
+                    PointerEntered="LaunchTitleArea_PointerEntered"
+                    PointerExited="LaunchTitleArea_PointerExited">
+                    <Button
+                        x:Name="LaunchGameBtn"
+                        Content="启动游戏"
+                        Style="{StaticResource AccentButtonStyle}"
+                        FontSize="15"
+                        Padding="22,7"
+                        MinWidth="130"
+                        Click="LaunchGameBtn_Click" />
                 </StackPanel>
             </Grid>
         </Border>
+        <primitives:Popup
+            x:Name="LaunchOptionsPopup"
+            IsLightDismissEnabled="False"
+            ShouldConstrainToRootBounds="False">
+            <Border
+                x:Name="LaunchOptionsBubble"
+                Background="{ThemeResource CardBackgroundBrush}"
+                BorderBrush="{ThemeResource CardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="10"
+                Width="230"
+                PointerEntered="LaunchOptionsPopup_PointerEntered"
+                PointerExited="LaunchOptionsPopup_PointerExited">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button
+                            x:Name="SmapiBtn"
+                            Content="SMAPI"
+                            Click="LaunchSmapi_Click"
+                            Style="{StaticResource AccentButtonStyle}"
+                            FontSize="14"
+                            Padding="16,7" />
+                        <Button
+                            x:Name="VanillaBtn"
+                            Content="原版"
+                            Click="LaunchVanilla_Click"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            FontSize="14"
+                            Padding="16,7" />
+                    </StackPanel>
+                    <CheckBox
+                        x:Name="SteamCheckbox"
+                        Content="通过 Steam 启动"
+                        HorizontalAlignment="Center"
+                        Checked="SteamCheckbox_Changed"
+                        Unchecked="SteamCheckbox_Changed" />
+                </StackPanel>
+            </Border>
+        </primitives:Popup>
         <NavigationView
             Grid.Row="1"
             x:Name="ShellNavigation"
@@ -62,10 +130,7 @@
                 <Thickness x:Key="NavigationViewPaneContentGridMargin">0,4,0,0</Thickness>
             </NavigationView.Resources>
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="首页" Tag="home" IsSelected="True">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="模组" Tag="mods">
+                <NavigationViewItem Content="模组" Tag="mods" IsSelected="True">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE74C;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="下载" Tag="downloads">

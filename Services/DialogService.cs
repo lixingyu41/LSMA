@@ -55,6 +55,54 @@ public sealed class DialogService
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
+    public async Task<string?> PromptTextAsync(
+        string title,
+        string message,
+        string initialValue = "",
+        string confirmText = "确定")
+    {
+        if (_xamlRoot is null)
+        {
+            return null;
+        }
+
+        var input = new TextBox
+        {
+            Text = initialValue,
+            PlaceholderText = message,
+            MinWidth = 320
+        };
+        var content = new StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = message,
+                    TextWrapping = TextWrapping.Wrap
+                },
+                input
+            }
+        };
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            PrimaryButtonText = confirmText,
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = _xamlRoot
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+
+        return input.Text.Trim();
+    }
+
     public async Task<NexusDownloadToken?> ShowNexusDownloadBrowserAsync(
         string startUrl,
         long expectedModId,

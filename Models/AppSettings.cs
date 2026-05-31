@@ -30,7 +30,7 @@ public enum LaunchMode
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 7;
+    public int SchemaVersion { get; set; } = 8;
 
     public string? GameDirectory { get; set; }
 
@@ -57,6 +57,8 @@ public sealed class AppSettings
     public bool NexusDownloadDebugStepMode { get; set; }
 
     public bool NexusDownloadDebugShowWebViewMode { get; set; }
+
+    public bool ModMetadataTranslationEnabled { get; set; } = true;
 
     public Dictionary<string, long> NexusBindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

@@ -19,14 +19,6 @@ public sealed partial class DownloadsPage : Page
         Loaded += async (_, _) => await App.Current.Services.Downloads.StartAsync();
     }
 
-    private void NexusButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button button && button.Tag is NexusModInfo mod)
-        {
-            ((DownloadsViewModel)DataContext).OpenNexusCommand.Execute(mod);
-        }
-    }
-
     private void OnlineSearchBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key != VirtualKey.Enter || DataContext is not DownloadsViewModel viewModel)
@@ -65,6 +57,22 @@ public sealed partial class DownloadsPage : Page
         if (viewModel.LoadMoreCommand.CanExecute(null))
         {
             _ = viewModel.LoadMoreCommand.ExecuteAsync(null);
+        }
+    }
+
+    private void OnlineModListItem_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: NexusModInfo mod })
+        {
+            mod.IsPointerOver = true;
+        }
+    }
+
+    private void OnlineModListItem_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: NexusModInfo mod })
+        {
+            mod.IsPointerOver = false;
         }
     }
 

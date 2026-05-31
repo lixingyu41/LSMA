@@ -338,20 +338,30 @@
                             <Grid>
                                 <Image Source="{Binding SelectedSave.BackgroundImageUri}" Stretch="UniformToFill" Opacity="0.78" Visibility="{Binding SaveBackgroundVisibility}" />
                                 <Border Background="{ThemeResource CardBackgroundBrush}" Opacity="0.18" />
-                                <Image Source="{Binding SelectedSave.PortraitImageUri}" Stretch="Uniform" Margin="12,8,12,6" VerticalAlignment="Bottom" />
+                                <Image Source="{Binding SelectedPlayer.PortraitImageUri}" Stretch="Uniform" Margin="12,8,12,6" VerticalAlignment="Bottom" />
                             </Grid>
                         </Border>
 
                         <StackPanel Grid.Column="1" Spacing="7" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SelectedSave.FarmerName}" FontSize="26" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedPlayer.FarmerName}" FontSize="26" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding SelectedSave.FarmName}" FontSize="16" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding SelectedSave.DateDisplay}" Style="{StaticResource BodyTextStyle}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding SelectedSave.FarmType}" Style="{StaticResource MutedTextStyle}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
 
-                        <TextBlock Grid.Column="2" Text="{Binding SelectedSave.UniqueGameIdDisplay}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" MaxWidth="170" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="2" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <TextBlock Text="{Binding SelectedSave.UniqueGameIdDisplay}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" MaxWidth="170" TextTrimming="CharacterEllipsis" />
+                            <ComboBox
+                                ItemsSource="{Binding SelectedSave.Players}"
+                                SelectedItem="{Binding SelectedPlayer, Mode=TwoWay}"
+                                DisplayMemberPath="SelectorDisplay"
+                                MinWidth="160"
+                                Height="32"
+                                HorizontalAlignment="Right"
+                                Visibility="{Binding PlayerSelectorVisibility}" />
+                        </StackPanel>
 
-                        <ItemsRepeater Grid.Row="1" Grid.ColumnSpan="3" ItemsSource="{Binding SelectedSave.SummaryStats}" ItemTemplate="{StaticResource HeroMetricTemplate}" HorizontalAlignment="Stretch">
+                        <ItemsRepeater Grid.Row="1" Grid.ColumnSpan="3" ItemsSource="{Binding SelectedPlayer.SummaryStats}" ItemTemplate="{StaticResource HeroMetricTemplate}" HorizontalAlignment="Stretch">
                             <ItemsRepeater.Layout>
                                 <UniformGridLayout MinItemWidth="130" MinColumnSpacing="18" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                             </ItemsRepeater.Layout>
@@ -359,7 +369,7 @@
                     </Grid>
                 </Border>
 
-                <ItemsRepeater ItemsSource="{Binding SelectedSave.ProgressStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
+                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.ProgressStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
                     <ItemsRepeater.Layout>
                         <UniformGridLayout MinItemWidth="136" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                     </ItemsRepeater.Layout>
@@ -381,12 +391,12 @@
                         <Border x:Name="FarmSummaryPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="经营与农场" Style="{StaticResource SectionTitleStyle}" />
-                                <ItemsRepeater ItemsSource="{Binding SelectedSave.EconomyStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
+                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.EconomyStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
                                     <ItemsRepeater.Layout>
                                         <UniformGridLayout MinItemWidth="136" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                                     </ItemsRepeater.Layout>
                                 </ItemsRepeater>
-                                <ItemsControl ItemsSource="{Binding SelectedSave.FarmLifeStats}">
+                                <ItemsControl ItemsSource="{Binding SelectedPlayer.FarmLifeStats}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Margin="0,4" ColumnSpacing="10">
@@ -406,7 +416,7 @@
                         <Border x:Name="SkillsPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="10">
                                 <TextBlock Text="技能" Style="{StaticResource SectionTitleStyle}" />
-                                <ItemsControl ItemsSource="{Binding SelectedSave.Skills}">
+                                <ItemsControl ItemsSource="{Binding SelectedPlayer.Skills}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Margin="0,5" ColumnSpacing="10">
@@ -436,9 +446,9 @@
                             <StackPanel Spacing="10">
                                 <Grid>
                                     <TextBlock Text="完美度统计" Style="{StaticResource SectionTitleStyle}" />
-                                    <TextBlock Text="{Binding SelectedSave.PerfectionProgressDisplay}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="{Binding SelectedPlayer.PerfectionProgressDisplay}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                                 </Grid>
-                                <ItemsRepeater ItemsSource="{Binding SelectedSave.PerfectionStats}" ItemTemplate="{StaticResource CompactProgressTileTemplate}" HorizontalAlignment="Stretch">
+                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.PerfectionStats}" ItemTemplate="{StaticResource CompactProgressTileTemplate}" HorizontalAlignment="Stretch">
                                     <ItemsRepeater.Layout>
                                         <UniformGridLayout MinItemWidth="132" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                                     </ItemsRepeater.Layout>
@@ -449,7 +459,7 @@
                         <Border x:Name="CollectionPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="10">
                                 <TextBlock Text="收集品进度" Style="{StaticResource SectionTitleStyle}" />
-                                <ItemsRepeater ItemsSource="{Binding SelectedSave.CollectionStats}" ItemTemplate="{StaticResource CompactProgressTileTemplate}" HorizontalAlignment="Stretch">
+                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.CollectionStats}" ItemTemplate="{StaticResource CompactProgressTileTemplate}" HorizontalAlignment="Stretch">
                                     <ItemsRepeater.Layout>
                                         <UniformGridLayout MinItemWidth="132" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                                     </ItemsRepeater.Layout>
@@ -462,7 +472,7 @@
                         <Border x:Name="ActivityPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="详细统计" Style="{StaticResource SectionTitleStyle}" />
-                                <ItemsRepeater ItemsSource="{Binding SelectedSave.ActivityStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
+                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.ActivityStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
                                     <ItemsRepeater.Layout>
                                         <UniformGridLayout MinItemWidth="136" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                                     </ItemsRepeater.Layout>
@@ -488,7 +498,7 @@
                                         <FontIcon x:Name="FishExpandIcon" Grid.Column="1" Glyph="&#xE70D;" FontSize="12" Foreground="{StaticResource AccentBrush}" />
                                     </Grid>
                                 </Button>
-                                    <ItemsRepeater ItemsSource="{Binding SelectedSave.FishCatchStats}" ItemTemplate="{StaticResource CatchTileTemplate}" HorizontalAlignment="Stretch">
+                                    <ItemsRepeater ItemsSource="{Binding SelectedPlayer.FishCatchStats}" ItemTemplate="{StaticResource CatchTileTemplate}" HorizontalAlignment="Stretch">
                                         <ItemsRepeater.Layout>
                                             <UniformGridLayout MinItemWidth="118" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
                                         </ItemsRepeater.Layout>
@@ -513,7 +523,7 @@
                                             <FontIcon x:Name="MonsterExpandIcon" Grid.Column="1" Glyph="&#xE70D;" FontSize="12" Foreground="{StaticResource AccentBrush}" />
                                         </Grid>
                                     </Button>
-                                    <ItemsRepeater ItemsSource="{Binding SelectedSave.MonsterKillStats}" ItemTemplate="{StaticResource CatchTileTemplate}" HorizontalAlignment="Stretch">
+                                    <ItemsRepeater ItemsSource="{Binding SelectedPlayer.MonsterKillStats}" ItemTemplate="{StaticResource CatchTileTemplate}" HorizontalAlignment="Stretch">
                                         <ItemsRepeater.Layout>
                                             <UniformGridLayout MinItemWidth="118" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
                                         </ItemsRepeater.Layout>
@@ -541,7 +551,7 @@
                                         <FontIcon x:Name="FriendshipExpandIcon" Grid.Column="1" Glyph="&#xE70D;" FontSize="12" Foreground="{StaticResource AccentBrush}" />
                                     </Grid>
                                 </Button>
-                                <ItemsControl ItemsSource="{Binding SelectedSave.Friendships}">
+                                <ItemsControl ItemsSource="{Binding SelectedPlayer.Friendships}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Margin="0,5" ColumnSpacing="10" MinHeight="34">

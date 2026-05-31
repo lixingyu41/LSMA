@@ -23,8 +23,8 @@ public sealed class SettingsService(LoggingService logging)
         try
         {
             Current = await JsonHelper.ReadAsync<AppSettings>(AppPaths.SettingsFile) ?? new AppSettings();
-            var needsSave = Current.SchemaVersion < 7;
-            Current.SchemaVersion = 7;
+            var needsSave = Current.SchemaVersion < 8;
+            Current.SchemaVersion = 8;
             if (Current.NexusBindings is null)
             {
                 Current.NexusBindings = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);

@@ -18,7 +18,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBox Text="{Binding OnlineQuery, Mode=TwoWay}" PlaceholderText="搜索模组或 Nexus ID" Width="260" Height="36" KeyDown="OnlineSearchBox_KeyDown" />
+                <TextBox Text="{Binding OnlineQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索模组或 Nexus ID" Width="260" Height="36" KeyDown="OnlineSearchBox_KeyDown" />
                 <ComboBox ItemsSource="{Binding OnlineCategories}" SelectedItem="{Binding SelectedOnlineCategory, Mode=TwoWay}" DisplayMemberPath="Name" MinWidth="160" Height="36" PlaceholderText="分类" />
                 <Button Content="刷新" Command="{Binding RefreshCommand}" Style="{StaticResource SubtleButtonStyle}" MinHeight="36" />
             </StackPanel>
@@ -31,32 +31,78 @@
             </Grid.ColumnDefinitions>
 
             <!-- Mod list -->
-            <Border Background="Transparent" BorderThickness="0" Padding="4,0,0,0">
+            <Border Style="{StaticResource CardStyle}" Padding="8">
                 <ListView x:Name="OnlineModsList"
                           ItemsSource="{Binding OnlineMods}"
                           SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}"
                           Loaded="OnlineModsList_Loaded"
+                          SelectionMode="Single"
                           ScrollViewer.VerticalScrollBarVisibility="Auto"
                           ScrollViewer.VerticalScrollMode="Enabled">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0" />
+                            <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="UseSystemFocusVisuals" Value="False" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ContentPresenter Content="{TemplateBinding Content}"
+                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{ThemeResource CardBackgroundBrush}" BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,3,8,3">
-                                <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Author}" Style="{StaticResource MutedTextStyle}" />
-                                    <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrush}" />
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Nexus" VerticalAlignment="Center"
-                                        Tag="{Binding}"
-                                        Click="NexusButton_Click"
-                                        Style="{StaticResource SubtleButtonStyle}" />
+                            <Grid Margin="0,4,8,4"
+                                  PointerEntered="OnlineModListItem_PointerEntered"
+                                  PointerExited="OnlineModListItem_PointerExited">
+                                <Border Background="{ThemeResource CardBackgroundBrush}"
+                                        BorderBrush="{ThemeResource CardBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8" />
+                                <Border Background="{ThemeResource AccentSoftBrush}"
+                                        CornerRadius="8"
+                                        Opacity="{Binding HoverLayerOpacity}" />
+                                <Border Background="{ThemeResource AccentSoftBrush}"
+                                        CornerRadius="8"
+                                        Opacity="{Binding SelectedLayerOpacity}" />
+                                <Grid Padding="10,8" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Margin="0,4,0,4">
+                                        <Border Background="{StaticResource AccentBrush}"
+                                                CornerRadius="1.5"
+                                                Opacity="{Binding HoverIndicatorOpacity}" />
+                                        <Border Background="{StaticResource AccentBrush}"
+                                                CornerRadius="1.5"
+                                                Opacity="{Binding SelectedIndicatorOpacity}" />
+                                    </Grid>
+                                    <Grid Grid.Column="1" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="{Binding ListTextBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Author}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding ResultStateText}" Foreground="{StaticResource AccentBrush}" FontSize="14" Visibility="{Binding ResultStateVisibility}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Summary}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" MinHeight="18" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                            <TextBlock Text="{Binding ModIdText}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" />
+                                            <TextBlock Text="{Binding Version}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" />
+                                            <TextBlock Text="{Binding DownloadStatusText}" Foreground="{Binding ListTextBrush}" HorizontalAlignment="Right" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
                             </Grid>
-                            </Border>
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
@@ -66,13 +112,15 @@
             <Border Grid.Column="1" Style="{StaticResource CardStyle}">
                 <ScrollViewer>
                     <StackPanel Spacing="12">
-                        <TextBlock Text="{Binding SelectedOnlineMod.Name}" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="{Binding SelectedOnlineMod.DisplayName}" Style="{StaticResource SectionTitleStyle}" />
                         <TextBlock Text="{Binding SelectedOnlineMod.Summary}" Style="{StaticResource BodyTextStyle}" />
 
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <ToggleButton Content="{Binding FavoriteButtonText}" Command="{Binding ToggleFavoriteCommand}"
                                           IsChecked="{Binding SelectedOnlineMod.IsFavorite, Mode=OneWay}"
                                           Style="{StaticResource ChoiceToggleStyle}" />
+                            <Button Content="打开 Nexus" Command="{Binding OpenNexusCommand}" CommandParameter="{Binding SelectedOnlineMod}"
+                                    Style="{StaticResource SubtleButtonStyle}" />
                         </StackPanel>
 
                         <Grid>

@@ -17,7 +17,9 @@ public sealed class SavesViewModel : ViewModelBase
     private readonly DialogService _dialogs;
     private readonly AutomaticScanMonitor _automaticScanMonitor;
     private SaveInfo? _selectedSave;
+    private SavePlayerInfo? _selectedPlayer;
     private SaveBackupEntry? _selectedBackup;
+    private string? _pendingSelectedPlayerKey;
     private bool _automaticScanningStarted;
 
     public SavesViewModel(
@@ -68,13 +70,27 @@ public sealed class SavesViewModel : ViewModelBase
             if (SetProperty(ref _selectedSave, value))
             {
                 _state.CurrentSave = value;
+                SelectedPlayer = SelectPlayer(value, _pendingSelectedPlayerKey);
                 OnPropertyChanged(nameof(DetailVisibility));
                 OnPropertyChanged(nameof(BackupStatus));
                 OnPropertyChanged(nameof(SaveBackgroundVisibility));
+                OnPropertyChanged(nameof(PlayerSelectorVisibility));
                 LoadBackupEntries();
                 Refresh();
                 _ = App.Current.Services.Guide.RefreshAsync();
                 App.Current.Services.Home.Refresh();
+            }
+        }
+    }
+
+    public SavePlayerInfo? SelectedPlayer
+    {
+        get => _selectedPlayer;
+        set
+        {
+            if (SetProperty(ref _selectedPlayer, value))
+            {
+                OnPropertyChanged(nameof(PlayerSelectorVisibility));
             }
         }
     }
@@ -94,6 +110,7 @@ public sealed class SavesViewModel : ViewModelBase
     public Visibility UnavailableVisibility => _state.IsGameConfigured ? Visibility.Collapsed : Visibility.Visible;
     public Visibility AvailableVisibility => _state.IsGameConfigured ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DetailVisibility => SelectedSave is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility PlayerSelectorVisibility => SelectedSave?.HasMultiplePlayers == true ? Visibility.Visible : Visibility.Collapsed;
     public Visibility RunningVisibility => _state.IsGameRunning ? Visibility.Visible : Visibility.Collapsed;
     public Visibility SaveBackgroundVisibility => string.IsNullOrWhiteSpace(SelectedSave?.BackgroundImageUri)
         ? Visibility.Collapsed
@@ -125,6 +142,7 @@ public sealed class SavesViewModel : ViewModelBase
         OnPropertyChanged(nameof(AvailableVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
         OnPropertyChanged(nameof(SavesCountDisplay));
+        OnPropertyChanged(nameof(PlayerSelectorVisibility));
         BackupCommand.NotifyCanExecuteChanged();
         BackupAllCommand.NotifyCanExecuteChanged();
         RestoreCommand.NotifyCanExecuteChanged();
@@ -170,6 +188,7 @@ public sealed class SavesViewModel : ViewModelBase
         try
         {
             var selectedPath = SelectedSave?.FolderPath;
+            var selectedPlayerKey = SelectedPlayer?.PlayerKey;
             var results = new List<SaveInfo>();
             foreach (var source in await _locator.LocateAsync())
             {
@@ -188,8 +207,13 @@ public sealed class SavesViewModel : ViewModelBase
                 Saves.Add(save);
             }
 
-            SelectedSave = Saves.FirstOrDefault(save => string.Equals(save.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
+            var nextSave = Saves.FirstOrDefault(save => string.Equals(save.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
                 ?? Saves.FirstOrDefault();
+            _pendingSelectedPlayerKey = string.Equals(nextSave?.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase)
+                ? selectedPlayerKey
+                : null;
+            SelectedSave = nextSave;
+            _pendingSelectedPlayerKey = null;
         }
         catch (Exception exception)
         {
@@ -249,6 +273,25 @@ public sealed class SavesViewModel : ViewModelBase
         var fullDirectory = Path.GetFullPath(directory);
         return fullPath.Equals(fullDirectory, StringComparison.OrdinalIgnoreCase)
             || fullPath.StartsWith(fullDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static SavePlayerInfo? SelectPlayer(SaveInfo? save, string? playerKey)
+    {
+        if (save is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(playerKey))
+        {
+            var matched = save.Players.FirstOrDefault(player => string.Equals(player.PlayerKey, playerKey, StringComparison.OrdinalIgnoreCase));
+            if (matched is not null)
+            {
+                return matched;
+            }
+        }
+
+        return save.Players.FirstOrDefault();
     }
 
     private async Task BackupSelectedAsync()

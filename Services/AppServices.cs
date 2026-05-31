@@ -22,6 +22,9 @@ public sealed class AppServices
         RunLock = new GameRunLockService(State, Logging);
         SmapiLogs = new SmapiLogService(Logging);
         Launcher = new GameLaunchService(State, RunLock, Logging);
+        MyMemoryTranslations = new MyMemoryTranslationClient();
+        ModTranslations = new ModTranslationService(Settings, MyMemoryTranslations, Logging);
+        NexusModNameTranslations = new NexusModNameTranslationService(Settings, MyMemoryTranslations, Logging, UiDispatcher);
         ModScanner = new ModScannerService(State, Logging);
         ModAnalyzer = new ModAnalyzerService(Settings);
         ModBackups = new ModBackupService(Settings, Files, Logging);
@@ -46,11 +49,11 @@ public sealed class AppServices
         LastKnownGood = new LastKnownGoodService(State, RunLock, ModScanner, SaveBackups, Files, Logging);
 
         Home = new HomeViewModel(State, Settings, GameLocator, GameIcons, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
-        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModBackups, ModTransactions, ModPackages, ModPacks, NexusCredentials, Nexus, NexusFavorites, Platform, Dialogs, UiDispatcher);
+        Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModTranslations, ModBackups, ModTransactions, ModPackages, ModPacks, NexusCredentials, Nexus, NexusFavorites, Platform, Dialogs, UiDispatcher);
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
         Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
-        Downloads = new DownloadsViewModel(NexusCredentials, Nexus, NexusFavorites, NexusDownloads, ModPackages, Settings, Platform, Dialogs);
+        Downloads = new DownloadsViewModel(State, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, ModPackages, Settings, Platform, Dialogs, NexusModNameTranslations);
     }
 
     public LoggingService Logging { get; }
@@ -67,6 +70,9 @@ public sealed class AppServices
     public GameRunLockService RunLock { get; }
     public SmapiLogService SmapiLogs { get; }
     public GameLaunchService Launcher { get; }
+    public MyMemoryTranslationClient MyMemoryTranslations { get; }
+    public ModTranslationService ModTranslations { get; }
+    public NexusModNameTranslationService NexusModNameTranslations { get; }
     public ModScannerService ModScanner { get; }
     public ModAnalyzerService ModAnalyzer { get; }
     public ModBackupService ModBackups { get; }

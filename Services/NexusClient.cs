@@ -135,11 +135,37 @@ public sealed class NexusClient(LoggingService logging)
 
         var envelope = await PostGraphQlAsync<ModsGraphQlData>(payload);
         var page = envelope.Data?.Mods ?? throw new NexusApiException("Nexus 返回了无法读取的数据。");
+        var mods = page.Nodes.Select(ToNexusModInfo).Where(mod => mod.ModId > 0).ToList();
+        PrioritizeExactNameMatches(mods, query);
         return new NexusModSearchResult
         {
-            Mods = page.Nodes.Select(ToNexusModInfo).Where(mod => mod.ModId > 0).ToList(),
+            Mods = mods,
             TotalCount = page.TotalCount
         };
+    }
+
+    private static void PrioritizeExactNameMatches(List<NexusModInfo> mods, string? query)
+    {
+        if (mods.Count <= 1 || string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        var normalizedQuery = NormalizeSearchName(query);
+        var sorted = mods
+            .Select((mod, index) => new
+            {
+                Mod = mod,
+                Index = index,
+                Exact = string.Equals(NormalizeSearchName(mod.Name), normalizedQuery, StringComparison.OrdinalIgnoreCase)
+            })
+            .OrderByDescending(item => item.Exact)
+            .ThenBy(item => item.Index)
+            .Select(item => item.Mod)
+            .ToList();
+
+        mods.Clear();
+        mods.AddRange(sorted);
     }
 
     public async Task<IReadOnlyList<NexusFileInfo>> GetFilesAsync(long modId, string apiKey)
@@ -338,6 +364,9 @@ public sealed class NexusClient(LoggingService logging)
             ? timestamp.ToUnixTimeSeconds()
             : 0;
     }
+
+    private static string NormalizeSearchName(string value)
+        => string.Join(' ', value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static string GetVersion()
         => typeof(NexusClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";

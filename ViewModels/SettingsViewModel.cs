@@ -28,6 +28,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private bool _gpuPageAccelerationEnabled = true;
     private bool _nexusDownloadDebugStepMode;
     private bool _nexusDownloadDebugShowWebViewMode;
+    private bool _modMetadataTranslationEnabled = true;
     private double _modBackupRetention = 20;
     private double _saveBackupRetention = 20;
     private string? _nexusConnectionStatus;
@@ -210,6 +211,18 @@ public sealed class SettingsViewModel : ViewModelBase
         }
     }
 
+    public bool ModMetadataTranslationEnabled
+    {
+        get => _modMetadataTranslationEnabled;
+        set
+        {
+            if (SetProperty(ref _modMetadataTranslationEnabled, value) && !_isRefreshing)
+            {
+                _ = UpdateModMetadataTranslationSettingAsync(value);
+            }
+        }
+    }
+
     public double ModBackupRetention
     {
         get => _modBackupRetention;
@@ -282,6 +295,7 @@ public sealed class SettingsViewModel : ViewModelBase
             GpuPageAccelerationEnabled = _settings.Current.GpuPageAccelerationEnabled;
             NexusDownloadDebugStepMode = _settings.Current.NexusDownloadDebugStepMode;
             NexusDownloadDebugShowWebViewMode = _settings.Current.NexusDownloadDebugShowWebViewMode;
+            ModMetadataTranslationEnabled = _settings.Current.ModMetadataTranslationEnabled;
             ModBackupRetention = _settings.Current.ModBackupRetention;
             SaveBackupRetention = _settings.Current.SaveBackupRetention;
             LaunchViaSteam = _settings.Current.LaunchViaSteam;
@@ -545,9 +559,23 @@ public sealed class SettingsViewModel : ViewModelBase
             settings.GpuPageAccelerationEnabled = GpuPageAccelerationEnabled;
             settings.NexusDownloadDebugStepMode = NexusDownloadDebugStepMode;
             settings.NexusDownloadDebugShowWebViewMode = NexusDownloadDebugShowWebViewMode;
+            settings.ModMetadataTranslationEnabled = ModMetadataTranslationEnabled;
         });
         FeedbackMessage = "备份与高级选项已保存。";
         Refresh();
+    }
+
+    private async Task UpdateModMetadataTranslationSettingAsync(bool value)
+    {
+        try
+        {
+            await _settings.UpdateAsync(settings => settings.ModMetadataTranslationEnabled = value);
+            await App.Current.Services.Mods.RefreshTranslationsAsync();
+        }
+        catch (Exception exception)
+        {
+            await _dialogs.ShowMessageAsync("保存设置失败", exception.Message);
+        }
     }
 
     private async Task SelectDisplayThemeAsync(AppTheme theme)

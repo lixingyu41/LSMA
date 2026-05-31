@@ -608,7 +608,8 @@ public sealed partial class SavesPage : Page
     private void CollectionTile_Tapped(object sender, TappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: SaveProgressInfo progress }
-            || App.Current.Services.Saves.SelectedSave is not { } save)
+            || App.Current.Services.Saves.SelectedSave is not { } save
+            || App.Current.Services.Saves.SelectedPlayer is not { } player)
         {
             return;
         }
@@ -619,7 +620,7 @@ public sealed partial class SavesPage : Page
             return;
         }
 
-        var items = ResolveProgressDetailItems(save, key);
+        var items = ResolveProgressDetailItems(save, player, key);
         if (items.Count == 0)
         {
             return;
@@ -634,15 +635,25 @@ public sealed partial class SavesPage : Page
         ShowProgressDetailCard(progress.Name, items);
     }
 
-    private static IReadOnlyList<SaveCollectionItemInfo> ResolveProgressDetailItems(SaveInfo save, string key)
+    private static IReadOnlyList<SaveCollectionItemInfo> ResolveProgressDetailItems(SaveInfo save, SavePlayerInfo player, string key)
     {
-        if (save.ProgressDetailItems.TryGetValue(key, out var progressItems))
+        if (player.ProgressDetailItems.TryGetValue(key, out var progressItems))
         {
             return progressItems;
         }
 
-        return save.CollectionItems.TryGetValue(key, out var collectionItems)
-            ? collectionItems
+        if (player.CollectionItems.TryGetValue(key, out var collectionItems))
+        {
+            return collectionItems;
+        }
+
+        if (save.ProgressDetailItems.TryGetValue(key, out var sharedProgressItems))
+        {
+            return sharedProgressItems;
+        }
+
+        return save.CollectionItems.TryGetValue(key, out var sharedCollectionItems)
+            ? sharedCollectionItems
             : [];
     }
 

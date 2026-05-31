@@ -12,6 +12,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     private const string GameDomain = "stardewvalley";
     private const int StardewGameId = 1303;
     private const int PageSize = 20;
+    private readonly AppStateService _state;
     private readonly NexusCredentialService _credentials;
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
@@ -20,6 +21,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     private readonly SettingsService _settings;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
+    private readonly NexusModNameTranslationService _nameTranslations;
     private List<NexusModInfo> _loadedOnlineMods = [];
     private NexusModInfo? _selectedOnlineMod;
     private NexusFileInfo? _selectedOnlineFile;
@@ -31,9 +33,46 @@ public sealed class DownloadsViewModel : ViewModelBase
     private int _currentPage = 1;
     private bool _categoriesLoaded;
     private NexusCategory? _selectedOnlineCategory;
+    private List<NexusModInfo> _browseOnlineMods = [];
+    private int _browseCategoryId;
+    private int _browseCurrentPage = 1;
+    private bool _browseHasMorePages = true;
+    private long? _browseSelectedModId;
+    private string _activeOnlineQuery = string.Empty;
     private static readonly NexusCategory AllCategories = new() { CategoryId = 0, Name = "全部分类" };
+    private static readonly IReadOnlyList<NexusCategory> FixedCategories =
+    [
+        AllCategories,
+        CreateCategory(1, "音频", "Audio"),
+        CreateCategory(2, "建筑", "Buildings"),
+        CreateCategory(3, "角色", "Characters"),
+        CreateCategory(4, "新角色", "New Characters"),
+        CreateCategory(5, "作弊", "Cheats"),
+        CreateCategory(6, "服装", "Clothing"),
+        CreateCategory(7, "制作", "Crafting"),
+        CreateCategory(8, "作物", "Crops"),
+        CreateCategory(9, "对话", "Dialogue"),
+        CreateCategory(10, "事件", "Events"),
+        CreateCategory(11, "扩展", "Expansions"),
+        CreateCategory(12, "钓鱼", "Fishing"),
+        CreateCategory(13, "家具", "Furniture"),
+        CreateCategory(14, "玩法机制", "Gameplay Mechanics"),
+        CreateCategory(15, "室内", "Interiors"),
+        CreateCategory(16, "物品", "Items"),
+        CreateCategory(17, "牲畜和动物", "Livestock and Animals"),
+        CreateCategory(18, "地点", "Locations"),
+        CreateCategory(19, "地图", "Maps"),
+        CreateCategory(20, "杂项", "Miscellaneous"),
+        CreateCategory(21, "模组工具", "Modding Tools"),
+        CreateCategory(22, "宠物/马", "Pets / Horses"),
+        CreateCategory(23, "玩家", "Player"),
+        CreateCategory(24, "肖像", "Portraits"),
+        CreateCategory(25, "用户界面", "User Interface"),
+        CreateCategory(26, "视觉和图形", "Visuals and Graphics"),
+    ];
 
     public DownloadsViewModel(
+        AppStateService state,
         NexusCredentialService credentials,
         NexusClient nexus,
         NexusFavoriteService favoritesService,
@@ -41,8 +80,10 @@ public sealed class DownloadsViewModel : ViewModelBase
         ModPackageService packages,
         SettingsService settings,
         PlatformService platform,
-        DialogService dialogs)
+        DialogService dialogs,
+        NexusModNameTranslationService nameTranslations)
     {
+        _state = state;
         _credentials = credentials;
         _nexus = nexus;
         _favoritesService = favoritesService;
@@ -51,6 +92,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         _settings = settings;
         _platform = platform;
         _dialogs = dialogs;
+        _nameTranslations = nameTranslations;
 
         OnlineCategories.Add(AllCategories);
         _selectedOnlineCategory = AllCategories;
@@ -88,8 +130,23 @@ public sealed class DownloadsViewModel : ViewModelBase
         get => _selectedOnlineMod;
         set
         {
+            if (ReferenceEquals(_selectedOnlineMod, value))
+            {
+                return;
+            }
+
+            if (_selectedOnlineMod is not null)
+            {
+                _selectedOnlineMod.IsSelected = false;
+            }
+
             if (SetProperty(ref _selectedOnlineMod, value))
             {
+                if (value is not null)
+                {
+                    value.IsSelected = true;
+                }
+
                 OnlineFiles.Clear();
                 SelectedOnlineFile = null;
                 OnPropertyChanged(nameof(FavoriteButtonText));
@@ -155,7 +212,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         {
             var mod = await _nexus.GetModAsync(modId, key);
             _favoriteValues = await _favoritesService.LoadAsync();
-            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
+            ApplyResultMarkers([mod]);
 
             _loadedOnlineMods = [mod];
             OnlineQuery = string.Empty;
@@ -163,6 +220,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             OnlineMods.Clear();
             OnlineMods.Add(mod);
             SelectedOnlineMod = mod;
+            QueueNameTranslations([mod]);
 
             OnlineFiles.Clear();
             foreach (var file in await _nexus.GetFilesAsync(mod.ModId, key))
@@ -232,7 +290,21 @@ public sealed class DownloadsViewModel : ViewModelBase
         => await ReloadOnlineAsync();
 
     private async Task SearchOnlineAsync()
-        => await ReloadOnlineAsync();
+    {
+        if (string.IsNullOrWhiteSpace(OnlineQuery))
+        {
+            OnlineQuery = string.Empty;
+            if (!TryRestoreBrowseList()
+                && (!string.IsNullOrWhiteSpace(_activeOnlineQuery) || OnlineMods.Count == 0))
+            {
+                await ReloadOnlineAsync();
+            }
+
+            return;
+        }
+
+        await ReloadOnlineAsync();
+    }
 
     private async Task ReloadOnlineAsync()
     {
@@ -304,25 +376,22 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
     }
 
-    private async Task EnsureCategoriesAsync()
+    private Task EnsureCategoriesAsync()
     {
         if (_categoriesLoaded)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        var categories = await _nexus.GetModCategoriesAsync();
         OnlineCategories.Clear();
-        OnlineCategories.Add(AllCategories);
-        foreach (var category in categories
-            .Where(category => !string.IsNullOrWhiteSpace(category.Name))
-            .OrderBy(category => category.Name, StringComparer.CurrentCultureIgnoreCase))
+        foreach (var category in FixedCategories)
         {
             OnlineCategories.Add(category);
         }
 
         _categoriesLoaded = true;
         SelectedOnlineCategory ??= AllCategories;
+        return Task.CompletedTask;
     }
 
     private async Task LoadOnlinePageAsync(string key, bool append)
@@ -358,16 +427,35 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
 
         _favoriteValues = await _favoritesService.LoadAsync();
-        foreach (var mod in _loadedOnlineMods)
+        ApplyResultMarkers(_loadedOnlineMods);
+
+        if (append)
         {
-            mod.IsFavorite = _favoriteValues.Any(value => value.ModId == mod.ModId);
+            foreach (var item in newMods)
+            {
+                OnlineMods.Add(item);
+            }
+        }
+        else
+        {
+            OnlineMods.Clear();
+            foreach (var item in _loadedOnlineMods)
+            {
+                OnlineMods.Add(item);
+            }
         }
 
-        OnlineMods.Clear();
-        foreach (var item in _loadedOnlineMods) OnlineMods.Add(item);
         if (!append && OnlineMods.Count > 0)
         {
             SelectedOnlineMod = OnlineMods[0];
+        }
+
+        QueueNameTranslations(newMods);
+
+        _activeOnlineQuery = query;
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            CacheBrowseList();
         }
 
         FeedbackMessage = string.IsNullOrWhiteSpace(query) || OnlineMods.Count > 0
@@ -377,9 +465,70 @@ public sealed class DownloadsViewModel : ViewModelBase
         OnPropertyChanged(nameof(LoadMoreVisibility));
     }
 
+    private void CacheBrowseList()
+    {
+        _browseOnlineMods = OnlineMods.ToList();
+        _browseCategoryId = SelectedOnlineCategory?.CategoryId ?? 0;
+        _browseCurrentPage = _currentPage;
+        _browseHasMorePages = HasMorePages;
+        _browseSelectedModId = SelectedOnlineMod?.ModId;
+    }
+
+    private bool TryRestoreBrowseList()
+    {
+        if (_browseOnlineMods.Count == 0
+            || _browseCategoryId != (SelectedOnlineCategory?.CategoryId ?? 0))
+        {
+            return false;
+        }
+
+        _loadedOnlineMods = _browseOnlineMods.ToList();
+        _currentPage = _browseCurrentPage;
+        HasMorePages = _browseHasMorePages;
+        _activeOnlineQuery = string.Empty;
+        OnlineMods.Clear();
+        foreach (var item in _loadedOnlineMods)
+        {
+            OnlineMods.Add(item);
+        }
+
+        SelectedOnlineMod = _browseSelectedModId is { } selectedModId
+            ? OnlineMods.FirstOrDefault(mod => mod.ModId == selectedModId) ?? OnlineMods.FirstOrDefault()
+            : OnlineMods.FirstOrDefault();
+        FeedbackMessage = null;
+        OnPropertyChanged(nameof(FeedbackMessage));
+        OnPropertyChanged(nameof(LoadMoreVisibility));
+        Refresh();
+        NotifyCommands();
+        return true;
+    }
+
     private string? SelectedCategoryName => SelectedOnlineCategory is { CategoryId: > 0 } category
-        ? category.Name
+        ? category.FilterName
         : null;
+
+    private static NexusCategory CreateCategory(int id, string name, string searchName)
+        => new() { CategoryId = id, Name = name, SearchName = searchName };
+
+    private void QueueNameTranslations(IReadOnlyList<NexusModInfo> mods)
+        => _ = _nameTranslations.ApplyCachedAndQueueAsync(mods);
+
+    private void ApplyResultMarkers(IEnumerable<NexusModInfo> mods)
+    {
+        var installedIds = _state.Mods
+            .Where(mod => !mod.IsArchived && mod.NexusModId is not null)
+            .Select(mod => mod.NexusModId!.Value)
+            .ToHashSet();
+        var favoriteIds = _favoriteValues
+            .Select(value => value.ModId)
+            .ToHashSet();
+
+        foreach (var mod in mods)
+        {
+            mod.IsInstalled = installedIds.Contains(mod.ModId);
+            mod.IsFavorite = favoriteIds.Contains(mod.ModId);
+        }
+    }
 
     private async Task ToggleFavoriteAsync()
     {
