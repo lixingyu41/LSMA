@@ -92,6 +92,8 @@ public sealed class ModsViewModel : ViewModelBase
         DeleteModPackCommand = new AsyncRelayCommand(DeleteModPackAsync, CanDeleteModPack);
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, CanUseOnlineNow);
         PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, CanPrepareSelectedUpdate);
+        OpenSelectedNexusPageCommand = new AsyncRelayCommand(OpenSelectedNexusPageAsync, CanOpenSelectedNexusPage);
+        OpenSelectedAuthorPageCommand = new AsyncRelayCommand(OpenSelectedAuthorPageAsync, HasSelected);
         BindNexusIdCommand = new AsyncRelayCommand(BindNexusIdAsync, () => SelectedMod is not null);
         EditNexusBindingCommand = new RelayCommand(ToggleNexusBindingEditor, () => SelectedMod is not null);
         NexusIdClickCommand = new RelayCommand(HandleNexusIdClick, () => SelectedMod is not null);
@@ -138,6 +140,8 @@ public sealed class ModsViewModel : ViewModelBase
     public IAsyncRelayCommand DeleteModPackCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public IAsyncRelayCommand PrepareSelectedUpdateCommand { get; }
+    public IAsyncRelayCommand OpenSelectedNexusPageCommand { get; }
+    public IAsyncRelayCommand OpenSelectedAuthorPageCommand { get; }
     public IAsyncRelayCommand BindNexusIdCommand { get; }
     public IRelayCommand EditNexusBindingCommand { get; }
     public ModInfo? SelectedMod
@@ -172,6 +176,7 @@ public sealed class ModsViewModel : ViewModelBase
                 OnPropertyChanged(nameof(EnableVisibility));
                 OnPropertyChanged(nameof(DisableVisibility));
                 OnPropertyChanged(nameof(NexusIdDisplayText));
+                OnPropertyChanged(nameof(OpenNexusPageVisibility));
                 OnPropertyChanged(nameof(DependencySectionVisibility));
                 OnPropertyChanged(nameof(IssuesSectionVisibility));
                 OnPropertyChanged(nameof(NoNexusIdMessageVisibility));
@@ -219,6 +224,7 @@ public sealed class ModsViewModel : ViewModelBase
     public Visibility NoNexusIdMessageVisibility => SelectedMod?.NexusModId is null ? Visibility.Visible : Visibility.Collapsed;
     public Visibility EnableVisibility => SelectedMod is { IsEnabled: false, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DisableVisibility => SelectedMod is { IsEnabled: true, IsArchived: false } ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility OpenNexusPageVisibility => SelectedMod?.NexusModId is null ? Visibility.Collapsed : Visibility.Visible;
     public string NexusBindingText => SelectedMod?.NexusModId is { } id ? $"Nexus Mod ID：{id}" : "未绑定 Nexus Mod ID";
     public string NexusIdDisplayText => SelectedMod?.NexusModId is { } id ? $"ID：{id}" : "手动匹配ID";
     public Visibility DependencySectionVisibility => SelectedMod?.HasRequiredDependencies == true ? Visibility.Visible : Visibility.Collapsed;
@@ -992,6 +998,99 @@ public sealed class ModsViewModel : ViewModelBase
         await App.Current.Services.Downloads.FocusModAsync(modId);
     }
 
+    private async Task OpenSelectedNexusPageAsync()
+    {
+        if (SelectedMod?.NexusModId is not { } modId)
+        {
+            FeedbackMessage = "该模组未绑定 Nexus Mod ID。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            return;
+        }
+
+        try
+        {
+            await _platform.OpenUriAsync($"https://www.nexusmods.com/stardewvalley/mods/{modId}");
+        }
+        catch (Exception exception)
+        {
+            await _dialogs.ShowMessageAsync("打开N网", exception.Message);
+        }
+    }
+
+    private async Task OpenSelectedAuthorPageAsync()
+    {
+        if (SelectedMod is not { } mod)
+        {
+            return;
+        }
+
+        var author = CleanNexusAuthorName(await ResolveNexusAuthorNameAsync(mod))
+            ?? CleanNexusAuthorName(mod.Author);
+        if (author is null)
+        {
+            FeedbackMessage = "该模组没有可跳转的作者名。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            return;
+        }
+
+        try
+        {
+            await _platform.OpenUriAsync(CreateNexusAuthorPageUrl(author));
+        }
+        catch (Exception exception)
+        {
+            await _dialogs.ShowMessageAsync("打开作者页", exception.Message);
+        }
+    }
+
+    private async Task<string?> ResolveNexusAuthorNameAsync(ModInfo mod)
+    {
+        if (mod.NexusModId is not { } modId)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (await _nexus.GetModFromGraphQlAsync(modId) is { Author.Length: > 0 } graphMod)
+            {
+                return graphMod.Author;
+            }
+        }
+        catch
+        {
+            // Fall back to the local manifest author below; author links are non-critical.
+        }
+
+        var key = _credentials.GetKey();
+        if (key is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return (await _nexus.GetModAsync(modId, key)).Author;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? CleanNexusAuthorName(string? value)
+    {
+        var author = value?.Trim();
+        return string.IsNullOrWhiteSpace(author)
+            || string.Equals(author, "未知作者", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(author, "Unknown", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : author;
+    }
+
+    private static string CreateNexusAuthorPageUrl(string author)
+        => $"https://next.nexusmods.com/profile/{Uri.EscapeDataString(author.Trim())}/mods";
+
     public void NotifyFeedbackMessage(string message)
     {
         FeedbackMessage = message;
@@ -1036,6 +1135,8 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(NexusBindingText));
         OnPropertyChanged(nameof(NexusIdDisplayText));
         OnPropertyChanged(nameof(NoNexusIdMessageVisibility));
+        OnPropertyChanged(nameof(OpenNexusPageVisibility));
+        OpenSelectedNexusPageCommand.NotifyCanExecuteChanged();
     }
 
     private void ToggleNexusBindingEditor()
@@ -1105,6 +1206,8 @@ public sealed class ModsViewModel : ViewModelBase
         DeleteModPackCommand.NotifyCanExecuteChanged();
         CheckUpdatesCommand.NotifyCanExecuteChanged();
         PrepareSelectedUpdateCommand.NotifyCanExecuteChanged();
+        OpenSelectedNexusPageCommand.NotifyCanExecuteChanged();
+        OpenSelectedAuthorPageCommand.NotifyCanExecuteChanged();
         BindNexusIdCommand.NotifyCanExecuteChanged();
         EditNexusBindingCommand.NotifyCanExecuteChanged();
     }
@@ -1121,6 +1224,7 @@ public sealed class ModsViewModel : ViewModelBase
     private bool CanDownloadMissingModPackFiles() => CanModifySelectedModPack() && SelectedModPack is { MissingCount: > 0 };
     private bool CanDeleteModPack() => CanModifySelectedModPack() && SelectedModPack is { IsActive: false };
     private bool HasSelected() => SelectedMod is not null && !IsBusy;
+    private bool CanOpenSelectedNexusPage() => !IsBusy && SelectedMod?.NexusModId is not null;
     private bool CanModifySelected() => HasSelected() && !_state.IsGameRunning && SelectedMod is { IsArchived: false };
     private bool CanEnable() => CanModifySelected() && SelectedMod is { IsEnabled: false };
     private bool CanDisable() => CanModifySelected() && SelectedMod is { IsEnabled: true };

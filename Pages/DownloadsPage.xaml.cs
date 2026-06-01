@@ -106,6 +106,17 @@ public sealed partial class DownloadsPage : Page
         e.Handled = true;
     }
 
+    private void OnlineFilesComboBox_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (DataContext is not DownloadsViewModel viewModel
+            || !viewModel.LoadFilesCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        _ = viewModel.LoadFilesCommand.ExecuteAsync(null);
+    }
+
     private void ShowOnlineCoverPreview(string uri)
     {
         OnlineCoverPreviewImage.Source = new BitmapImage(new Uri(uri));

@@ -76,6 +76,8 @@ public class SaveInfo
     public Dictionary<string, List<SaveCollectionItemInfo>> ProgressDetailItems { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<int, List<bool>> CommunityBundleStates { get; } = [];
     public HashSet<string> MailFlags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyList<SaveFriendshipInfo> FriendshipLeftColumn => Friendships.Take(FriendshipColumnSplitIndex).ToList();
+    public IReadOnlyList<SaveFriendshipInfo> FriendshipRightColumn => Friendships.Skip(FriendshipColumnSplitIndex).ToList();
     public bool HasMultiplePlayers => Players.Count > 1;
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
     public string ListDisplay => $"{FarmName}-{FarmerName}-{Year}年{Season}{Day}日";
@@ -166,6 +168,8 @@ public class SaveInfo
 
     private static string CompactMoney(long amount)
         => $"{CompactMoneyNumber(amount)}g";
+
+    private int FriendshipColumnSplitIndex => (Friendships.Count + 1) / 2;
 
     private static string CompactMoneyNumber(double amount)
     {
@@ -318,9 +322,10 @@ public sealed class SaveSkillLevelSlot
 {
     public int Level { get; init; }
     public bool IsAvailable { get; init; } = true;
-    public bool IsUnlocked { get; init; }
-    public double Opacity => !IsAvailable ? 0 : IsUnlocked ? 1 : 0.32;
+    public double FillRatio { get; init; }
+    public double SlotOpacity => IsAvailable ? 1 : 0;
     public double SlotSize => Level is 5 or 10 ? 27 : 18;
+    public double FillWidth => Math.Round(SlotSize * Math.Clamp(FillRatio, 0, 1), 1);
 }
 
 public sealed class SaveSkillProfessionBranch

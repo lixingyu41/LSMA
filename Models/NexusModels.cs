@@ -287,6 +287,19 @@ public sealed class NexusCategory
     public string FilterName => string.IsNullOrWhiteSpace(SearchName) ? Name : SearchName;
 }
 
+public sealed class NexusSortOption
+{
+    public string Name { get; init; } = string.Empty;
+    public string FieldName { get; init; } = string.Empty;
+    public bool IsRandom => string.Equals(FieldName, "random", StringComparison.OrdinalIgnoreCase);
+}
+
+public sealed class NexusSortDirectionOption
+{
+    public string Name { get; init; } = string.Empty;
+    public string Value { get; init; } = "DESC";
+}
+
 public sealed class NexusDownloadLink
 {
     [JsonPropertyName("URI")]

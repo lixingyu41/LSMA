@@ -10,11 +10,12 @@ namespace LSMA.Services;
 public sealed class NexusClient(LoggingService logging)
 {
     private const string GameDomain = "stardewvalley";
+    private const int RequestTimeoutSeconds = 25;
     private readonly SemaphoreSlim _requestGate = new(1, 1);
     private readonly HttpClient _client = new()
     {
         BaseAddress = new Uri("https://api.nexusmods.com/v1/"),
-        Timeout = TimeSpan.FromSeconds(25)
+        Timeout = TimeSpan.FromSeconds(RequestTimeoutSeconds)
     };
     private DateTime? _cooldownUntil;
 
@@ -117,12 +118,13 @@ public sealed class NexusClient(LoggingService logging)
         string? query,
         string? categoryName,
         int offset,
-        int count)
+        int count,
+        string? sortFieldName = null,
+        string? sortDirection = null,
+        int? randomSeed = null)
     {
         var filter = CreateModsFilter(query, categoryName);
-        var sort = string.IsNullOrWhiteSpace(query)
-            ? new object[] { new { updatedAt = new { direction = "DESC" } } }
-            : [new { relevance = new { direction = "DESC" } }, new { downloads = new { direction = "DESC" } }];
+        var sort = CreateModsSort(sortFieldName, sortDirection, randomSeed);
         var payload = new
         {
             query = """
@@ -159,7 +161,6 @@ public sealed class NexusClient(LoggingService logging)
         var envelope = await PostGraphQlAsync<ModsGraphQlData>(payload);
         var page = envelope.Data?.Mods ?? throw new NexusApiException("Nexus 返回了无法读取的数据。");
         var mods = page.Nodes.Select(ToNexusModInfo).Where(mod => mod.ModId > 0).ToList();
-        PrioritizeExactNameMatches(mods, query);
         return new NexusModSearchResult
         {
             Mods = mods,
@@ -167,28 +168,31 @@ public sealed class NexusClient(LoggingService logging)
         };
     }
 
-    private static void PrioritizeExactNameMatches(List<NexusModInfo> mods, string? query)
+    private static object[] CreateModsSort(string? sortFieldName, string? sortDirection, int? randomSeed)
     {
-        if (mods.Count <= 1 || string.IsNullOrWhiteSpace(query))
+        var fieldName = NormalizeSortFieldName(sortFieldName);
+        if (string.Equals(fieldName, "random", StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            object randomValue = randomSeed is null
+                ? new { }
+                : new { seed = randomSeed.Value };
+            return [new Dictionary<string, object?> { ["random"] = randomValue }];
         }
 
-        var normalizedQuery = NormalizeSearchName(query);
-        var sorted = mods
-            .Select((mod, index) => new
-            {
-                Mod = mod,
-                Index = index,
-                Exact = string.Equals(NormalizeSearchName(mod.Name), normalizedQuery, StringComparison.OrdinalIgnoreCase)
-            })
-            .OrderByDescending(item => item.Exact)
-            .ThenBy(item => item.Index)
-            .Select(item => item.Mod)
-            .ToList();
+        var direction = string.Equals(sortDirection, "ASC", StringComparison.OrdinalIgnoreCase)
+            ? "ASC"
+            : "DESC";
+        return [new Dictionary<string, object?> { [fieldName] = new { direction } }];
+    }
 
-        mods.Clear();
-        mods.AddRange(sorted);
+    private static string NormalizeSortFieldName(string? sortFieldName)
+    {
+        return sortFieldName switch
+        {
+            "createdAt" or "endorsements" or "downloads" or "uniqueDownloads" or "updatedAt"
+                or "name" or "size" or "lastComment" or "random" => sortFieldName,
+            _ => "updatedAt"
+        };
     }
 
     public async Task<IReadOnlyList<NexusFileInfo>> GetFilesAsync(long modId, string apiKey)
@@ -248,7 +252,7 @@ public sealed class NexusClient(LoggingService logging)
         catch (Exception exception)
         {
             await logging.ErrorAsync("Nexus API 请求失败", exception);
-            throw new NexusApiException("无法连接 Nexus Mods，请检查网络后重试。");
+            throw ToNetworkException(exception);
         }
         finally
         {
@@ -291,29 +295,61 @@ public sealed class NexusClient(LoggingService logging)
 
     private async Task<GraphQlEnvelope<T>> PostGraphQlAsync<T>(object payload)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.nexusmods.com/v2/graphql");
-        request.Headers.Add("Application-Name", "LSMA");
-        request.Headers.Add("Application-Version", GetVersion());
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Content = new StringContent(JsonSerializer.Serialize(payload, JsonHelper.Options), Encoding.UTF8, "application/json");
-
-        using var response = await _client.SendAsync(request);
-        ReadLimits(response);
-        if (!response.IsSuccessStatusCode)
+        await _requestGate.WaitAsync();
+        try
         {
-            throw ToFriendlyException(response.StatusCode);
-        }
+            if (_cooldownUntil is { } until && until > DateTime.Now)
+            {
+                throw new NexusApiException($"请求被限流，请在 {until:HH:mm} 后重试。");
+            }
 
-        await using var content = await response.Content.ReadAsStreamAsync();
-        var envelope = await JsonSerializer.DeserializeAsync<GraphQlEnvelope<T>>(content, JsonHelper.Options)
-            ?? throw new NexusApiException("Nexus 返回了无法读取的数据。");
-        if (envelope.Errors is { Count: > 0 })
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.nexusmods.com/v2/graphql");
+            request.Headers.Add("Application-Name", "LSMA");
+            request.Headers.Add("Application-Version", GetVersion());
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Content = new StringContent(JsonSerializer.Serialize(payload, JsonHelper.Options), Encoding.UTF8, "application/json");
+
+            using var response = await _client.SendAsync(request);
+            ReadLimits(response);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw ToFriendlyException(response.StatusCode);
+            }
+
+            await using var content = await response.Content.ReadAsStreamAsync();
+            var envelope = await JsonSerializer.DeserializeAsync<GraphQlEnvelope<T>>(content, JsonHelper.Options)
+                ?? throw new NexusApiException("Nexus 返回了无法读取的数据。");
+            if (envelope.Errors is { Count: > 0 })
+            {
+                throw new NexusApiException(envelope.Errors[0].Message ?? "Nexus 请求失败。");
+            }
+
+            return envelope;
+        }
+        catch (NexusApiException)
         {
-            throw new NexusApiException(envelope.Errors[0].Message ?? "Nexus 请求失败。");
+            throw;
         }
-
-        return envelope;
+        catch (Exception exception)
+        {
+            await logging.ErrorAsync("Nexus GraphQL 请求失败", exception);
+            throw ToNetworkException(exception);
+        }
+        finally
+        {
+            _requestGate.Release();
+        }
     }
+
+    private static NexusApiException ToNetworkException(Exception exception)
+        => IsTimeoutException(exception)
+            ? new NexusApiException($"Nexus 请求超过 {RequestTimeoutSeconds} 秒未响应，请稍后重试。")
+            : new NexusApiException("无法连接 Nexus Mods，请检查网络后重试。");
+
+    private static bool IsTimeoutException(Exception exception)
+        => exception is TaskCanceledException or TimeoutException
+            || exception.InnerException is TaskCanceledException or TimeoutException
+            || exception.InnerException?.InnerException is TaskCanceledException or TimeoutException;
 
     public async Task<NexusModInfo?> GetModFromGraphQlAsync(long modId)
     {
@@ -475,9 +511,6 @@ public sealed class NexusClient(LoggingService logging)
             ? timestamp.ToUnixTimeSeconds()
             : 0;
     }
-
-    private static string NormalizeSearchName(string value)
-        => string.Join(' ', value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static string GetVersion()
         => typeof(NexusClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";

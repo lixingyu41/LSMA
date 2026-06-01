@@ -27,7 +27,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     private NexusModInfo? _selectedOnlineMod;
     private NexusFileInfo? _selectedOnlineFile;
     private int _onlineFilesLoadVersion;
-    private bool _suppressOnlineFileAutoLoad;
+    private long? _onlineFilesLoadedModId;
     private string _onlineQuery = string.Empty;
     private List<NexusFavorite> _favoriteValues = [];
     private CancellationTokenSource? _downloadCancellation;
@@ -41,8 +41,16 @@ public sealed class DownloadsViewModel : ViewModelBase
     private int _browseCurrentPage = 1;
     private bool _browseHasMorePages = true;
     private long? _browseSelectedModId;
+    private string _browseSortFieldName = string.Empty;
+    private string _browseSortDirection = string.Empty;
+    private int? _browseSurpriseSeed;
     private string _activeOnlineQuery = string.Empty;
+    private NexusSortOption? _selectedOnlineSortOption;
+    private NexusSortDirectionOption? _selectedOnlineSortDirection;
+    private int? _surpriseSeed;
     private static readonly NexusCategory AllCategories = new() { CategoryId = 0, Name = "全部分类" };
+    private static readonly NexusSortOption DefaultSortOption = CreateSortOption("推荐数", "endorsements");
+    private static readonly NexusSortDirectionOption DefaultSortDirection = new() { Name = "倒序", Value = "DESC" };
     private static readonly IReadOnlyList<NexusCategory> FixedCategories =
     [
         AllCategories,
@@ -73,6 +81,23 @@ public sealed class DownloadsViewModel : ViewModelBase
         CreateCategory(25, "用户界面", "User Interface"),
         CreateCategory(26, "视觉和图形", "Visuals and Graphics"),
     ];
+    private static readonly IReadOnlyList<NexusSortOption> FixedSortOptions =
+    [
+        CreateSortOption("发布日期", "createdAt"),
+        DefaultSortOption,
+        CreateSortOption("下载次数", "downloads"),
+        CreateSortOption("独立下载次数", "uniqueDownloads"),
+        CreateSortOption("最后更新", "updatedAt"),
+        CreateSortOption("模组名称", "name"),
+        CreateSortOption("文件大小", "size"),
+        CreateSortOption("最新评论", "lastComment"),
+        CreateSortOption("随机", "random"),
+    ];
+    private static readonly IReadOnlyList<NexusSortDirectionOption> FixedSortDirections =
+    [
+        DefaultSortDirection,
+        new() { Name = "正序", Value = "ASC" },
+    ];
 
     public DownloadsViewModel(
         AppStateService state,
@@ -101,6 +126,18 @@ public sealed class DownloadsViewModel : ViewModelBase
 
         OnlineCategories.Add(AllCategories);
         _selectedOnlineCategory = AllCategories;
+        foreach (var option in FixedSortOptions)
+        {
+            OnlineSortOptions.Add(option);
+        }
+
+        foreach (var direction in FixedSortDirections)
+        {
+            OnlineSortDirections.Add(direction);
+        }
+
+        _selectedOnlineSortOption = DefaultSortOption;
+        _selectedOnlineSortDirection = DefaultSortDirection;
 
         SearchOnlineCommand = new AsyncRelayCommand(SearchOnlineAsync, () => !IsBusy);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedOnlineMod is not null);
@@ -114,6 +151,8 @@ public sealed class DownloadsViewModel : ViewModelBase
     }
 
     public ObservableCollection<NexusCategory> OnlineCategories { get; } = [];
+    public ObservableCollection<NexusSortOption> OnlineSortOptions { get; } = [];
+    public ObservableCollection<NexusSortDirectionOption> OnlineSortDirections { get; } = [];
 
     public NexusCategory? SelectedOnlineCategory
     {
@@ -123,6 +162,38 @@ public sealed class DownloadsViewModel : ViewModelBase
             if (SetProperty(ref _selectedOnlineCategory, value) && _categoriesLoaded)
             {
                 _ = ReloadOnlineAsync();
+            }
+        }
+    }
+
+    public NexusSortOption? SelectedOnlineSortOption
+    {
+        get => _selectedOnlineSortOption;
+        set
+        {
+            if (SetProperty(ref _selectedOnlineSortOption, value))
+            {
+                _surpriseSeed = null;
+                if (_hasLoaded)
+                {
+                    _ = ReloadOnlineAsync();
+                }
+            }
+        }
+    }
+
+    public NexusSortDirectionOption? SelectedOnlineSortDirection
+    {
+        get => _selectedOnlineSortDirection;
+        set
+        {
+            if (SetProperty(ref _selectedOnlineSortDirection, value))
+            {
+                _surpriseSeed = null;
+                if (_hasLoaded)
+                {
+                    _ = ReloadOnlineAsync();
+                }
             }
         }
     }
@@ -154,15 +225,12 @@ public sealed class DownloadsViewModel : ViewModelBase
                     value.IsSelected = true;
                 }
 
-                var loadVersion = ++_onlineFilesLoadVersion;
+                _onlineFilesLoadVersion++;
+                _onlineFilesLoadedModId = null;
                 OnlineFiles.Clear();
                 SelectedOnlineFile = null;
                 OnPropertyChanged(nameof(FavoriteButtonText));
                 NotifyCommands();
-                if (value is not null && !_suppressOnlineFileAutoLoad)
-                {
-                    _ = LoadFilesForSelectedModAsync(value, loadVersion);
-                }
             }
         }
     }
@@ -176,19 +244,6 @@ public sealed class DownloadsViewModel : ViewModelBase
             {
                 NotifyCommands();
             }
-        }
-    }
-
-    private void SelectOnlineModWithoutAutoFileLoad(NexusModInfo? mod)
-    {
-        _suppressOnlineFileAutoLoad = true;
-        try
-        {
-            SelectedOnlineMod = mod;
-        }
-        finally
-        {
-            _suppressOnlineFileAutoLoad = false;
         }
     }
 
@@ -246,7 +301,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             HasMorePages = false;
             OnlineMods.Clear();
             OnlineMods.Add(mod);
-            SelectOnlineModWithoutAutoFileLoad(mod);
+            SelectedOnlineMod = mod;
             QueueNameTranslations([mod]);
 
             OnlineFiles.Clear();
@@ -255,6 +310,7 @@ public sealed class DownloadsViewModel : ViewModelBase
                 OnlineFiles.Add(file);
             }
 
+            _onlineFilesLoadedModId = mod.ModId;
             SelectedOnlineFile = SelectLatestFile(OnlineFiles);
             FeedbackMessage = OnlineFiles.Count > 0
                 ? $"已加载 {mod.Name}，可直接下载更新文件。"
@@ -298,7 +354,6 @@ public sealed class DownloadsViewModel : ViewModelBase
             {
                 if (attempt >= maxRetries)
                 {
-                    await _dialogs.ShowMessageAsync("Nexus", "多次加载失败，请检查网络后重试。");
                     return;
                 }
                 await Task.Delay(1000);
@@ -349,6 +404,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         _currentPage = 1;
         _loadedOnlineMods = [];
         _favoriteValues = [];
+        _surpriseSeed = null;
         HasMorePages = true;
         IsBusy = true;
         ProgressText = "正在加载...";
@@ -436,7 +492,14 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
         else
         {
-            var result = await _nexus.SearchModsAsync(query, SelectedCategoryName, offset, PageSize);
+            var result = await _nexus.SearchModsAsync(
+                query,
+                SelectedCategoryName,
+                offset,
+                PageSize,
+                SelectedSortFieldName,
+                SelectedSortDirectionValue,
+                GetSurpriseSeed(append));
             newMods = result.Mods.ToList();
             totalCount = result.TotalCount;
             HasMorePages = offset + newMods.Count < totalCount;
@@ -500,12 +563,17 @@ public sealed class DownloadsViewModel : ViewModelBase
         _browseCurrentPage = _currentPage;
         _browseHasMorePages = HasMorePages;
         _browseSelectedModId = SelectedOnlineMod?.ModId;
+        _browseSortFieldName = SelectedSortFieldName;
+        _browseSortDirection = SelectedSortDirectionValue;
+        _browseSurpriseSeed = _surpriseSeed;
     }
 
     private bool TryRestoreBrowseList()
     {
         if (_browseOnlineMods.Count == 0
-            || _browseCategoryId != (SelectedOnlineCategory?.CategoryId ?? 0))
+            || _browseCategoryId != (SelectedOnlineCategory?.CategoryId ?? 0)
+            || !string.Equals(_browseSortFieldName, SelectedSortFieldName, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(_browseSortDirection, SelectedSortDirectionValue, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -513,6 +581,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         _loadedOnlineMods = _browseOnlineMods.ToList();
         _currentPage = _browseCurrentPage;
         HasMorePages = _browseHasMorePages;
+        _surpriseSeed = _browseSurpriseSeed;
         _activeOnlineQuery = string.Empty;
         OnlineMods.Clear();
         foreach (var item in _loadedOnlineMods)
@@ -537,6 +606,28 @@ public sealed class DownloadsViewModel : ViewModelBase
 
     private static NexusCategory CreateCategory(int id, string name, string searchName)
         => new() { CategoryId = id, Name = name, SearchName = searchName };
+
+    private string SelectedSortFieldName => SelectedOnlineSortOption?.FieldName ?? DefaultSortOption.FieldName;
+
+    private string SelectedSortDirectionValue => SelectedOnlineSortDirection?.Value ?? DefaultSortDirection.Value;
+
+    private int? GetSurpriseSeed(bool append)
+    {
+        if (SelectedOnlineSortOption?.IsRandom != true)
+        {
+            return null;
+        }
+
+        if (!append || _surpriseSeed is null)
+        {
+            _surpriseSeed = Random.Shared.Next(1, int.MaxValue);
+        }
+
+        return _surpriseSeed;
+    }
+
+    private static NexusSortOption CreateSortOption(string name, string fieldName)
+        => new() { Name = name, FieldName = fieldName };
 
     private void QueueNameTranslations(IReadOnlyList<NexusModInfo> mods)
         => _ = _nameTranslations.ApplyCachedAndQueueAsync(mods);
@@ -580,6 +671,10 @@ public sealed class DownloadsViewModel : ViewModelBase
     private async Task LoadFilesAsync()
     {
         if (SelectedOnlineMod is not { } mod) return;
+        if (_onlineFilesLoadedModId == mod.ModId)
+        {
+            return;
+        }
 
         var loadVersion = ++_onlineFilesLoadVersion;
         await LoadFilesForSelectedModAsync(mod, loadVersion);
@@ -619,6 +714,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             OnlineFiles.Add(file);
         }
 
+        _onlineFilesLoadedModId = mod.ModId;
         SelectedOnlineFile = SelectLatestFile(OnlineFiles);
         FeedbackMessage = OnlineFiles.Count > 0
             ? $"已加载 {OnlineFiles.Count} 个历史版本。"
@@ -703,7 +799,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             _favoriteValues = await _favoritesService.LoadAsync();
             ApplyResultMarkers([mod]);
             await _coverCache.ApplyCachedAndQueueAsync([mod]);
-            SelectOnlineModWithoutAutoFileLoad(mod);
+            SelectedOnlineMod = mod;
             OnlineFiles.Clear();
             OnlineFiles.Add(file);
             SelectedOnlineFile = file;

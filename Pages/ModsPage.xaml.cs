@@ -267,6 +267,16 @@ public sealed partial class ModsPage : Page
         _vm.NexusIdClickCommand.Execute(null);
     }
 
+    private void AuthorText_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (_vm.OpenSelectedAuthorPageCommand.CanExecute(null))
+        {
+            _vm.OpenSelectedAuthorPageCommand.Execute(null);
+        }
+
+        e.Handled = true;
+    }
+
     private void FolderPathText_Tapped(object sender, TappedRoutedEventArgs e)
     {
         // Click to copy path

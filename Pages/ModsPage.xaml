@@ -23,7 +23,7 @@
                     <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
                 </StackPanel>
-                <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True" HorizontalAlignment="Right">
+                <CommandBar Grid.Column="1" Style="{StaticResource TopBarCommandBarStyle}" HorizontalAlignment="Right">
                     <AppBarButton Label="安装模组" Command="{Binding ChoosePackageCommand}">
                         <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
                     </AppBarButton>
@@ -460,6 +460,7 @@
                                         <Button Content="禁用" Command="{Binding DisableCommand}" Style="{StaticResource DangerButtonStyle}" Visibility="{Binding DisableVisibility}" />
                                         <Button Content="备份" Command="{Binding BackupCommand}" Style="{StaticResource SubtleButtonStyle}" />
                                         <Button Content="获取更新" Command="{Binding PrepareSelectedUpdateCommand}" Style="{StaticResource SubtleButtonStyle}" />
+                                        <Button Content="打开N网" Command="{Binding OpenSelectedNexusPageCommand}" Style="{StaticResource SubtleButtonStyle}" Visibility="{Binding OpenNexusPageVisibility}" />
                                     </StackPanel>
                                 </Grid>
 
@@ -467,7 +468,12 @@
                                 <Grid ColumnSpacing="18">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="作者" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding SelectedMod.Author}" />
+                                        <TextBlock Text="作者" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock x:Name="AuthorText"
+                                                   Text="{Binding SelectedMod.Author}"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   ToolTipService.ToolTip="打开 Nexus 作者页"
+                                                   Tapped="AuthorText_Tapped" />
                                         <TextBlock Text="模组识别名" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" /><TextBlock Text="{Binding SelectedMod.UniqueId}" />
                                         <StackPanel Visibility="{Binding DependencySectionVisibility}">
                                             <TextBlock Text="前置模组" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" />

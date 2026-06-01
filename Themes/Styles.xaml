@@ -129,6 +129,50 @@
         <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
         <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
     </Style>
+    <Style x:Key="TopBarTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style x:Key="TopBarComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style x:Key="TopBarAutoSuggestBoxStyle" TargetType="AutoSuggestBox">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style x:Key="TopBarAccentButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="TopBarSubtleButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="TopBarNeutralButtonStyle" TargetType="Button" BasedOn="{StaticResource NeutralButtonStyle}">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="TopBarCommandBarStyle" TargetType="CommandBar">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="DefaultLabelPosition" Value="Right" />
+        <Setter Property="IsDynamicOverflowEnabled" Value="True" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
     <Style x:Key="ChoiceButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonBaseStyle}">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}" />
@@ -372,7 +416,8 @@
         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="MinWidth" Value="84" />
-        <Setter Property="Height" Value="42" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
         <Setter Property="Margin" Value="0,0,10,0" />
         <Setter Property="FontSize" Value="15" />
         <Setter Property="FontWeight" Value="Normal" />

@@ -1182,11 +1182,18 @@ public sealed class SaveParserService(
 
         for (var slot = 1; slot <= 10; slot++)
         {
+            var isAvailable = slot <= maxLevel;
             skill.LevelSlots.Add(new SaveSkillLevelSlot
             {
                 Level = slot,
-                IsAvailable = slot <= maxLevel,
-                IsUnlocked = slot <= maxLevel && level >= slot
+                IsAvailable = isAvailable,
+                FillRatio = !isAvailable
+                    ? 0
+                    : slot <= level
+                        ? 1
+                        : useExperienceProgress && slot == level + 1
+                            ? skill.Percent / 100d
+                            : 0
             });
         }
 

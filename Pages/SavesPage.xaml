@@ -27,6 +27,29 @@
             </Grid>
         </DataTemplate>
 
+        <DataTemplate x:Key="EconomyMetricRowTemplate">
+            <Grid HorizontalAlignment="Stretch">
+                <Border Style="{StaticResource CardStyle}" Padding="13" MinHeight="86" Tapped="MetricTile_Tapped" ToolTipService.ToolTip="{Binding Detail}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Glyph="{Binding Glyph}"
+                            FontSize="16"
+                            Foreground="{StaticResource AccentBrush}"
+                            Visibility="{Binding GlyphVisibility}"
+                            VerticalAlignment="Top" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{ThemeResource MutedTextBrush}" />
+                            <TextBlock Text="{Binding Value}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate x:Key="HeroMetricTemplate">
             <Grid>
                 <Border
@@ -210,6 +233,29 @@
             </Grid>
         </DataTemplate>
 
+        <DataTemplate x:Key="SkillLevelSlotTemplate">
+            <Grid
+                Width="30"
+                Height="30"
+                Opacity="{Binding SlotOpacity}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+                <Grid
+                    Width="{Binding SlotSize}"
+                    Height="{Binding SlotSize}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                    <Border Background="{StaticResource AccentBrush}" Opacity="0.05" CornerRadius="5" />
+                    <Border
+                        Width="{Binding FillWidth}"
+                        Background="{StaticResource AccentBrush}"
+                        Opacity="0.75"
+                        CornerRadius="5"
+                        HorizontalAlignment="Left" />
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate x:Key="MetricRowTemplate">
             <Grid Margin="0,4" ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
@@ -232,6 +278,57 @@
                 <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="2" Text="{Binding Value}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
             </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="FriendshipRowTemplate">
+            <Border
+                Margin="0,3"
+                Padding="8,6"
+                MinHeight="46"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="1"
+                CornerRadius="8"
+                PointerEntered="FriendshipRow_PointerEntered"
+                PointerExited="FriendshipRow_PointerExited">
+                <Grid ColumnSpacing="10" MinHeight="34">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="34" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="UniformToFill" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </StackPanel>
+                    <ItemsControl Grid.Column="2" ItemsSource="{Binding HeartSlots}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Width="18" Height="15">
+                                    <Image Source="{Binding IconUri}" Width="18" Height="15" Stretch="Fill" Opacity="{Binding HeartOpacity}" />
+                                    <Image Source="{Binding FullIconUri}" Width="18" Height="15" Stretch="Fill" Visibility="{Binding PartialVisibility}">
+                                        <Image.Clip>
+                                            <RectangleGeometry Rect="0,0,18,15">
+                                                <RectangleGeometry.Transform>
+                                                    <ScaleTransform ScaleX="{Binding FillPercent}" CenterX="0" />
+                                                </RectangleGeometry.Transform>
+                                            </RectangleGeometry>
+                                        </Image.Clip>
+                                    </Image>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </Border>
         </DataTemplate>
 
         <DataTemplate x:Key="CatchTileTemplate">
@@ -306,16 +403,16 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border Width="{Binding LevelSlots[0].SlotSize}" Height="{Binding LevelSlots[0].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[0].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Width="{Binding LevelSlots[1].SlotSize}" Height="{Binding LevelSlots[1].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[1].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="2" Width="{Binding LevelSlots[2].SlotSize}" Height="{Binding LevelSlots[2].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[2].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="3" Width="{Binding LevelSlots[3].SlotSize}" Height="{Binding LevelSlots[3].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[3].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="4" Width="{Binding LevelSlots[4].SlotSize}" Height="{Binding LevelSlots[4].SlotSize}" CornerRadius="7" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[4].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="5" Width="{Binding LevelSlots[5].SlotSize}" Height="{Binding LevelSlots[5].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[5].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="6" Width="{Binding LevelSlots[6].SlotSize}" Height="{Binding LevelSlots[6].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[6].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="7" Width="{Binding LevelSlots[7].SlotSize}" Height="{Binding LevelSlots[7].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[7].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="8" Width="{Binding LevelSlots[8].SlotSize}" Height="{Binding LevelSlots[8].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[8].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Grid.Column="9" Width="{Binding LevelSlots[9].SlotSize}" Height="{Binding LevelSlots[9].SlotSize}" CornerRadius="7" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[9].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <ContentControl Content="{Binding LevelSlots[0]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="1" Content="{Binding LevelSlots[1]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="2" Content="{Binding LevelSlots[2]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="3" Content="{Binding LevelSlots[3]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="4" Content="{Binding LevelSlots[4]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="5" Content="{Binding LevelSlots[5]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="6" Content="{Binding LevelSlots[6]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="7" Content="{Binding LevelSlots[7]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="8" Content="{Binding LevelSlots[8]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
+                            <ContentControl Grid.Column="9" Content="{Binding LevelSlots[9]}" ContentTemplate="{StaticResource SkillLevelSlotTemplate}" />
                         </Grid>
                         <TextBlock
                             Grid.Row="2"
@@ -350,8 +447,8 @@
                     <ComboBox
                         ItemsSource="{Binding Saves}"
                         SelectedItem="{Binding SelectedSave, Mode=TwoWay}"
-                        Width="220"
-                        Height="32">
+                        MinWidth="420"
+                        Style="{StaticResource TopBarComboBoxStyle}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -371,7 +468,7 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Style="{StaticResource NeutralButtonStyle}" Padding="14,8">
+                    <Button Style="{StaticResource TopBarNeutralButtonStyle}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <FontIcon Glyph="&#xE8B5;" FontSize="15" />
@@ -416,7 +513,7 @@
                         </Button.Flyout>
                     </Button>
 
-                    <Button Style="{StaticResource AccentButtonStyle}" Padding="14,8">
+                    <Button Style="{StaticResource TopBarAccentButtonStyle}">
                     <Button.Content>
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <SymbolIcon Symbol="Save" />
@@ -585,14 +682,15 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel x:Name="SectionColumn0" Spacing="16">
                         <Border x:Name="FarmSummaryPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="经营与农场" Style="{StaticResource SectionTitleStyle}" />
-                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.EconomyStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
+                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.EconomyStats}" ItemTemplate="{StaticResource EconomyMetricRowTemplate}" HorizontalAlignment="Stretch">
                                     <ItemsRepeater.Layout>
-                                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
+                                        <StackLayout Spacing="10" />
                                     </ItemsRepeater.Layout>
                                 </ItemsRepeater>
                                 <ItemsControl ItemsSource="{Binding SelectedPlayer.FarmLifeStats}">
@@ -734,49 +832,15 @@
                                         <FontIcon x:Name="FriendshipExpandIcon" Grid.Column="1" Glyph="&#xE70D;" FontSize="12" Foreground="{StaticResource AccentBrush}" />
                                     </Grid>
                                 </Button>
-                                <ItemsControl ItemsSource="{Binding SelectedPlayer.Friendships}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,5" ColumnSpacing="10" MinHeight="34">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="34" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <Image Source="{Binding IconUri}" Width="32" Height="32" Stretch="UniformToFill" VerticalAlignment="Center" />
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" Spacing="5">
-                                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{Binding RelationshipText}" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
-                                                </StackPanel>
-                                                <ItemsControl Grid.Column="2" ItemsSource="{Binding HeartSlots}" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Horizontal" Spacing="1" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Grid Width="18" Height="15">
-                                                                <Image Source="{Binding IconUri}" Width="18" Height="15" Stretch="Fill" Opacity="{Binding HeartOpacity}" />
-                                                                <Image Source="{Binding FullIconUri}" Width="18" Height="15" Stretch="Fill" Visibility="{Binding PartialVisibility}">
-                                                                    <Image.Clip>
-                                                                        <RectangleGeometry Rect="0,0,18,15">
-                                                                            <RectangleGeometry.Transform>
-                                                                                <ScaleTransform ScaleX="{Binding FillPercent}" CenterX="0" />
-                                                                            </RectangleGeometry.Transform>
-                                                                        </RectangleGeometry>
-                                                                    </Image.Clip>
-                                                                </Image>
-                                                            </Grid>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <ItemsControl x:Name="FriendshipList" ItemsSource="{Binding SelectedPlayer.Friendships}" ItemTemplate="{StaticResource FriendshipRowTemplate}" />
+                                <Grid x:Name="FriendshipColumns" ColumnSpacing="16" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ItemsControl ItemsSource="{Binding SelectedPlayer.FriendshipLeftColumn}" ItemTemplate="{StaticResource FriendshipRowTemplate}" />
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding SelectedPlayer.FriendshipRightColumn}" ItemTemplate="{StaticResource FriendshipRowTemplate}" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </StackPanel>

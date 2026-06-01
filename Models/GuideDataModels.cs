@@ -149,6 +149,9 @@ public sealed class GuideSearchResult
     {
         "人物" => "\uE77B",
         "节日" => "\uE787",
+        "地点" => "\uE81C",
+        "技能" => "\uE7BE",
+        "机制" => "\uE9D9",
         "礼物" => "\uEB52",
         "鱼类" => "\uE7FC",
         "菜谱" => "\uE8D4",

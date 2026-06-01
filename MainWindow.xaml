@@ -5,7 +5,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:LSMA"
     xmlns:pages="using:LSMA.Pages"
-    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
     Title="LSMA">
 
     <Window.SystemBackdrop>
@@ -50,66 +49,99 @@
                         <TextBlock Text="ssistant" Foreground="{ThemeResource MutedTextBrush}" />
                     </StackPanel>
                 </StackPanel>
+            </Grid>
+        </Border>
+        <ContentControl
+            x:Name="LaunchTitleArea"
+            Grid.RowSpan="2"
+            VerticalAlignment="Top"
+            HorizontalAlignment="Center"
+            Width="680"
+            Height="82"
+            Margin="0,6,0,0"
+            Canvas.ZIndex="90"
+            PointerExited="LaunchTitleArea_PointerExited">
+            <Grid
+                x:Name="LaunchHoverSurface"
+                Height="82">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="380" />
+                    <ColumnDefinition Width="150" />
+                </Grid.ColumnDefinitions>
                 <StackPanel
-                    x:Name="LaunchTitleArea"
-                    Grid.Column="1"
+                    x:Name="LaunchTargetOptions"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    HorizontalAlignment="Right"
                     VerticalAlignment="Top"
+                    Opacity="0"
+                    IsHitTestVisible="False"
+                    Canvas.ZIndex="1">
+                    <StackPanel.RenderTransform>
+                        <TranslateTransform x:Name="LaunchTargetOptionsTranslate" X="150" />
+                    </StackPanel.RenderTransform>
+                    <Button
+                        x:Name="SmapiBtn"
+                        Content="SMAPI"
+                        Click="LaunchSmapi_Click"
+                        Style="{StaticResource AccentButtonStyle}"
+                        FontSize="14"
+                        Padding="16,7" />
+                    <Button
+                        x:Name="VanillaBtn"
+                        Content="原版"
+                        Click="LaunchVanilla_Click"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        FontSize="14"
+                        Padding="16,7" />
+                </StackPanel>
+                <Grid
+                    x:Name="LaunchGameButtonHost"
+                    Grid.Column="1"
+                    Width="380"
+                    Height="68"
                     HorizontalAlignment="Center"
-                    Width="130"
-                    Margin="0,6,0,0"
-                    PointerEntered="LaunchTitleArea_PointerEntered"
-                    PointerExited="LaunchTitleArea_PointerExited">
+                    VerticalAlignment="Top"
+                    Canvas.ZIndex="10">
                     <Button
                         x:Name="LaunchGameBtn"
                         Content="启动游戏"
                         Style="{StaticResource AccentButtonStyle}"
                         FontSize="15"
                         Padding="22,7"
-                        MinWidth="130"
-                        Click="LaunchGameBtn_Click" />
-                </StackPanel>
-            </Grid>
-        </Border>
-        <primitives:Popup
-            x:Name="LaunchOptionsPopup"
-            IsLightDismissEnabled="False"
-            ShouldConstrainToRootBounds="False">
-            <Border
-                x:Name="LaunchOptionsBubble"
-                Background="{ThemeResource CardBackgroundBrush}"
-                BorderBrush="{ThemeResource CardBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="10"
-                Width="230"
-                PointerEntered="LaunchOptionsPopup_PointerEntered"
-                PointerExited="LaunchOptionsPopup_PointerExited">
-                <StackPanel Spacing="10">
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <Button
-                            x:Name="SmapiBtn"
-                            Content="SMAPI"
-                            Click="LaunchSmapi_Click"
-                            Style="{StaticResource AccentButtonStyle}"
-                            FontSize="14"
-                            Padding="16,7" />
-                        <Button
-                            x:Name="VanillaBtn"
-                            Content="原版"
-                            Click="LaunchVanilla_Click"
-                            Style="{StaticResource SubtleButtonStyle}"
-                            FontSize="14"
-                            Padding="16,7" />
-                    </StackPanel>
+                        Width="130"
+                        Height="34"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        RenderTransformOrigin="0.5,0"
+                        PointerEntered="LaunchGameBtn_PointerEntered"
+                        Click="LaunchGameBtn_Click">
+                        <Button.RenderTransform>
+                            <ScaleTransform x:Name="LaunchGameScale" ScaleX="1" ScaleY="1" />
+                        </Button.RenderTransform>
+                    </Button>
+                </Grid>
+                <Grid
+                    x:Name="SteamLaunchOption"
+                    Grid.Column="2"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Opacity="0"
+                    IsHitTestVisible="False"
+                    Canvas.ZIndex="1">
+                    <Grid.RenderTransform>
+                        <TranslateTransform x:Name="SteamLaunchOptionTranslate" X="-150" />
+                    </Grid.RenderTransform>
                     <CheckBox
                         x:Name="SteamCheckbox"
                         Content="通过 Steam 启动"
-                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
                         Checked="SteamCheckbox_Changed"
                         Unchecked="SteamCheckbox_Changed" />
-                </StackPanel>
-            </Border>
-        </primitives:Popup>
+                </Grid>
+            </Grid>
+        </ContentControl>
         <NavigationView
             Grid.Row="1"
             x:Name="ShellNavigation"
@@ -154,6 +186,34 @@
                 </Frame.ContentTransitions>
             </Frame>
         </NavigationView>
+        <Border
+            x:Name="StartupLoadingOverlay"
+            Grid.RowSpan="2"
+            Background="{ThemeResource AppBackgroundBrush}"
+            Visibility="Visible"
+            IsHitTestVisible="True"
+            Canvas.ZIndex="110">
+            <StackPanel
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="14">
+                <Image
+                    Source="ms-appx:///Assets/Square150x150Logo.scale-200.png"
+                    Width="84"
+                    Height="84"
+                    Stretch="Uniform" />
+                <ProgressRing
+                    Width="28"
+                    Height="28"
+                    IsActive="True" />
+                <TextBlock
+                    x:Name="StartupStatusText"
+                    Text="正在加载本地模组..."
+                    Style="{StaticResource BodyTextStyle}"
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center" />
+            </StackPanel>
+        </Border>
         <Border
             x:Name="ThemeTransitionOverlay"
             Grid.RowSpan="2"

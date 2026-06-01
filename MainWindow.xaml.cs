@@ -18,14 +18,16 @@ namespace LSMA;
 
 public sealed partial class MainWindow : Window
 {
-    private const double LaunchOptionsPopupWidth = 230;
+    private static readonly TimeSpan StartupModLoadTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan StartupTimeoutNoticeDelay = TimeSpan.FromMilliseconds(900);
     private AppPalette _palette = AppPalette.Stardrop;
     private bool _layoutLoaded;
     private int _appearanceTransitionVersion;
     private Storyboard? _appearanceStoryboard;
     private TaskCompletionSource? _appearanceStoryboardCompletion;
     private bool _updatingNavigationSelection;
-    private CancellationTokenSource? _hideLaunchOptionsCts;
+    private bool _launchOptionsVisible;
+    private Storyboard? _launchOptionsStoryboard;
     private InputNonClientPointerSource? _nonClientPointerSource;
 
     public MainWindow()
@@ -49,6 +51,7 @@ public sealed partial class MainWindow : Window
         AppTitleBarDragRegion.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
         BrandTitleArea.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
         LaunchTitleArea.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
+        LaunchGameButtonHost.SizeChanged += (_, _) => UpdateTitleBarPassthroughRegions();
         RootLayout.Loaded += RootLayout_Loaded;
     }
 
@@ -185,16 +188,70 @@ public sealed partial class MainWindow : Window
         App.Current.Services.Dialogs.AttachRoot(RootLayout);
         App.Current.Services.RunLock.AttachDispatcher(RootLayout.DispatcherQueue);
         App.Current.Services.UiDispatcher.Attach(RootLayout.DispatcherQueue);
-        await App.Current.Services.InitializeAsync();
-        if (await App.Current.TryHandlePendingActivationAsync())
-        {
-            return;
-        }
-
-        if (ContentFrame.CurrentSourcePageType is null)
+        var startupTask = App.Current.Services.InitializeForStartupAsync();
+        var startupReady = await WaitForStartupAsync(startupTask);
+        var handledActivation = await App.Current.TryHandlePendingActivationAsync();
+        if (!handledActivation && ContentFrame.CurrentSourcePageType is null)
         {
             App.Current.Services.Navigation.Navigate(typeof(ModsPage));
         }
+
+        if (startupReady)
+        {
+            HideStartupLoading();
+        }
+        else
+        {
+            _ = HideStartupLoadingAfterNoticeAsync();
+        }
+
+        _ = ContinueStartupInitializationAsync(startupTask);
+    }
+
+    private async Task<bool> WaitForStartupAsync(Task startupTask)
+    {
+        try
+        {
+            if (await Task.WhenAny(startupTask, Task.Delay(StartupModLoadTimeout)) == startupTask)
+            {
+                await startupTask;
+                return true;
+            }
+
+            StartupStatusText.Text = "模组加载超过 15 秒，进入界面后继续刷新。";
+            return false;
+        }
+        catch
+        {
+            StartupStatusText.Text = "模组加载失败，进入界面后可重试。";
+            return true;
+        }
+    }
+
+    private async Task ContinueStartupInitializationAsync(Task startupTask)
+    {
+        try
+        {
+            await startupTask;
+            await App.Current.Services.InitializeDeferredAsync();
+        }
+        catch (Exception exception)
+        {
+            await App.Current.Services.Logging.ErrorAsync("启动初始化失败", exception);
+            await App.Current.Services.Dialogs.ShowMessageAsync("启动初始化失败", exception.Message);
+        }
+    }
+
+    private async Task HideStartupLoadingAfterNoticeAsync()
+    {
+        await Task.Delay(StartupTimeoutNoticeDelay);
+        HideStartupLoading();
+    }
+
+    private void HideStartupLoading()
+    {
+        StartupLoadingOverlay.Visibility = Visibility.Collapsed;
+        StartupLoadingOverlay.IsHitTestVisible = false;
     }
 
     private void UpdateLaunchToggle(bool isSmapi)
@@ -207,49 +264,94 @@ public sealed partial class MainWindow : Window
             : (Style)Application.Current.Resources["DangerButtonStyle"];
     }
 
-    private void LaunchTitleArea_PointerEntered(object sender, PointerRoutedEventArgs e)
+    private void LaunchGameBtn_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        _hideLaunchOptionsCts?.Cancel();
-        PositionLaunchOptionsPopup();
-        LaunchOptionsPopup.IsOpen = true;
+        _launchOptionsVisible = true;
         var target = App.Current.Services.Settings.Current.DefaultLaunchTarget;
         UpdateLaunchToggle(target == LaunchTarget.Smapi);
         SteamCheckbox.IsChecked = App.Current.Services.Settings.Current.LaunchViaSteam;
+        ApplyLaunchOptionsVisual(true, true);
         UpdateTitleBarPassthroughRegions();
     }
 
-    private async void LaunchTitleArea_PointerExited(object sender, PointerRoutedEventArgs e)
+    private void LaunchTitleArea_PointerExited(object sender, PointerRoutedEventArgs e)
     {
-        _hideLaunchOptionsCts?.Cancel();
-        _hideLaunchOptionsCts = new CancellationTokenSource();
-        try
-        {
-            await Task.Delay(300, _hideLaunchOptionsCts.Token);
-            LaunchOptionsPopup.IsOpen = false;
-            UpdateTitleBarPassthroughRegions();
-        }
-        catch (TaskCanceledException)
-        {
-        }
+        _launchOptionsVisible = false;
+        ApplyLaunchOptionsVisual(false, true);
+        UpdateTitleBarPassthroughRegions();
     }
 
-    private void LaunchOptionsPopup_PointerEntered(object sender, PointerRoutedEventArgs e)
+    private void ApplyLaunchOptionsVisual(bool visible, bool animate)
     {
-        _hideLaunchOptionsCts?.Cancel();
+        LaunchHoverSurface.Background = visible
+            ? new SolidColorBrush(Color.FromArgb(0, 0, 0, 0))
+            : null;
+        LaunchTargetOptions.IsHitTestVisible = visible;
+        SteamLaunchOption.IsHitTestVisible = visible;
+
+        var scale = visible ? 2 : 1;
+        var opacity = visible ? 1 : 0;
+        var leftX = visible ? 0 : 150;
+        var rightX = visible ? 0 : -150;
+        if (!animate)
+        {
+            SetLaunchOptionsVisual(scale, opacity, leftX, rightX);
+            return;
+        }
+
+        _launchOptionsStoryboard?.Stop();
+        var duration = new Duration(TimeSpan.FromMilliseconds(visible ? 180 : 150));
+        var easing = new CubicEase
+        {
+            EasingMode = visible ? EasingMode.EaseOut : EasingMode.EaseIn
+        };
+        var storyboard = new Storyboard();
+        AddDoubleAnimation(storyboard, LaunchGameScale, "ScaleX", scale, duration, easing);
+        AddDoubleAnimation(storyboard, LaunchGameScale, "ScaleY", scale, duration, easing);
+        AddDoubleAnimation(storyboard, LaunchTargetOptions, "Opacity", opacity, duration, easing);
+        AddDoubleAnimation(storyboard, SteamLaunchOption, "Opacity", opacity, duration, easing);
+        AddDoubleAnimation(storyboard, LaunchTargetOptionsTranslate, "X", leftX, duration, easing);
+        AddDoubleAnimation(storyboard, SteamLaunchOptionTranslate, "X", rightX, duration, easing);
+        storyboard.Completed += (_, _) =>
+        {
+            SetLaunchOptionsVisual(scale, opacity, leftX, rightX);
+            storyboard.Stop();
+            if (ReferenceEquals(_launchOptionsStoryboard, storyboard))
+            {
+                _launchOptionsStoryboard = null;
+            }
+        };
+        _launchOptionsStoryboard = storyboard;
+        storyboard.Begin();
     }
 
-    private async void LaunchOptionsPopup_PointerExited(object sender, PointerRoutedEventArgs e)
+    private void SetLaunchOptionsVisual(double scale, double opacity, double leftX, double rightX)
     {
-        _hideLaunchOptionsCts?.Cancel();
-        _hideLaunchOptionsCts = new CancellationTokenSource();
-        try
+        LaunchGameScale.ScaleX = scale;
+        LaunchGameScale.ScaleY = scale;
+        LaunchTargetOptions.Opacity = opacity;
+        SteamLaunchOption.Opacity = opacity;
+        LaunchTargetOptionsTranslate.X = leftX;
+        SteamLaunchOptionTranslate.X = rightX;
+    }
+
+    private static void AddDoubleAnimation(
+        Storyboard storyboard,
+        DependencyObject target,
+        string property,
+        double value,
+        Duration duration,
+        EasingFunctionBase easing)
+    {
+        var animation = new DoubleAnimation
         {
-            await Task.Delay(300, _hideLaunchOptionsCts.Token);
-            LaunchOptionsPopup.IsOpen = false;
-        }
-        catch (TaskCanceledException)
-        {
-        }
+            To = value,
+            Duration = duration,
+            EasingFunction = easing
+        };
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, property);
+        storyboard.Children.Add(animation);
     }
 
     private async void LaunchSmapi_Click(object sender, RoutedEventArgs e)
@@ -281,23 +383,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void PositionLaunchOptionsPopup()
-    {
-        if (RootLayout.XamlRoot is null || LaunchGameBtn.ActualWidth <= 0)
-        {
-            return;
-        }
-
-        var bounds = LaunchGameBtn.TransformToVisual(RootLayout)
-            .TransformBounds(new Rect(0, 0, LaunchGameBtn.ActualWidth, LaunchGameBtn.ActualHeight));
-        var maxLeft = Math.Max(0, RootLayout.ActualWidth - LaunchOptionsPopupWidth);
-        LaunchOptionsPopup.HorizontalOffset = Math.Clamp(
-            bounds.X + (bounds.Width / 2) - (LaunchOptionsPopupWidth / 2),
-            0,
-            maxLeft);
-        LaunchOptionsPopup.VerticalOffset = Math.Max(50, bounds.Y + bounds.Height + 6);
-    }
-
     private void UpdateTitleBarPassthroughRegions()
     {
         if (_nonClientPointerSource is null || RootLayout.XamlRoot is null)
@@ -305,9 +390,19 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        var regions = new List<RectInt32>
+        {
+            GetElementRect(BrandTitleArea),
+            GetElementRect(LaunchGameButtonHost)
+        };
+        if (_launchOptionsVisible)
+        {
+            regions.Add(GetElementRect(LaunchTitleArea));
+        }
+
         _nonClientPointerSource.SetRegionRects(
             NonClientRegionKind.Passthrough,
-            [GetElementRect(BrandTitleArea), GetElementRect(LaunchTitleArea)]);
+            [.. regions]);
     }
 
     private static RectInt32 GetElementRect(FrameworkElement element)

@@ -116,7 +116,7 @@ public sealed class AppServices
         PageAcceleration.Apply(Settings.Current.GpuPageAccelerationEnabled);
     }
 
-    public async Task InitializeAsync()
+    public async Task InitializeForStartupAsync()
     {
         await InitializeAppearanceAsync();
         await GameLocator.DetectAsync();
@@ -126,8 +126,18 @@ public sealed class AppServices
         RunLock.Refresh();
         Home.Refresh();
         await Mods.StartAutomaticScanningAsync();
+    }
+
+    public async Task InitializeDeferredAsync()
+    {
         await Guide.RefreshAsync();
         await Saves.StartAutomaticScanningAsync();
         SettingsPage.Refresh();
+    }
+
+    public async Task InitializeAsync()
+    {
+        await InitializeForStartupAsync();
+        await InitializeDeferredAsync();
     }
 }

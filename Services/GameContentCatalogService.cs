@@ -48,6 +48,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         _objectNamesById.Clear();
         _itemResultsByQualifiedId.Clear();
         _collectionItems.Clear();
+        AddWikiGuideResults();
         if (state.GameDirectory is not { } game)
         {
             return;
@@ -900,32 +901,64 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             }
         }
 
-        foreach (var item in LoadRecipeCollectionItems(cookingRecipes, objectNamesById, "食材", "烹饪食谱"))
+        foreach (var item in LoadRecipeCollectionItems(
+            cookingRecipes,
+            objectNamesById,
+            catalogItemsByQualifiedId,
+            "食材",
+            "烹饪食谱",
+            useBigCraftableOutputFlag: false))
         {
             AddCollectionCatalogItem("Cooking", item);
         }
 
-        foreach (var item in LoadRecipeCollectionItems(craftingRecipes, objectNamesById, "材料", "制造配方"))
+        foreach (var item in LoadRecipeCollectionItems(
+            craftingRecipes,
+            objectNamesById,
+            catalogItemsByQualifiedId,
+            "材料",
+            "制造配方",
+            useBigCraftableOutputFlag: true))
         {
             AddCollectionCatalogItem("Crafting", item);
         }
 
-        foreach (var result in LoadRecipeSearchResults(cookingRecipes, objectNamesById, "菜谱").ToList())
+        foreach (var recipe in LoadRecipeSearchResults(
+            cookingRecipes,
+            objectNamesById,
+            catalogItemsByQualifiedId,
+            "菜谱",
+            useBigCraftableOutputFlag: false).ToList())
         {
-            if (result.ObjectId is { } objectId && objectResultsById.TryGetValue(objectId, out var objectResult))
+            var result = recipe.Result;
+            if (recipe.Output.ObjectId is { } objectId && objectResultsById.TryGetValue(objectId, out var objectResult))
             {
                 AddClonedSections(objectResult, result.Sections);
+            }
+            else if (itemResultsByQualifiedId.TryGetValue(recipe.Output.ItemId, out var itemResult))
+            {
+                AddClonedSections(itemResult, result.Sections);
             }
 
             AddRecipeReverseAssociations(result, objectResultsById, "用于菜谱");
             _searchIndex.Add(result);
         }
 
-        foreach (var result in LoadRecipeSearchResults(craftingRecipes, objectNamesById, "配方").ToList())
+        foreach (var recipe in LoadRecipeSearchResults(
+            craftingRecipes,
+            objectNamesById,
+            catalogItemsByQualifiedId,
+            "配方",
+            useBigCraftableOutputFlag: true).ToList())
         {
-            if (result.ObjectId is { } objectId && objectResultsById.TryGetValue(objectId, out var objectResult))
+            var result = recipe.Result;
+            if (recipe.Output.ObjectId is { } objectId && objectResultsById.TryGetValue(objectId, out var objectResult))
             {
                 AddClonedSections(objectResult, result.Sections);
+            }
+            else if (itemResultsByQualifiedId.TryGetValue(recipe.Output.ItemId, out var itemResult))
+            {
+                AddClonedSections(itemResult, result.Sections);
             }
 
             AddRecipeReverseAssociations(result, objectResultsById, "用于配方");
@@ -2324,10 +2357,12 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         };
     }
 
-    private static IEnumerable<GuideSearchResult> LoadRecipeSearchResults(
+    private static IEnumerable<RecipeSearchResultDefinition> LoadRecipeSearchResults(
         IReadOnlyDictionary<string, string> recipeData,
         IReadOnlyDictionary<string, string> objectNamesById,
-        string category)
+        IReadOnlyDictionary<string, CatalogItemReference> catalogItemsByQualifiedId,
+        string category,
+        bool useBigCraftableOutputFlag)
     {
         foreach (var (_, raw) in recipeData)
         {
@@ -2339,7 +2374,12 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
 
             var outputTokens = fields[2].Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var outputId = outputTokens.FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(outputId) || !objectNamesById.TryGetValue(outputId, out var outputName))
+            var outputReference = ResolveRecipeOutputReference(
+                outputId,
+                useBigCraftableOutputFlag && IsBigCraftableRecipeOutput(fields),
+                objectNamesById,
+                catalogItemsByQualifiedId);
+            if (outputReference is null)
             {
                 continue;
             }
@@ -2353,9 +2393,13 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             var result = new GuideSearchResult
             {
                 Category = category,
-                Title = outputName,
+                Title = outputReference.Name,
                 Detail = $"{category}：{string.Join("、", ingredients.Select(item => item.DisplayText))}",
-                ObjectId = int.TryParse(outputId, out var objectId) ? objectId : null
+                ObjectId = outputReference.ObjectId,
+                IconTexture = outputReference.IconTexture,
+                IconSpriteIndex = outputReference.IconSpriteIndex,
+                IconWidth = outputReference.IconWidth,
+                IconHeight = outputReference.IconHeight
             };
             var section = new GuideSearchSection { Title = category == "菜谱" ? "所需食材" : "所需材料" };
             section.Actions.AddRange(ingredients.Select(item => new GuideSearchAction
@@ -2366,15 +2410,17 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
                 ObjectId = item.ObjectId
             }));
             result.Sections.Add(section);
-            yield return result;
+            yield return new RecipeSearchResultDefinition(outputReference, result);
         }
     }
 
     private static IEnumerable<CollectionCatalogItem> LoadRecipeCollectionItems(
         IReadOnlyDictionary<string, string> recipeData,
         IReadOnlyDictionary<string, string> objectNamesById,
+        IReadOnlyDictionary<string, CatalogItemReference> catalogItemsByQualifiedId,
         string ingredientLabel,
-        string fallbackDetail)
+        string fallbackDetail,
+        bool useBigCraftableOutputFlag)
     {
         foreach (var (recipeKey, raw) in recipeData)
         {
@@ -2386,26 +2432,105 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
 
             var outputTokens = fields[2].Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var outputId = outputTokens.FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(outputId) || !objectNamesById.TryGetValue(outputId, out var outputName))
+            var outputReference = ResolveRecipeOutputReference(
+                outputId,
+                useBigCraftableOutputFlag && IsBigCraftableRecipeOutput(fields),
+                objectNamesById,
+                catalogItemsByQualifiedId);
+            if (outputReference is null)
             {
                 continue;
             }
 
             var ingredients = ParseRecipeIngredients(fields[0], objectNamesById).ToList();
-            int? objectId = int.TryParse(outputId, out var parsedObjectId) ? parsedObjectId : null;
             yield return new CollectionCatalogItem(
                 recipeKey,
-                outputName,
+                outputReference.Name,
                 ingredients.Count > 0
                     ? $"{ingredientLabel}：{string.Join("、", ingredients.Select(item => item.DisplayText))}"
                     : fallbackDetail,
-                objectId,
-                null,
-                null,
-                16,
-                16,
-                objectId ?? int.MaxValue);
+                outputReference.ObjectId,
+                outputReference.IconTexture,
+                outputReference.IconSpriteIndex,
+                outputReference.IconWidth,
+                outputReference.IconHeight,
+                RecipeOutputSortKey(outputReference, outputId));
         }
+    }
+
+    private static CatalogItemReference? ResolveRecipeOutputReference(
+        string? rawOutputId,
+        bool isBigCraftable,
+        IReadOnlyDictionary<string, string> objectNamesById,
+        IReadOnlyDictionary<string, CatalogItemReference> catalogItemsByQualifiedId)
+    {
+        var outputId = rawOutputId?.Trim();
+        if (string.IsNullOrWhiteSpace(outputId))
+        {
+            return null;
+        }
+
+        var match = QualifiedItemType().Match(outputId);
+        if (match.Success)
+        {
+            if (catalogItemsByQualifiedId.TryGetValue(outputId, out var qualifiedReference))
+            {
+                return qualifiedReference;
+            }
+
+            isBigCraftable = match.Groups[1].Value.Equals("BC", StringComparison.OrdinalIgnoreCase);
+            outputId = match.Groups[2].Value;
+        }
+
+        if (isBigCraftable && catalogItemsByQualifiedId.TryGetValue($"(BC){outputId}", out var bigCraftableReference))
+        {
+            return bigCraftableReference;
+        }
+
+        if (catalogItemsByQualifiedId.TryGetValue($"(O){outputId}", out var objectReference))
+        {
+            return objectReference;
+        }
+
+        if (!isBigCraftable && catalogItemsByQualifiedId.TryGetValue(outputId, out var rawReference))
+        {
+            return rawReference;
+        }
+
+        if (objectNamesById.TryGetValue(outputId, out var outputName))
+        {
+            return new CatalogItemReference(
+                $"(O){outputId}",
+                outputName,
+                "物品",
+                string.Empty,
+                int.TryParse(outputId, out var objectId) ? objectId : null,
+                null,
+                null,
+                16,
+                16);
+        }
+
+        return null;
+    }
+
+    private static bool IsBigCraftableRecipeOutput(IReadOnlyList<string> fields)
+        => fields.Count > 3 && bool.TryParse(fields[3], out var isBigCraftable) && isBigCraftable;
+
+    private static int RecipeOutputSortKey(CatalogItemReference outputReference, string? rawOutputId)
+    {
+        if (outputReference.ObjectId is { } objectId)
+        {
+            return objectId;
+        }
+
+        var match = QualifiedItemType().Match(outputReference.ItemId);
+        if (match.Success && int.TryParse(match.Groups[2].Value, out var qualifiedId))
+        {
+            return qualifiedId;
+        }
+
+        return int.TryParse(rawOutputId, out var rawId) ? rawId : int.MaxValue;
     }
 
     private static IEnumerable<RecipeIngredientDefinition> ParseRecipeIngredients(
@@ -2755,6 +2880,10 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         int? IconSpriteIndex,
         int IconWidth,
         int IconHeight);
+
+    private sealed record RecipeSearchResultDefinition(
+        CatalogItemReference Output,
+        GuideSearchResult Result);
 
     private sealed record CommunityBundleDefinition(
         int Id,

@@ -46,7 +46,7 @@ public sealed partial class SavesPage : Page
     private bool _responsiveLayoutQueued;
     private bool _isFishPanelExpanded;
     private bool _isMonsterPanelExpanded;
-    private bool _isFriendshipPanelExpanded;
+    private bool _isFriendshipPanelExpanded = true;
 
     public SavesPage()
     {
@@ -353,6 +353,7 @@ public sealed partial class SavesPage : Page
             columnPanels[index].Visibility = index < columns ? Visibility.Visible : Visibility.Collapsed;
         }
         ApplySectionColumnMargins(columnPanels, columns);
+        SetFriendshipListMode(columns);
 
         var sections = SectionPanels();
         var signature = columns.ToString();
@@ -368,6 +369,7 @@ public sealed partial class SavesPage : Page
         {
             _isFishPanelExpanded = columns > 1;
             _isMonsterPanelExpanded = columns > 1;
+            _isFriendshipPanelExpanded = true;
             ApplyExpandablePanelStates();
         }
 
@@ -387,22 +389,25 @@ public sealed partial class SavesPage : Page
             return;
         }
 
-        AddSections(SectionColumn0, FarmSummaryPanel, SkillsPanel);
         if (columns == 3)
         {
-            AddSections(SectionColumn1, ActivityPanel, FriendshipPanel);
+            AddSections(SectionColumn0, FarmSummaryPanel);
+            AddSections(SectionColumn1, ActivityPanel, SkillsPanel);
             AddSections(SectionColumn2, PerfectionPanel, CollectionPanel);
-            AddGridSection(FishPanel, 0, 1, 3);
-            AddGridSection(MonsterPanel, 0, 2, 3);
+            AddGridSection(FriendshipPanel, 0, 1, 3);
+            AddGridSection(FishPanel, 0, 2, 3);
+            AddGridSection(MonsterPanel, 0, 3, 3);
             QueueTopColumnStretch(columns);
             return;
         }
 
+        AddSections(SectionColumn0, FarmSummaryPanel);
         AddSections(SectionColumn1, ActivityPanel, CollectionPanel);
         AddSections(SectionColumn2, PerfectionPanel);
-        AddSections(SectionColumn3, FriendshipPanel);
-        AddGridSection(FishPanel, 0, 1, 2);
-        AddGridSection(MonsterPanel, 2, 1, 2);
+        AddSections(SectionColumn3, SkillsPanel);
+        AddGridSection(FriendshipPanel, 0, 1, 4);
+        AddGridSection(FishPanel, 0, 2, 2);
+        AddGridSection(MonsterPanel, 2, 2, 2);
         QueueTopColumnStretch(columns);
     }
 
@@ -446,6 +451,13 @@ public sealed partial class SavesPage : Page
                 ? new Thickness(0, 0, SectionColumnSpacing, 0)
                 : new Thickness(0);
         }
+    }
+
+    private void SetFriendshipListMode(int columns)
+    {
+        var useTwoColumns = columns >= 3;
+        FriendshipList.Visibility = useTwoColumns ? Visibility.Collapsed : Visibility.Visible;
+        FriendshipColumns.Visibility = useTwoColumns ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void AddGridSection(FrameworkElement section, int column, int row, int columnSpan)
@@ -500,7 +512,7 @@ public sealed partial class SavesPage : Page
 
     private void ResetTopColumnStretch()
     {
-        foreach (var panel in new FrameworkElement[] { SkillsPanel, CollectionPanel, PerfectionPanel, FriendshipPanel })
+        foreach (var panel in new FrameworkElement[] { FarmSummaryPanel, ActivityPanel, SkillsPanel, CollectionPanel, PerfectionPanel, FriendshipPanel })
         {
             panel.MinHeight = 0;
         }
@@ -522,6 +534,28 @@ public sealed partial class SavesPage : Page
     {
         _isFriendshipPanelExpanded = !_isFriendshipPanelExpanded;
         ApplyExpandablePanelStates();
+    }
+
+    private void FriendshipRow_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not Border row)
+        {
+            return;
+        }
+
+        row.Background = (Brush)Application.Current.Resources["AccentSoftBrush"];
+        row.BorderBrush = (Brush)Application.Current.Resources["AccentBrush"];
+    }
+
+    private void FriendshipRow_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not Border row)
+        {
+            return;
+        }
+
+        row.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        row.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
     }
 
     private void ApplyExpandablePanelStates()
