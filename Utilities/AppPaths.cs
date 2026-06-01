@@ -23,6 +23,8 @@ public static class AppPaths
     public static string Cache => Path.Combine(LocalRoot, "Cache");
     public static string ModTranslationCacheFile => Path.Combine(Cache, "mod-translations.zh-CN.json");
     public static string NexusModNameTranslationCacheFile => Path.Combine(Cache, "nexus-mod-name-translations.zh-CN.json");
+    public static string NexusCoverCache => Path.Combine(Cache, "NexusCovers");
+    public static string NexusCoverCacheFile => Path.Combine(Cache, "nexus-cover-cache.json");
     public static string AssetCache => Path.Combine(LocalRoot, "AssetCache", "StardewValley");
     public static string Temp => Path.Combine(LocalRoot, "Temp");
     public static string SaveSource => Path.Combine(
@@ -46,6 +48,7 @@ public static class AppPaths
         LastKnownGood,
         Logs,
         Cache,
+        NexusCoverCache,
         AssetCache,
         Temp
     ];

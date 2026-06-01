@@ -22,9 +22,12 @@ public sealed class DownloadsViewModel : ViewModelBase
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
     private readonly NexusModNameTranslationService _nameTranslations;
+    private readonly NexusCoverCacheService _coverCache;
     private List<NexusModInfo> _loadedOnlineMods = [];
     private NexusModInfo? _selectedOnlineMod;
     private NexusFileInfo? _selectedOnlineFile;
+    private int _onlineFilesLoadVersion;
+    private bool _suppressOnlineFileAutoLoad;
     private string _onlineQuery = string.Empty;
     private List<NexusFavorite> _favoriteValues = [];
     private CancellationTokenSource? _downloadCancellation;
@@ -81,7 +84,8 @@ public sealed class DownloadsViewModel : ViewModelBase
         SettingsService settings,
         PlatformService platform,
         DialogService dialogs,
-        NexusModNameTranslationService nameTranslations)
+        NexusModNameTranslationService nameTranslations,
+        NexusCoverCacheService coverCache)
     {
         _state = state;
         _credentials = credentials;
@@ -93,6 +97,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         _platform = platform;
         _dialogs = dialogs;
         _nameTranslations = nameTranslations;
+        _coverCache = coverCache;
 
         OnlineCategories.Add(AllCategories);
         _selectedOnlineCategory = AllCategories;
@@ -103,6 +108,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         LoadFilesCommand = new AsyncRelayCommand(LoadFilesAsync, () => SelectedOnlineMod is not null && !IsBusy);
         DownloadFileCommand = new AsyncRelayCommand(DownloadLatestFileAsync, () => SelectedOnlineMod is not null && !IsBusy);
         CancelDownloadCommand = new RelayCommand(CancelDownload, () => _isDownloading);
+        InstallMissingDependencyCommand = new AsyncRelayCommand<MissingDependencyAction?>(InstallMissingDependencyAsync, dependency => dependency?.CanDownload == true && !IsBusy);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
         LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync, () => HasMorePages && !IsBusy);
     }
@@ -124,6 +130,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     public ObservableCollection<NexusModInfo> OnlineMods { get; } = [];
     public ObservableCollection<NexusFileInfo> OnlineFiles { get; } = [];
     public ObservableCollection<DownloadQueueItem> DownloadQueue { get; } = [];
+    public ObservableCollection<MissingDependencyAction> MissingDependencies { get; } = [];
 
     public NexusModInfo? SelectedOnlineMod
     {
@@ -147,10 +154,15 @@ public sealed class DownloadsViewModel : ViewModelBase
                     value.IsSelected = true;
                 }
 
+                var loadVersion = ++_onlineFilesLoadVersion;
                 OnlineFiles.Clear();
                 SelectedOnlineFile = null;
                 OnPropertyChanged(nameof(FavoriteButtonText));
                 NotifyCommands();
+                if (value is not null && !_suppressOnlineFileAutoLoad)
+                {
+                    _ = LoadFilesForSelectedModAsync(value, loadVersion);
+                }
             }
         }
     }
@@ -164,6 +176,19 @@ public sealed class DownloadsViewModel : ViewModelBase
             {
                 NotifyCommands();
             }
+        }
+    }
+
+    private void SelectOnlineModWithoutAutoFileLoad(NexusModInfo? mod)
+    {
+        _suppressOnlineFileAutoLoad = true;
+        try
+        {
+            SelectedOnlineMod = mod;
+        }
+        finally
+        {
+            _suppressOnlineFileAutoLoad = false;
         }
     }
 
@@ -181,6 +206,7 @@ public sealed class DownloadsViewModel : ViewModelBase
     public IAsyncRelayCommand LoadFilesCommand { get; }
     public IAsyncRelayCommand DownloadFileCommand { get; }
     public IRelayCommand CancelDownloadCommand { get; }
+    public IAsyncRelayCommand<MissingDependencyAction?> InstallMissingDependencyCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
     public IAsyncRelayCommand LoadMoreCommand { get; }
 
@@ -213,13 +239,14 @@ public sealed class DownloadsViewModel : ViewModelBase
             var mod = await _nexus.GetModAsync(modId, key);
             _favoriteValues = await _favoritesService.LoadAsync();
             ApplyResultMarkers([mod]);
+            await _coverCache.ApplyCachedAndQueueAsync([mod]);
 
             _loadedOnlineMods = [mod];
             OnlineQuery = string.Empty;
             HasMorePages = false;
             OnlineMods.Clear();
             OnlineMods.Add(mod);
-            SelectedOnlineMod = mod;
+            SelectOnlineModWithoutAutoFileLoad(mod);
             QueueNameTranslations([mod]);
 
             OnlineFiles.Clear();
@@ -428,6 +455,7 @@ public sealed class DownloadsViewModel : ViewModelBase
 
         _favoriteValues = await _favoritesService.LoadAsync();
         ApplyResultMarkers(_loadedOnlineMods);
+        await _coverCache.ApplyCachedAndQueueAsync(newMods);
 
         if (append)
         {
@@ -551,37 +579,51 @@ public sealed class DownloadsViewModel : ViewModelBase
 
     private async Task LoadFilesAsync()
     {
-        var key = RequireNexusKey();
-        if (key is null || SelectedOnlineMod is not { } mod) return;
+        if (SelectedOnlineMod is not { } mod) return;
 
-        IsBusy = true;
-        ProgressText = "正在刷新所有历史版本...";
-        Refresh();
-        NotifyCommands();
+        var loadVersion = ++_onlineFilesLoadVersion;
+        await LoadFilesForSelectedModAsync(mod, loadVersion);
+    }
+
+    private async Task LoadFilesForSelectedModAsync(NexusModInfo mod, int loadVersion)
+    {
+        var key = RequireNexusKey();
+        if (key is null) return;
+
+        FeedbackMessage = "正在加载历史版本...";
+        OnPropertyChanged(nameof(FeedbackMessage));
+
+        IReadOnlyList<NexusFileInfo> files;
         try
         {
-            OnlineFiles.Clear();
-            foreach (var file in await _nexus.GetFilesAsync(mod.ModId, key))
-            {
-                OnlineFiles.Add(file);
-            }
-            SelectedOnlineFile = OnlineFiles.FirstOrDefault();
-            FeedbackMessage = OnlineFiles.Count > 0
-                ? $"已加载 {OnlineFiles.Count} 个历史版本。"
-                : "该模组没有可下载文件。";
-            OnPropertyChanged(nameof(FeedbackMessage));
+            files = await _nexus.GetFilesAsync(mod.ModId, key);
         }
         catch (NexusApiException exception)
         {
-            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+            if (loadVersion == _onlineFilesLoadVersion && ReferenceEquals(SelectedOnlineMod, mod))
+            {
+                await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+            }
+
+            return;
         }
-        finally
+
+        if (loadVersion != _onlineFilesLoadVersion || !ReferenceEquals(SelectedOnlineMod, mod))
         {
-            IsBusy = false;
-            ProgressText = string.Empty;
-            Refresh();
-            NotifyCommands();
+            return;
         }
+
+        OnlineFiles.Clear();
+        foreach (var file in files)
+        {
+            OnlineFiles.Add(file);
+        }
+
+        SelectedOnlineFile = SelectLatestFile(OnlineFiles);
+        FeedbackMessage = OnlineFiles.Count > 0
+            ? $"已加载 {OnlineFiles.Count} 个历史版本。"
+            : "该模组没有可下载文件。";
+        OnPropertyChanged(nameof(FeedbackMessage));
     }
 
     private async Task DownloadLatestFileAsync()
@@ -622,7 +664,83 @@ public sealed class DownloadsViewModel : ViewModelBase
             NotifyCommands();
         }
 
+        MissingDependencies.Clear();
+        OnPropertyChanged(nameof(MissingDependencies));
         await DownloadItemAsync(CreateQueueItem(mod, file), key);
+    }
+
+    public async Task<bool> InstallModByIdAsync(long modId, string? displayName = null)
+    {
+        if (IsBusy)
+        {
+            return false;
+        }
+
+        var key = RequireNexusKey();
+        if (key is null)
+        {
+            return false;
+        }
+
+        DownloadQueueItem? queueItem = null;
+        IsBusy = true;
+        ProgressText = string.IsNullOrWhiteSpace(displayName)
+            ? "正在获取前置模组..."
+            : $"正在获取前置模组：{displayName}";
+        Refresh();
+        NotifyCommands();
+        try
+        {
+            var mod = await _nexus.GetModAsync(modId, key);
+            var file = SelectLatestFile(await _nexus.GetFilesAsync(mod.ModId, key));
+            if (file is null)
+            {
+                FeedbackMessage = "该前置没有可下载文件。";
+                OnPropertyChanged(nameof(FeedbackMessage));
+                return false;
+            }
+
+            _favoriteValues = await _favoritesService.LoadAsync();
+            ApplyResultMarkers([mod]);
+            await _coverCache.ApplyCachedAndQueueAsync([mod]);
+            SelectOnlineModWithoutAutoFileLoad(mod);
+            OnlineFiles.Clear();
+            OnlineFiles.Add(file);
+            SelectedOnlineFile = file;
+            queueItem = CreateQueueItem(mod, file);
+        }
+        catch (NexusApiException exception)
+        {
+            await _dialogs.ShowMessageAsync("Nexus", exception.Message);
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+            NotifyCommands();
+        }
+
+        await DownloadItemAsync(queueItem, key);
+        return queueItem.State == DownloadState.Installed;
+    }
+
+    private async Task InstallMissingDependencyAsync(MissingDependencyAction? dependency)
+    {
+        if (dependency?.NexusModId is not { } modId)
+        {
+            FeedbackMessage = "该前置未绑定 Nexus ID，请在下载页手动搜索。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            return;
+        }
+
+        if (await InstallModByIdAsync(modId, dependency.UniqueId))
+        {
+            MissingDependencies.Remove(dependency);
+        }
+
+        NotifyCommands();
     }
 
     private static NexusFileInfo? SelectLatestFile(IReadOnlyList<NexusFileInfo> files)
@@ -853,6 +971,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         {
             await App.Current.Services.Mods.ScanForLaunchAsync();
             plan = await _packages.InspectAsync(packagePath);
+            MergeMissingDependencies(plan.MissingDependencies);
             if (!plan.CanInstall)
             {
                 var message = plan.Blockers.Count > 0
@@ -889,7 +1008,9 @@ public sealed class DownloadsViewModel : ViewModelBase
 
             item.State = DownloadState.Installed;
             item.Error = null;
-            FeedbackMessage = $"安装完成：{result.InstalledCount} 个模组。";
+            FeedbackMessage = plan.MissingDependencies.Count > 0
+                ? $"安装完成：{result.InstalledCount} 个模组。仍缺少 {plan.MissingDependencies.Count} 个前置，可继续下载。"
+                : $"安装完成：{result.InstalledCount} 个模组。";
             OnPropertyChanged(nameof(FeedbackMessage));
             await App.Current.Services.Mods.ScanForLaunchAsync();
         }
@@ -908,6 +1029,19 @@ public sealed class DownloadsViewModel : ViewModelBase
                 await _packages.CleanupPreparedPackageAsync(plan);
             }
         }
+    }
+
+    private void MergeMissingDependencies(IEnumerable<MissingDependencyAction> dependencies)
+    {
+        foreach (var dependency in dependencies)
+        {
+            if (!MissingDependencies.Any(value => value.UniqueId.Equals(dependency.UniqueId, StringComparison.OrdinalIgnoreCase)))
+            {
+                MissingDependencies.Add(dependency);
+            }
+        }
+
+        InstallMissingDependencyCommand.NotifyCanExecuteChanged();
     }
 
     private async Task HandleRequirementsPopupLinkAsync(NexusRequirementsPopupLink popup)
@@ -951,6 +1085,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         LoadFilesCommand.NotifyCanExecuteChanged();
         DownloadFileCommand.NotifyCanExecuteChanged();
         CancelDownloadCommand.NotifyCanExecuteChanged();
+        InstallMissingDependencyCommand.NotifyCanExecuteChanged();
         RefreshCommand.NotifyCanExecuteChanged();
         LoadMoreCommand.NotifyCanExecuteChanged();
     }

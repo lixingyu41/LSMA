@@ -24,96 +24,143 @@
             </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnSpacing="14">
+        <Grid x:Name="DownloadsSplitGrid" Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="380" />
+                <ColumnDefinition x:Name="DownloadsListColumn" Width="*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition x:Name="DownloadsDetailColumn" Width="380" />
             </Grid.ColumnDefinitions>
 
             <!-- Mod list -->
-            <Border Style="{StaticResource CardStyle}" Padding="8">
-                <ListView x:Name="OnlineModsList"
-                          ItemsSource="{Binding OnlineMods}"
-                          SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}"
-                          Loaded="OnlineModsList_Loaded"
-                          SelectionMode="Single"
-                          ScrollViewer.VerticalScrollBarVisibility="Auto"
-                          ScrollViewer.VerticalScrollMode="Enabled">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="0" />
-                            <Setter Property="MinHeight" Value="0" />
-                            <Setter Property="UseSystemFocusVisuals" Value="False" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListViewItem">
-                                        <ContentPresenter Content="{TemplateBinding Content}"
-                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,4,8,4"
-                                  PointerEntered="OnlineModListItem_PointerEntered"
-                                  PointerExited="OnlineModListItem_PointerExited">
-                                <Border Background="{ThemeResource CardBackgroundBrush}"
-                                        BorderBrush="{ThemeResource CardBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8" />
-                                <Border Background="{ThemeResource AccentSoftBrush}"
-                                        CornerRadius="8"
-                                        Opacity="{Binding HoverLayerOpacity}" />
-                                <Border Background="{ThemeResource AccentSoftBrush}"
-                                        CornerRadius="8"
-                                        Opacity="{Binding SelectedLayerOpacity}" />
-                                <Grid Padding="10,8" ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="3" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid Margin="0,4,0,4">
-                                        <Border Background="{StaticResource AccentBrush}"
-                                                CornerRadius="1.5"
-                                                Opacity="{Binding HoverIndicatorOpacity}" />
-                                        <Border Background="{StaticResource AccentBrush}"
-                                                CornerRadius="1.5"
-                                                Opacity="{Binding SelectedIndicatorOpacity}" />
-                                    </Grid>
-                                    <Grid Grid.Column="1" ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="3">
+            <Grid>
+                <Border Style="{StaticResource CardStyle}" Padding="8">
+                    <ListView x:Name="OnlineModsList"
+                              ItemsSource="{Binding OnlineMods}"
+                              SelectedItem="{Binding SelectedOnlineMod, Mode=TwoWay}"
+                              Loaded="OnlineModsList_Loaded"
+                              SelectionMode="Single"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollMode="Enabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="UseSystemFocusVisuals" Value="False" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListViewItem">
+                                            <ContentPresenter Content="{TemplateBinding Content}"
+                                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,4,8,4"
+                                      MinHeight="116"
+                                      PointerEntered="OnlineModListItem_PointerEntered"
+                                      PointerExited="OnlineModListItem_PointerExited">
+                                    <Border Background="{ThemeResource CardBackgroundBrush}"
+                                            BorderBrush="{ThemeResource CardBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8" />
+                                    <Border Background="{ThemeResource AccentSoftBrush}"
+                                            CornerRadius="8"
+                                            Opacity="{Binding HoverLayerOpacity}" />
+                                    <Border Background="{ThemeResource AccentSoftBrush}"
+                                            CornerRadius="8"
+                                            Opacity="{Binding SelectedLayerOpacity}" />
+                                    <Grid Padding="10,10" ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="128" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="112" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0"
+                                                Width="128"
+                                                Height="82"
+                                                Background="{ThemeResource AccentSoftBrush}"
+                                                BorderBrush="{ThemeResource CardBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                VerticalAlignment="Top"
+                                                Tapped="OnlineCover_Tapped"
+                                                ToolTipService.ToolTip="预览封面">
+                                            <Grid>
+                                                <Image Source="{Binding CoverImageUri}" Stretch="Uniform" Visibility="{Binding CoverImageVisibility}" />
+                                                <FontIcon Glyph="&#xEB9F;" FontSize="24" Opacity="0.5" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding CoverPlaceholderVisibility}" />
+                                            </Grid>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="4">
                                             <TextBlock Text="{Binding DisplayName}" Foreground="{Binding ListTextBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Author}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding CategoryText}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Summary}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextWrapping="WrapWholeWords" MaxLines="3" />
                                             <TextBlock Text="{Binding ResultStateText}" Foreground="{StaticResource AccentBrush}" FontSize="14" Visibility="{Binding ResultStateVisibility}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Summary}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" TextTrimming="CharacterEllipsis" MinHeight="18" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                                            <TextBlock Text="{Binding ModIdText}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" />
-                                            <TextBlock Text="{Binding Version}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" />
-                                            <TextBlock Text="{Binding DownloadStatusText}" Foreground="{Binding ListTextBrush}" HorizontalAlignment="Right" />
+                                        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="8">
+                                            <TextBlock Text="{Binding ModIdText}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding UpdatedText}" Foreground="{Binding ListTextBrush}" FontSize="14" Opacity="0.72" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DownloadsText}" Foreground="{Binding ListTextBrush}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                     </Grid>
                                 </Grid>
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
+                <Border x:Name="OnlineCoverPreviewOverlay"
+                        Background="#B0000000"
+                        Visibility="Collapsed"
+                        IsTabStop="True"
+                        KeyDown="OnlineCoverPreviewOverlay_KeyDown"
+                        Tapped="OnlineCoverPreviewOverlay_Tapped">
+                    <Grid>
+                        <Image x:Name="OnlineCoverPreviewImage"
+                               Stretch="Uniform"
+                               MaxWidth="900"
+                               MaxHeight="620"
+                               PointerPressed="OnlineCoverPreviewImage_PointerPressed"
+                               PointerMoved="OnlineCoverPreviewImage_PointerMoved"
+                               PointerReleased="OnlineCoverPreviewImage_PointerReleased"
+                               PointerCanceled="OnlineCoverPreviewImage_PointerReleased"
+                               PointerWheelChanged="OnlineCoverPreviewImage_PointerWheelChanged"
+                               Tapped="OnlineCoverPreviewImage_Tapped">
+                            <Image.RenderTransform>
+                                <CompositeTransform x:Name="OnlineCoverPreviewTransform" />
+                            </Image.RenderTransform>
+                        </Image>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Splitter -->
+            <Border x:Name="DownloadsSplitter"
+                    Grid.Column="1"
+                    Width="14"
+                    Background="Transparent"
+                    PointerPressed="DownloadsSplitter_PointerPressed"
+                    PointerMoved="DownloadsSplitter_PointerMoved"
+                    PointerReleased="DownloadsSplitter_PointerReleased"
+                    PointerCanceled="DownloadsSplitter_PointerReleased">
+                <Border Width="2"
+                        HorizontalAlignment="Center"
+                        Background="{ThemeResource CardBorderBrush}"
+                        CornerRadius="1" />
             </Border>
 
             <!-- Detail panel -->
-            <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
                 <ScrollViewer>
                     <StackPanel Spacing="12">
-                        <TextBlock Text="{Binding SelectedOnlineMod.DisplayName}" Style="{StaticResource SectionTitleStyle}" />
-                        <TextBlock Text="{Binding SelectedOnlineMod.Summary}" Style="{StaticResource BodyTextStyle}" />
+                        <TextBlock Text="{Binding SelectedOnlineMod.DisplayName}" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" TextTrimming="None" />
+                        <TextBlock Text="{Binding SelectedOnlineMod.Summary}" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap" TextTrimming="None" />
 
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <ToggleButton Content="{Binding FavoriteButtonText}" Command="{Binding ToggleFavoriteCommand}"
@@ -123,20 +170,31 @@
                                     Style="{StaticResource SubtleButtonStyle}" />
                         </StackPanel>
 
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}"
-                                      DisplayMemberPath="DisplayText" PlaceholderText="历史版本" MinHeight="32" />
-                            <Button Grid.Column="1" Content="刷新所有历史版本" Command="{Binding LoadFilesCommand}"
-                                    Style="{StaticResource SubtleButtonStyle}" MinHeight="32" Padding="12,0" />
-                        </Grid>
+                        <ComboBox ItemsSource="{Binding OnlineFiles}" SelectedItem="{Binding SelectedOnlineFile, Mode=TwoWay}"
+                                  DisplayMemberPath="DisplayText" PlaceholderText="历史版本" MinHeight="32" HorizontalAlignment="Stretch" />
 
                         <Button Content="下载最新" Command="{Binding DownloadFileCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
                         <Button Content="取消下载" Command="{Binding CancelDownloadCommand}" Style="{StaticResource NeutralButtonStyle}" HorizontalAlignment="Left" />
                         <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding MissingDependencies}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="8" Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1"
+                                                Content="{Binding ButtonText}"
+                                                Command="{Binding DataContext.InstallMissingDependencyCommand, ElementName=DownloadsPageRoot}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding CanDownload}"
+                                                Style="{StaticResource SubtleButtonStyle}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using LSMA.Utilities;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
@@ -29,6 +30,12 @@ public sealed class NexusModInfo : ObservableObject
     private bool _isFavorite;
     private bool _isInstalled;
     private string? _translatedName;
+    private int _categoryId;
+    private long _updatedTimestamp;
+    private long _downloads;
+    private string? _coverSourceUrl;
+    private string? _coverImageUri;
+    private string? _categoryName;
 
     [JsonPropertyName("mod_id")]
     public long ModId { get; set; }
@@ -41,14 +48,86 @@ public sealed class NexusModInfo : ObservableObject
     [JsonPropertyName("author")]
     public string Author { get; set; } = "未知作者";
     [JsonPropertyName("category_id")]
-    public int CategoryId { get; set; }
+    public int CategoryId
+    {
+        get => _categoryId;
+        set
+        {
+            if (SetProperty(ref _categoryId, value))
+            {
+                OnPropertyChanged(nameof(CategoryText));
+            }
+        }
+    }
     [JsonPropertyName("updated_timestamp")]
-    public long UpdatedTimestamp { get; set; }
+    public long UpdatedTimestamp
+    {
+        get => _updatedTimestamp;
+        set
+        {
+            if (SetProperty(ref _updatedTimestamp, value))
+            {
+                OnPropertyChanged(nameof(UpdatedAt));
+                OnPropertyChanged(nameof(UpdatedText));
+            }
+        }
+    }
     [JsonPropertyName("endorsement_count")]
     public int Endorsements { get; set; }
     [JsonPropertyName("mod_downloads")]
-    public long Downloads { get; set; }
+    public long Downloads
+    {
+        get => _downloads;
+        set
+        {
+            if (SetProperty(ref _downloads, value))
+            {
+                OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(DownloadStatusText));
+                OnPropertyChanged(nameof(DownloadsText));
+            }
+        }
+    }
+    [JsonPropertyName("picture_url")]
+    public string? CoverSourceUrl
+    {
+        get => _coverSourceUrl;
+        set => SetProperty(ref _coverSourceUrl, string.IsNullOrWhiteSpace(value) ? null : value.Trim());
+    }
+    [JsonPropertyName("category_name")]
+    public string? CategoryName
+    {
+        get => _categoryName;
+        set
+        {
+            if (SetProperty(ref _categoryName, string.IsNullOrWhiteSpace(value) ? null : value.Trim()))
+            {
+                OnPropertyChanged(nameof(CategoryText));
+            }
+        }
+    }
+    public string? CoverImageUri
+    {
+        get => _coverImageUri;
+        set
+        {
+            if (SetProperty(ref _coverImageUri, string.IsNullOrWhiteSpace(value) ? null : value))
+            {
+                OnPropertyChanged(nameof(CoverImageVisibility));
+                OnPropertyChanged(nameof(CoverPlaceholderVisibility));
+            }
+        }
+    }
     public DateTime UpdatedAt => DateTimeOffset.FromUnixTimeSeconds(UpdatedTimestamp).LocalDateTime;
+    public string CategoryText => NexusCategoryNameMapper.ToDisplayName(CategoryName, CategoryId);
+    public string UpdatedText => UpdatedTimestamp > 0 ? $"更新 {UpdatedAt:yyyy-MM-dd}" : "更新 -";
+    public string DownloadsText => $"下载 {Downloads:N0}";
+    public Visibility CoverImageVisibility => string.IsNullOrWhiteSpace(CoverImageUri)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+    public Visibility CoverPlaceholderVisibility => string.IsNullOrWhiteSpace(CoverImageUri)
+        ? Visibility.Visible
+        : Visibility.Collapsed;
     public bool IsFavorite
     {
         get => _isFavorite;

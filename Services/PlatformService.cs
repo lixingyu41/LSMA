@@ -47,6 +47,20 @@ public sealed class PlatformService(LoggingService logging)
         return file?.Path;
     }
 
+    public async Task<string?> ChooseSaveArchiveAsync()
+    {
+        if (_window is null)
+        {
+            return null;
+        }
+
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".zip");
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+        return (await picker.PickSingleFileAsync())?.Path;
+    }
+
     public async Task<string?> ChooseModPackAsync()
     {
         if (_window is null)
@@ -71,6 +85,20 @@ public sealed class PlatformService(LoggingService logging)
 
         var picker = new FileSavePicker { SuggestedFileName = suggestedName };
         picker.FileTypeChoices.Add("LSMA 模组包", [".lsmapack"]);
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+        return (await picker.PickSaveFileAsync())?.Path;
+    }
+
+    public async Task<string?> ChooseSaveArchiveSavePathAsync(string suggestedName)
+    {
+        if (_window is null)
+        {
+            return null;
+        }
+
+        var picker = new FileSavePicker { SuggestedFileName = suggestedName };
+        picker.FileTypeChoices.Add("Stardew Valley 存档 ZIP", [".zip"]);
         var handle = WinRT.Interop.WindowNative.GetWindowHandle(_window);
         WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
         return (await picker.PickSaveFileAsync())?.Path;

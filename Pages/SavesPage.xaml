@@ -6,7 +6,7 @@
     <Page.Resources>
         <DataTemplate x:Key="MetricTileTemplate">
             <Grid>
-                <Border Style="{StaticResource CardStyle}" Padding="13" MinHeight="86" ToolTipService.ToolTip="{Binding Detail}">
+                <Border Style="{StaticResource CardStyle}" Padding="13" MinHeight="86" Tapped="MetricTile_Tapped" ToolTipService.ToolTip="{Binding Detail}">
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -33,7 +33,8 @@
                     Background="Transparent"
                     BorderBrush="{ThemeResource CardBorderBrush}"
                     BorderThickness="0,0,0,1"
-                    Padding="0,0,0,8">
+                    Padding="0,0,0,8"
+                    Tapped="MetricTile_Tapped">
                     <StackPanel>
                         <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding Name}" Style="{StaticResource MutedTextStyle}" />
@@ -127,6 +128,88 @@
             </Border>
         </DataTemplate>
 
+        <DataTemplate x:Key="SkillProfessionChoiceTemplate">
+            <Border
+                MinHeight="76"
+                Padding="10"
+                Background="{ThemeResource CardBackgroundBrush}"
+                BorderBrush="{ThemeResource CardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Opacity="{Binding TileOpacity}"
+                Tapped="ProgressDetailItem_Tapped">
+                <Grid>
+                    <Border Background="{StaticResource AccentBrush}" Opacity="0.12" CornerRadius="6" Visibility="{Binding SelectedVisibility}" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="34" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="32" Height="32" CornerRadius="6" Background="{ThemeResource AccentSoftBrush}" VerticalAlignment="Top">
+                            <Grid>
+                                <Image Source="{Binding IconUri}" Width="25" Height="25" Stretch="Uniform" Visibility="{Binding IconVisibility}" />
+                                <FontIcon Glyph="{Binding Glyph}" FontSize="16" Foreground="{StaticResource AccentBrush}" Visibility="{Binding FallbackGlyphVisibility}" />
+                            </Grid>
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource AccentBrush}" />
+                            </Grid>
+                            <TextBlock
+                                Text="{Binding Detail}"
+                                Style="{StaticResource MutedTextStyle}"
+                                FontSize="12"
+                                TextWrapping="Wrap"
+                                MaxLines="2"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SkillProfessionBranchTemplate">
+            <Grid Margin="4" ColumnSpacing="16" MinHeight="172" HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.08*" />
+                    <ColumnDefinition Width="46" />
+                    <ColumnDefinition Width="1.28*" />
+                </Grid.ColumnDefinitions>
+                <ContentControl
+                    Content="{Binding LevelFiveChoice}"
+                    ContentTemplate="{StaticResource SkillProfessionChoiceTemplate}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center" />
+                <Grid Grid.Column="1" VerticalAlignment="Stretch">
+                    <Border Width="2" Background="{StaticResource AccentBrush}" Opacity="0.4" HorizontalAlignment="Center" Margin="0,24" />
+                    <Border Height="2" Background="{StaticResource AccentBrush}" Opacity="0.4" VerticalAlignment="Center" />
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border Height="2" Background="{StaticResource AccentBrush}" Opacity="0.4" VerticalAlignment="Center" />
+                        <Border Grid.Row="1" Height="2" Background="{StaticResource AccentBrush}" Opacity="0.4" VerticalAlignment="Center" />
+                    </Grid>
+                </Grid>
+                <ItemsRepeater
+                    Grid.Column="2"
+                    ItemsSource="{Binding LevelTenChoices}"
+                    ItemTemplate="{StaticResource SkillProfessionChoiceTemplate}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Spacing="8" />
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate x:Key="MetricRowTemplate">
             <Grid Margin="0,4" ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
@@ -167,12 +250,81 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Grid Width="28" Height="28" VerticalAlignment="Center">
+                        <Grid Width="28" Height="28" VerticalAlignment="Center" Tapped="CatchIcon_Tapped">
                             <Image Source="{Binding IconUri}" Width="26" Height="26" Stretch="Uniform" Visibility="{Binding IconVisibility}" />
                             <FontIcon Glyph="{Binding Glyph}" FontSize="18" Foreground="{StaticResource AccentBrush}" Visibility="{Binding FallbackGlyphVisibility}" />
                         </Grid>
                         <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="2" Text="{Binding Value}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SkillTileTemplate">
+            <Grid>
+                <Border
+                    Background="{ThemeResource CardBackgroundBrush}"
+                    BorderBrush="{ThemeResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="10"
+                    MinHeight="104"
+                    Tapped="SkillTile_Tapped"
+                    ToolTipService.ToolTip="{Binding ExperienceText}">
+                    <Grid RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid ColumnSpacing="9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="34" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="32" Height="32" CornerRadius="7" Background="{ThemeResource AccentSoftBrush}">
+                                <Image Source="{Binding IconUri}" Width="24" Height="24" Stretch="Uniform" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="1">
+                                <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding ExperienceText}" Style="{StaticResource MutedTextStyle}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding LevelText}" FontSize="22" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Grid.Row="1" ColumnSpacing="4" MinHeight="30" HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="{Binding LevelSlots[0].SlotSize}" Height="{Binding LevelSlots[0].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[0].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Width="{Binding LevelSlots[1].SlotSize}" Height="{Binding LevelSlots[1].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[1].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="2" Width="{Binding LevelSlots[2].SlotSize}" Height="{Binding LevelSlots[2].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[2].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="3" Width="{Binding LevelSlots[3].SlotSize}" Height="{Binding LevelSlots[3].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[3].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="4" Width="{Binding LevelSlots[4].SlotSize}" Height="{Binding LevelSlots[4].SlotSize}" CornerRadius="7" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[4].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="5" Width="{Binding LevelSlots[5].SlotSize}" Height="{Binding LevelSlots[5].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[5].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="6" Width="{Binding LevelSlots[6].SlotSize}" Height="{Binding LevelSlots[6].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[6].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="7" Width="{Binding LevelSlots[7].SlotSize}" Height="{Binding LevelSlots[7].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[7].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="8" Width="{Binding LevelSlots[8].SlotSize}" Height="{Binding LevelSlots[8].SlotSize}" CornerRadius="4" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[8].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Grid.Column="9" Width="{Binding LevelSlots[9].SlotSize}" Height="{Binding LevelSlots[9].SlotSize}" CornerRadius="7" Background="{ThemeResource AccentSoftBrush}" Opacity="{Binding LevelSlots[9].Opacity}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock
+                            Grid.Row="2"
+                            Text="{Binding ProfessionSummary}"
+                            Style="{StaticResource MutedTextStyle}"
+                            FontSize="11"
+                            MaxLines="2"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{Binding ProfessionSummaryVisibility}" />
                     </Grid>
                 </Border>
             </Grid>
@@ -218,7 +370,53 @@
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <Button Grid.Column="2" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="14,8">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Style="{StaticResource NeutralButtonStyle}" Padding="14,8">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="&#xE8B5;" FontSize="15" />
+                                <TextBlock Text="导入/导出" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button.Content>
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <Flyout.FlyoutPresenterStyle>
+                                    <Style TargetType="FlyoutPresenter">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                    </Style>
+                                </Flyout.FlyoutPresenterStyle>
+                                <Border Style="{StaticResource CardStyle}" Padding="14" Width="260">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="存档导入导出" Style="{StaticResource SectionTitleStyle}" FontSize="17" />
+                                        <Button
+                                            Command="{Binding ImportSaveCommand}"
+                                            Style="{StaticResource NeutralButtonStyle}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE8B5;" FontSize="14" />
+                                                <TextBlock Text="导入 ZIP 存档" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button
+                                            Command="{Binding ExportSaveCommand}"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xEDE1;" FontSize="14" />
+                                                <TextBlock Text="导出当前存档" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+
+                    <Button Style="{StaticResource AccentButtonStyle}" Padding="14,8">
                     <Button.Content>
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <SymbolIcon Symbol="Save" />
@@ -291,7 +489,8 @@
                             </Border>
                         </Flyout>
                     </Button.Flyout>
-                </Button>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -393,7 +592,7 @@
                                 <TextBlock Text="经营与农场" Style="{StaticResource SectionTitleStyle}" />
                                 <ItemsRepeater ItemsSource="{Binding SelectedPlayer.EconomyStats}" ItemTemplate="{StaticResource MetricTileTemplate}" HorizontalAlignment="Stretch">
                                     <ItemsRepeater.Layout>
-                                        <UniformGridLayout MinItemWidth="136" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
+                                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
                                     </ItemsRepeater.Layout>
                                 </ItemsRepeater>
                                 <ItemsControl ItemsSource="{Binding SelectedPlayer.FarmLifeStats}">
@@ -416,27 +615,11 @@
                         <Border x:Name="SkillsPanel" Style="{StaticResource CardStyle}" Padding="16">
                             <StackPanel Spacing="10">
                                 <TextBlock Text="技能" Style="{StaticResource SectionTitleStyle}" />
-                                <ItemsControl ItemsSource="{Binding SelectedPlayer.Skills}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,5" ColumnSpacing="10">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="30" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <Image Source="{Binding IconUri}" Width="28" Height="28" Stretch="Uniform" VerticalAlignment="Center" />
-                                                <StackPanel Grid.Column="1">
-                                                    <Grid>
-                                                        <TextBlock Text="{Binding Name}" />
-                                                        <TextBlock Text="{Binding LevelText}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}" />
-                                                    </Grid>
-                                                    <ProgressBar Value="{Binding Percent}" Maximum="100" Height="7" Margin="0,5,0,0" Foreground="{StaticResource AccentBrush}" />
-                                                    <TextBlock Text="{Binding ExperienceText}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <ItemsRepeater ItemsSource="{Binding SelectedPlayer.Skills}" ItemTemplate="{StaticResource SkillTileTemplate}" HorizontalAlignment="Stretch">
+                                    <ItemsRepeater.Layout>
+                                        <UniformGridLayout MinItemWidth="172" MinColumnSpacing="10" MinRowSpacing="10" ItemsStretch="Fill" ItemsJustification="Start" />
+                                    </ItemsRepeater.Layout>
+                                </ItemsRepeater>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -500,7 +683,7 @@
                                 </Button>
                                     <ItemsRepeater ItemsSource="{Binding SelectedPlayer.FishCatchStats}" ItemTemplate="{StaticResource CatchTileTemplate}" HorizontalAlignment="Stretch">
                                         <ItemsRepeater.Layout>
-                                            <UniformGridLayout MinItemWidth="118" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
+                                            <UniformGridLayout MinItemWidth="184" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
                                         </ItemsRepeater.Layout>
                                     </ItemsRepeater>
                             </StackPanel>
@@ -525,7 +708,7 @@
                                     </Button>
                                     <ItemsRepeater ItemsSource="{Binding SelectedPlayer.MonsterKillStats}" ItemTemplate="{StaticResource CatchTileTemplate}" HorizontalAlignment="Stretch">
                                         <ItemsRepeater.Layout>
-                                            <UniformGridLayout MinItemWidth="118" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
+                                            <UniformGridLayout MinItemWidth="184" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
                                         </ItemsRepeater.Layout>
                                     </ItemsRepeater>
                             </StackPanel>
@@ -651,11 +834,28 @@
                         HorizontalScrollBarVisibility="Disabled"
                         VerticalScrollMode="Enabled"
                         VerticalScrollBarVisibility="Auto">
-                        <ItemsRepeater x:Name="ProgressDetailItems" ItemTemplate="{StaticResource CollectionDialogItemTemplate}" HorizontalAlignment="Stretch">
-                            <ItemsRepeater.Layout>
-                                <UniformGridLayout MinItemWidth="198" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
-                            </ItemsRepeater.Layout>
-                        </ItemsRepeater>
+                        <Grid>
+                            <ItemsRepeater x:Name="ProgressDetailItems" ItemTemplate="{StaticResource CollectionDialogItemTemplate}" HorizontalAlignment="Stretch">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout MinItemWidth="198" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" ItemsJustification="Start" />
+                                </ItemsRepeater.Layout>
+                            </ItemsRepeater>
+                            <StackPanel x:Name="SkillProfessionTree" Spacing="10" Visibility="Collapsed">
+                                <Grid Margin="4,0,4,0" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="1.35*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="5级职业" Style="{StaticResource MutedTextStyle}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="10级职业" Style="{StaticResource MutedTextStyle}" FontWeight="SemiBold" />
+                                </Grid>
+                                <ItemsRepeater x:Name="SkillProfessionBranches" ItemTemplate="{StaticResource SkillProfessionBranchTemplate}" HorizontalAlignment="Stretch">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Spacing="10" />
+                                    </ItemsRepeater.Layout>
+                                </ItemsRepeater>
+                            </StackPanel>
+                        </Grid>
                     </ScrollViewer>
                 </Grid>
             </Border>

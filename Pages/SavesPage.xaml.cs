@@ -605,6 +605,57 @@ public sealed partial class SavesPage : Page
         host.Text.Text = text;
     }
 
+    private void MetricTile_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SaveMetricInfo metric }
+            || !metric.CanToggleCompactValue)
+        {
+            return;
+        }
+
+        metric.ToggleCompactValue();
+        e.Handled = true;
+    }
+
+    private void CatchIcon_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SaveMetricInfo metric })
+        {
+            return;
+        }
+
+        var query = metric.EffectiveSearchQuery.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (_activeBubble is { } active)
+        {
+            HideBubble(active);
+        }
+
+        App.Current.Services.Navigation.Navigate(typeof(GuidePage), query);
+    }
+
+    private void SkillTile_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SaveSkillInfo skill }
+            || skill.ProfessionChoices.Count == 0)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (_activeBubble is { } active)
+        {
+            HideBubble(active);
+        }
+
+        ShowSkillProfessionCard(skill);
+    }
+
     private void CollectionTile_Tapped(object sender, TappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: SaveProgressInfo progress }
@@ -657,11 +708,26 @@ public sealed partial class SavesPage : Page
             : [];
     }
 
-    private void ShowProgressDetailCard(string title, IReadOnlyList<SaveCollectionItemInfo> items)
+    private void ShowProgressDetailCard(string title, IReadOnlyList<SaveCollectionItemInfo> items, string? summary = null)
     {
         ProgressDetailTitle.Text = title;
-        ProgressDetailSummary.Text = $"{items.Count(item => item.IsCollected):N0}/{items.Count:N0} 已完成 · 点击条目打开攻略搜索";
+        ProgressDetailSummary.Text = summary ?? $"{items.Count(item => item.IsCollected):N0}/{items.Count:N0} 已完成 · 点击条目打开攻略搜索";
         ProgressDetailItems.ItemsSource = items;
+        ProgressDetailItems.Visibility = Visibility.Visible;
+        SkillProfessionBranches.ItemsSource = null;
+        SkillProfessionTree.Visibility = Visibility.Collapsed;
+        UpdateProgressDetailCardSize();
+        ProgressDetailOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void ShowSkillProfessionCard(SaveSkillInfo skill)
+    {
+        ProgressDetailTitle.Text = $"{skill.Name}技能";
+        ProgressDetailSummary.Text = $"{skill.LevelText} · {skill.ExperienceText}";
+        ProgressDetailItems.ItemsSource = null;
+        ProgressDetailItems.Visibility = Visibility.Collapsed;
+        SkillProfessionBranches.ItemsSource = skill.ProfessionBranches;
+        SkillProfessionTree.Visibility = Visibility.Visible;
         UpdateProgressDetailCardSize();
         ProgressDetailOverlay.Visibility = Visibility.Visible;
     }
@@ -716,6 +782,8 @@ public sealed partial class SavesPage : Page
     {
         ProgressDetailOverlay.Visibility = Visibility.Collapsed;
         ProgressDetailItems.ItemsSource = null;
+        SkillProfessionBranches.ItemsSource = null;
+        SkillProfessionTree.Visibility = Visibility.Collapsed;
     }
 
     private BubbleHost? TryCreateBubbleHost(Border card, string text)

@@ -30,6 +30,11 @@ public sealed class ModInfo : ObservableObject
 {
     private bool _isSelected;
     private bool _isPointerOver;
+    private long? _nexusModId;
+    private string? _coverImageUri;
+    private string? _remoteCategoryName;
+    private long? _remoteUpdatedTimestamp;
+    private long? _remoteDownloads;
 
     public string FolderPath { get; init; } = string.Empty;
     public string FolderName { get; init; } = string.Empty;
@@ -37,7 +42,18 @@ public sealed class ModInfo : ObservableObject
     public bool IsArchived { get; set; }
     public bool IsFavorite { get; set; }
     public string? SuggestedNestedDirectory { get; set; }
-    public long? NexusModId { get; set; }
+    public long? NexusModId
+    {
+        get => _nexusModId;
+        set
+        {
+            if (SetProperty(ref _nexusModId, value))
+            {
+                OnPropertyChanged(nameof(UpdateStatus));
+                OnPropertyChanged(nameof(ListNexusIdText));
+            }
+        }
+    }
     public string? RemoteVersion { get; set; }
     public ModManifest? Manifest { get; set; }
     public string? TranslatedName { get; set; }
@@ -72,6 +88,67 @@ public sealed class ModInfo : ObservableObject
     public double HoverIndicatorOpacity => IsPointerOver && !IsSelected ? 1 : 0;
     public double SelectedIndicatorOpacity => IsSelected ? 1 : 0;
     public Brush ListTextBrush => (Brush)Application.Current.Resources["PrimaryTextBrush"];
+    public string? CoverImageUri
+    {
+        get => _coverImageUri;
+        set
+        {
+            if (SetProperty(ref _coverImageUri, string.IsNullOrWhiteSpace(value) ? null : value))
+            {
+                OnPropertyChanged(nameof(CoverImageVisibility));
+                OnPropertyChanged(nameof(CoverPlaceholderVisibility));
+            }
+        }
+    }
+
+    public string? RemoteCategoryName
+    {
+        get => _remoteCategoryName;
+        set
+        {
+            if (SetProperty(ref _remoteCategoryName, string.IsNullOrWhiteSpace(value) ? null : value.Trim()))
+            {
+                OnPropertyChanged(nameof(RemoteCategoryText));
+            }
+        }
+    }
+
+    public long? RemoteUpdatedTimestamp
+    {
+        get => _remoteUpdatedTimestamp;
+        set
+        {
+            if (SetProperty(ref _remoteUpdatedTimestamp, value))
+            {
+                OnPropertyChanged(nameof(RemoteUpdatedText));
+            }
+        }
+    }
+
+    public long? RemoteDownloads
+    {
+        get => _remoteDownloads;
+        set
+        {
+            if (SetProperty(ref _remoteDownloads, value))
+            {
+                OnPropertyChanged(nameof(RemoteDownloadsText));
+            }
+        }
+    }
+
+    public Visibility CoverImageVisibility => string.IsNullOrWhiteSpace(CoverImageUri)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+    public Visibility CoverPlaceholderVisibility => string.IsNullOrWhiteSpace(CoverImageUri)
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+    public string RemoteCategoryText => NexusCategoryNameMapper.ToDisplayName(RemoteCategoryName, fallback: "本地模组");
+    public string RemoteUpdatedText => RemoteUpdatedTimestamp is > 0
+        ? $"更新 {DateTimeOffset.FromUnixTimeSeconds(RemoteUpdatedTimestamp.Value).LocalDateTime:yyyy-MM-dd}"
+        : "更新 -";
+    public string RemoteDownloadsText => RemoteDownloads is { } downloads ? $"下载 {downloads:N0}" : "下载 -";
+    public string ListNexusIdText => NexusModId is { } id ? $"ID {id}" : "未绑定";
     public string OriginalName => Manifest?.Name ?? FolderName;
     public string? OriginalDescription => Manifest?.Description;
     public string OriginalDescriptionText => OriginalDescription ?? string.Empty;

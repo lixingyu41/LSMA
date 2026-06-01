@@ -52,8 +52,28 @@ public sealed class NexusClient(LoggingService logging)
     public Task<List<NexusModInfo>> GetLatestUpdatedAsync(string apiKey, int page = 1)
         => GetAsync<List<NexusModInfo>>($"games/{GameDomain}/mods/latest_updated.json?page={page}&size=20", apiKey);
 
-    public Task<NexusModInfo> GetModAsync(long modId, string apiKey)
-        => GetAsync<NexusModInfo>($"games/{GameDomain}/mods/{modId}.json", apiKey);
+    public async Task<NexusModInfo> GetModAsync(long modId, string apiKey)
+    {
+        var mod = await GetAsync<NexusModInfo>($"games/{GameDomain}/mods/{modId}.json", apiKey);
+        if (!NeedsGraphQlEnrichment(mod))
+        {
+            return mod;
+        }
+
+        try
+        {
+            if (await GetModFromGraphQlAsync(modId) is { } graphMod)
+            {
+                MergeGraphQlFields(mod, graphMod);
+            }
+        }
+        catch (Exception exception)
+        {
+            await logging.ErrorAsync($"Nexus GraphQL 模组详情补齐失败：{modId}", exception);
+        }
+
+        return mod;
+    }
 
     public Task<List<NexusCategory>> GetCategoriesAsync(string apiKey)
         => GetAsync<List<NexusCategory>>($"games/{GameDomain}/categories.json", apiKey);
@@ -120,6 +140,9 @@ public sealed class NexusClient(LoggingService logging)
                       updatedAt
                       endorsements
                       downloads
+                      pictureUrl
+                      thumbnailLargeUrl
+                      thumbnailUrl
                     }
                   }
                 }
@@ -292,7 +315,50 @@ public sealed class NexusClient(LoggingService logging)
         return envelope;
     }
 
-    private static object CreateModsFilter(string? query, string? categoryName)
+    public async Task<NexusModInfo?> GetModFromGraphQlAsync(long modId)
+    {
+        if (modId <= 0)
+        {
+            return null;
+        }
+
+        var payload = new
+        {
+            query = """
+                query ModById($filter: ModsFilter, $count: Int) {
+                  mods(filter: $filter, count: $count) {
+                    nodes {
+                      modId
+                      name
+                      summary
+                      version
+                      author
+                      category
+                      modCategory { categoryId }
+                      updatedAt
+                      endorsements
+                      downloads
+                      pictureUrl
+                      thumbnailLargeUrl
+                      thumbnailUrl
+                    }
+                  }
+                }
+                """,
+            variables = new
+            {
+                filter = CreateModsFilter(null, null, modId),
+                count = 1
+            }
+        };
+
+        var envelope = await PostGraphQlAsync<ModsGraphQlData>(payload);
+        return envelope.Data?.Mods?.Nodes
+            .Select(ToNexusModInfo)
+            .FirstOrDefault(mod => mod.ModId == modId);
+    }
+
+    private static object CreateModsFilter(string? query, string? categoryName, long? modId = null)
     {
         var filters = new List<object>
         {
@@ -308,6 +374,14 @@ public sealed class NexusClient(LoggingService logging)
             filters.Add(new Dictionary<string, object?>
             {
                 ["categoryName"] = new[] { new { value = categoryName, op = "EQUALS" } }
+            });
+        }
+
+        if (modId is > 0)
+        {
+            filters.Add(new Dictionary<string, object?>
+            {
+                ["modId"] = new[] { new { value = modId.Value, op = "EQUALS" } }
             });
         }
 
@@ -351,12 +425,49 @@ public sealed class NexusClient(LoggingService logging)
             Summary = node.Summary ?? string.Empty,
             Version = string.IsNullOrWhiteSpace(node.Version) ? "-" : node.Version,
             Author = string.IsNullOrWhiteSpace(node.Author) ? "未知作者" : node.Author,
+            CategoryName = node.Category,
             CategoryId = node.ModCategory?.CategoryId ?? 0,
             UpdatedTimestamp = ToUnixTimestamp(node.UpdatedAt),
             Endorsements = node.Endorsements,
-            Downloads = node.Downloads
+            Downloads = node.Downloads,
+            CoverSourceUrl = FirstNonWhiteSpace(node.ThumbnailLargeUrl, node.ThumbnailUrl, node.PictureUrl)
         };
     }
+
+    private static bool NeedsGraphQlEnrichment(NexusModInfo mod)
+        => string.IsNullOrWhiteSpace(mod.CoverSourceUrl)
+            || string.IsNullOrWhiteSpace(mod.CategoryName);
+
+    private static void MergeGraphQlFields(NexusModInfo target, NexusModInfo source)
+    {
+        if (!string.IsNullOrWhiteSpace(source.CoverSourceUrl))
+        {
+            target.CoverSourceUrl = source.CoverSourceUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.CategoryName))
+        {
+            target.CategoryName = source.CategoryName;
+        }
+
+        if (source.CategoryId > 0)
+        {
+            target.CategoryId = source.CategoryId;
+        }
+
+        if (source.UpdatedTimestamp > 0)
+        {
+            target.UpdatedTimestamp = source.UpdatedTimestamp;
+        }
+
+        if (source.Downloads > 0)
+        {
+            target.Downloads = source.Downloads;
+        }
+    }
+
+    private static string? FirstNonWhiteSpace(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
 
     private static long ToUnixTimestamp(string? value)
     {
@@ -417,9 +528,13 @@ public sealed class NexusClient(LoggingService logging)
         public string? Summary { get; set; }
         public string? Version { get; set; }
         public string? Author { get; set; }
+        public string? Category { get; set; }
         public string? UpdatedAt { get; set; }
         public int Endorsements { get; set; }
         public long Downloads { get; set; }
+        public string? PictureUrl { get; set; }
+        public string? ThumbnailLargeUrl { get; set; }
+        public string? ThumbnailUrl { get; set; }
         public GraphQlModCategory? ModCategory { get; set; }
     }
 

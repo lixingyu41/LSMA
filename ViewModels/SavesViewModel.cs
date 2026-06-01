@@ -14,6 +14,7 @@ public sealed class SavesViewModel : ViewModelBase
     private readonly SaveParserService _parser;
     private readonly GameIconService _icons;
     private readonly SaveBackupService _backups;
+    private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
     private readonly AutomaticScanMonitor _automaticScanMonitor;
     private SaveInfo? _selectedSave;
@@ -28,6 +29,7 @@ public sealed class SavesViewModel : ViewModelBase
         SaveParserService parser,
         GameIconService icons,
         SaveBackupService backups,
+        PlatformService platform,
         DialogService dialogs,
         UiDispatcherService dispatcher)
     {
@@ -36,8 +38,11 @@ public sealed class SavesViewModel : ViewModelBase
         _parser = parser;
         _icons = icons;
         _backups = backups;
+        _platform = platform;
         _dialogs = dialogs;
         _automaticScanMonitor = new AutomaticScanMonitor(dispatcher, ScanAutomaticallyAsync);
+        ImportSaveCommand = new AsyncRelayCommand(ImportSaveAsync, CanImport);
+        ExportSaveCommand = new AsyncRelayCommand(ExportSaveAsync, CanExport);
         BackupCommand = new AsyncRelayCommand(BackupSelectedAsync, CanBackup);
         BackupAllCommand = new AsyncRelayCommand(BackupAllAsync, CanBackupAll);
         RestoreCommand = new AsyncRelayCommand(RestoreSelectedAsync, CanRestore);
@@ -58,6 +63,8 @@ public sealed class SavesViewModel : ViewModelBase
 
     public ObservableCollection<SaveInfo> Saves { get; } = [];
     public ObservableCollection<SaveBackupEntry> BackupEntries { get; } = [];
+    public IAsyncRelayCommand ImportSaveCommand { get; }
+    public IAsyncRelayCommand ExportSaveCommand { get; }
     public IAsyncRelayCommand BackupCommand { get; }
     public IAsyncRelayCommand BackupAllCommand { get; }
     public IAsyncRelayCommand RestoreCommand { get; }
@@ -143,6 +150,8 @@ public sealed class SavesViewModel : ViewModelBase
         OnPropertyChanged(nameof(RunningVisibility));
         OnPropertyChanged(nameof(SavesCountDisplay));
         OnPropertyChanged(nameof(PlayerSelectorVisibility));
+        ImportSaveCommand.NotifyCanExecuteChanged();
+        ExportSaveCommand.NotifyCanExecuteChanged();
         BackupCommand.NotifyCanExecuteChanged();
         BackupAllCommand.NotifyCanExecuteChanged();
         RestoreCommand.NotifyCanExecuteChanged();
@@ -175,7 +184,7 @@ public sealed class SavesViewModel : ViewModelBase
         LoadBackupEntries();
     }
 
-    private async Task ScanAsync()
+    private async Task ScanAsync(string? preferredPath = null)
     {
         if (!_state.IsGameConfigured || IsBusy)
         {
@@ -187,7 +196,7 @@ public sealed class SavesViewModel : ViewModelBase
         Refresh();
         try
         {
-            var selectedPath = SelectedSave?.FolderPath;
+            var selectedPath = preferredPath ?? SelectedSave?.FolderPath;
             var selectedPlayerKey = SelectedPlayer?.PlayerKey;
             var results = new List<SaveInfo>();
             foreach (var source in await _locator.LocateAsync())
@@ -294,6 +303,55 @@ public sealed class SavesViewModel : ViewModelBase
         return save.Players.FirstOrDefault();
     }
 
+    private async Task ImportSaveAsync()
+    {
+        if (!_state.IsGameConfigured)
+        {
+            return;
+        }
+
+        var path = await _platform.ChooseSaveArchiveAsync();
+        if (string.IsNullOrWhiteSpace(path)
+            || !await _dialogs.ConfirmAsync("导入存档", "同名存档会先自动备份再替换。确认导入这个 ZIP 存档？", "导入"))
+        {
+            return;
+        }
+
+        SaveImportResult? result = null;
+        await WithBusyAsync("正在导入存档...", async () =>
+        {
+            result = await _backups.ImportAsync(path);
+            FeedbackMessage = result.ReplacedExisting ? "存档已导入，同名旧档已备份。" : "存档已导入。";
+        }, "导入失败");
+
+        if (result is not null)
+        {
+            await ScanAsync(Path.Combine(AppPaths.SaveSource, result.FolderName));
+            App.Current.Services.Home.Refresh();
+        }
+    }
+
+    private async Task ExportSaveAsync()
+    {
+        if (SelectedSave is not { ParseError: null } save)
+        {
+            return;
+        }
+
+        var suggested = $"{save.FolderName}_{DateTime.Now:yyyyMMdd_HHmmss}";
+        var path = await _platform.ChooseSaveArchiveSavePathAsync(suggested);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        await WithBusyAsync("正在导出存档...", async () =>
+        {
+            await _backups.ExportAsync(save, path);
+            FeedbackMessage = "存档已导出。";
+        }, "导出失败");
+    }
+
     private async Task BackupSelectedAsync()
     {
         if (SelectedSave is not { ParseError: null } save)
@@ -375,6 +433,8 @@ public sealed class SavesViewModel : ViewModelBase
         SelectedBackup = BackupEntries.FirstOrDefault();
     }
 
+    private bool CanImport() => _state.IsGameConfigured && !_state.IsGameRunning && !IsBusy;
+    private bool CanExport() => SelectedSave is { ParseError: null } && !IsBusy;
     private bool CanBackupAll() => _state.IsGameConfigured && !IsBusy;
     private bool CanBackup() => SelectedSave is { ParseError: null } && !IsBusy;
     private bool CanRestore() => SelectedSave is not null && SelectedBackup is not null && !_state.IsGameRunning && !IsBusy;

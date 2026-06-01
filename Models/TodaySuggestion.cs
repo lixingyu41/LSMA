@@ -41,3 +41,10 @@ public sealed class SaveBackupEntry
     public DateTime CreatedAt { get; init; }
     public string DisplayName => $"{CreatedAt:yyyy-MM-dd HH:mm} · {System.IO.Path.GetFileName(Path)}";
 }
+
+public sealed class SaveImportResult
+{
+    public string FolderName { get; init; } = string.Empty;
+    public bool ReplacedExisting { get; init; }
+    public string? SafetyBackupPath { get; init; }
+}

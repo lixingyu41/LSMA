@@ -11,6 +11,22 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         159, 160, 163, 682, 775, 898, 899, 900, 901, 902
     ];
 
+    private static readonly IReadOnlyDictionary<string, string[]> CollectionKeyAliases = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Cheese Cauli."] = ["Cheese Cauliflower"],
+        ["Cheese Cauliflower"] = ["Cheese Cauli."],
+        ["Cookies"] = ["Cookie"],
+        ["Cookie"] = ["Cookies"],
+        ["Cran. Sauce"] = ["Cranberry Sauce"],
+        ["Cranberry Sauce"] = ["Cran. Sauce"],
+        ["Dish o' The Sea"] = ["Dish O' The Sea"],
+        ["Dish O' The Sea"] = ["Dish o' The Sea"],
+        ["Eggplant Parm."] = ["Eggplant Parmesan"],
+        ["Eggplant Parmesan"] = ["Eggplant Parm."],
+        ["Vegetable Stew"] = ["Vegetable Medley"],
+        ["Vegetable Medley"] = ["Vegetable Stew"]
+    };
+
     private readonly List<GuideSearchResult> _searchIndex = [];
     private readonly List<FishRecord> _fish = [];
     private readonly List<CropRecord> _crops = [];
@@ -486,6 +502,14 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         }
 
         yield return normalized;
+        if (CollectionKeyAliases.TryGetValue(normalized, out var aliases))
+        {
+            foreach (var alias in aliases)
+            {
+                yield return alias;
+            }
+        }
+
         if (normalized.StartsWith("(O)", StringComparison.OrdinalIgnoreCase))
         {
             yield return normalized[3..];

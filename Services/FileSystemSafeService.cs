@@ -17,7 +17,11 @@ public sealed class FileSystemSafeService(LoggingService logging)
         }
     }
 
-    public Task CreateVerifiedZipAsync(string sourceDirectory, string destinationPath, CancellationToken cancellationToken = default)
+    public Task CreateVerifiedZipAsync(
+        string sourceDirectory,
+        string destinationPath,
+        bool includeBaseDirectory = false,
+        CancellationToken cancellationToken = default)
     {
         return Task.Run(() =>
         {
@@ -36,7 +40,7 @@ public sealed class FileSystemSafeService(LoggingService logging)
                     File.Delete(temporary);
                 }
 
-                ZipFile.CreateFromDirectory(sourceDirectory, temporary, CompressionLevel.Fastest, false);
+                ZipFile.CreateFromDirectory(sourceDirectory, temporary, CompressionLevel.Fastest, includeBaseDirectory);
                 using (var archive = ZipFile.OpenRead(temporary))
                 {
                     if (archive.Entries.Count == 0)

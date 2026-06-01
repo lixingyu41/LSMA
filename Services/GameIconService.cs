@@ -289,6 +289,14 @@ public sealed class GameIconService(
         {
             item.IconUri = await GetObjectIconAsync(objectId);
         }
+        else if (item.NpcId is { Length: > 0 } npcId)
+        {
+            item.IconUri = GetPortraitUri(npcId);
+        }
+        else if (item.IconKey is { Length: > 0 } iconKey)
+        {
+            item.IconUri = GetSkillIconUri(iconKey);
+        }
         else if (item.IconTexture is { Length: > 0 } texture && item.IconSpriteIndex is { } spriteIndex)
         {
             item.IconUri = await GetTextureIconAsync(texture, spriteIndex, item.IconWidth, item.IconHeight);

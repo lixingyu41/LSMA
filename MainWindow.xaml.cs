@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml.Navigation;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.System;
+using Windows.UI.Core;
 using Windows.UI;
 
 namespace LSMA;
@@ -323,23 +324,33 @@ public sealed partial class MainWindow : Window
 
     private void RegisterHistoryInput()
     {
-        var backAccelerator = new KeyboardAccelerator
-        {
-            Key = VirtualKey.Left,
-            Modifiers = VirtualKeyModifiers.Menu
-        };
-        backAccelerator.Invoked += (_, args) => args.Handled = App.Current.Services.Navigation.GoBack();
-        RootLayout.KeyboardAccelerators.Add(backAccelerator);
-
-        var forwardAccelerator = new KeyboardAccelerator
-        {
-            Key = VirtualKey.Right,
-            Modifiers = VirtualKeyModifiers.Menu
-        };
-        forwardAccelerator.Invoked += (_, args) => args.Handled = App.Current.Services.Navigation.GoForward();
-        RootLayout.KeyboardAccelerators.Add(forwardAccelerator);
-
+        RootLayout.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(RootLayout_KeyDown), true);
         RootLayout.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootLayout_PointerPressed), true);
+    }
+
+    private void RootLayout_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (!IsAltPressed())
+        {
+            return;
+        }
+
+        var handled = e.Key switch
+        {
+            VirtualKey.Left => App.Current.Services.Navigation.GoBack(),
+            VirtualKey.Right => App.Current.Services.Navigation.GoForward(),
+            _ => false
+        };
+        if (handled)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private static bool IsAltPressed()
+    {
+        var state = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu);
+        return (state & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
     }
 
     private void RootLayout_PointerPressed(object sender, PointerRoutedEventArgs e)

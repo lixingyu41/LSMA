@@ -102,6 +102,56 @@ public sealed class SaveParserService(
         .Select(goal => goal.Flag)
         .ToArray();
 
+    private static readonly IReadOnlyDictionary<string, SkillProfessionDefinition[]> SkillProfessionDefinitions =
+        new Dictionary<string, SkillProfessionDefinition[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Farming"] =
+            [
+                new(0, 5, "牧场主", "动物产品售价提高 20%"),
+                new(1, 5, "农耕人", "作物售价提高 10%"),
+                new(2, 10, "鸡舍大师", "更快与鸡舍动物建立友谊，孵化时间减半"),
+                new(3, 10, "牧羊人", "更快与畜棚动物建立友谊，绵羊产毛更快"),
+                new(4, 10, "工匠", "工匠物品售价提高 40%"),
+                new(5, 10, "农学家", "作物生长速度提高 10%")
+            ],
+            ["Fishing"] =
+            [
+                new(6, 5, "渔夫", "鱼售价提高 25%"),
+                new(7, 5, "捕猎者", "蟹笼制作材料减少"),
+                new(8, 10, "垂钓者", "鱼售价提高 50%"),
+                new(9, 10, "海盗", "找到宝藏的几率翻倍"),
+                new(10, 10, "水手", "蟹笼不再产出垃圾"),
+                new(11, 10, "诱饵大师", "蟹笼不需要放置鱼饵")
+            ],
+            ["Foraging"] =
+            [
+                new(12, 5, "护林人", "树木掉落的木材增加 25%"),
+                new(13, 5, "收集者", "采集物有 20% 几率双倍收获"),
+                new(14, 10, "伐木工", "所有树木都有几率掉落硬木"),
+                new(15, 10, "萃取者", "树液采集器产物售价提高 25%"),
+                new(16, 10, "植物学家", "采集物总是铱星品质"),
+                new(17, 10, "追踪者", "显示可采集物位置")
+            ],
+            ["Mining"] =
+            [
+                new(18, 5, "矿工", "每个矿脉额外产出 1 个矿石"),
+                new(19, 5, "地质学家", "宝石有 50% 几率成对出现"),
+                new(20, 10, "铁匠", "金属锭售价提高 50%"),
+                new(21, 10, "勘探者", "找到煤炭的几率翻倍"),
+                new(22, 10, "挖掘者", "找到晶球的几率翻倍"),
+                new(23, 10, "宝石专家", "宝石售价提高 30%")
+            ],
+            ["Combat"] =
+            [
+                new(24, 5, "战士", "所有攻击伤害提高 10%，生命值增加 15"),
+                new(25, 5, "侦察兵", "暴击率提高 50%"),
+                new(26, 10, "野蛮人", "伤害提高 15%"),
+                new(27, 10, "防御者", "生命值增加 25"),
+                new(28, 10, "特技者", "特殊招式冷却时间减半"),
+                new(29, 10, "亡命徒", "暴击伤害提高")
+            ]
+        };
+
     public async Task<SaveInfo?> ParseAsync(SaveSource source)
     {
         try
@@ -308,7 +358,7 @@ public sealed class SaveParserService(
             ItemsShipped = CountDictionaryItems(player, "basicShipped"),
             MineralsFound = CountDictionaryItems(player, "mineralsFound"),
             ArtifactsFound = CountDictionaryItems(player, "archaeologyFound"),
-            CookedRecipes = CountDictionaryPositiveValues(player, "cookingRecipes"),
+            CookedRecipes = CountCookedRecipes(player),
             CraftedRecipes = CountDictionaryPositiveValues(player, "craftingRecipes"),
             FishSpeciesCaught = CountDictionaryItems(player, "fishCaught"),
             TotalMonsterKills = StatisticsInteger(player, root, "monstersKilled", 0),
@@ -340,14 +390,15 @@ public sealed class SaveParserService(
             .Where(element => element.Name.LocalName.Equals("int", StringComparison.OrdinalIgnoreCase))
             .Select(element => int.TryParse(element.Value, out var value) ? value : 0)
             .ToList() ?? [];
+        var professions = ReadIntSet(player, "professions");
         save.Skills.AddRange(
         [
-            new SaveSkillInfo { Key = "Farming", Name = "耕种", Level = Integer(player, "farmingLevel"), Experience = ExperienceAt(experience, 0) },
-            new SaveSkillInfo { Key = "Mining", Name = "采矿", Level = Integer(player, "miningLevel"), Experience = ExperienceAt(experience, 3) },
-            new SaveSkillInfo { Key = "Foraging", Name = "采集", Level = Integer(player, "foragingLevel"), Experience = ExperienceAt(experience, 2) },
-            new SaveSkillInfo { Key = "Fishing", Name = "钓鱼", Level = Integer(player, "fishingLevel"), Experience = ExperienceAt(experience, 1) },
-            new SaveSkillInfo { Key = "Combat", Name = "战斗", Level = Integer(player, "combatLevel"), Experience = ExperienceAt(experience, 4) },
-            new SaveSkillInfo { Key = "Mastery", Name = "精通", Level = save.MasteryLevel, Experience = save.MasteryExp, MaxLevel = 5, UseExperienceProgress = false }
+            CreateSkill("Farming", "耕种", Integer(player, "farmingLevel"), ExperienceAt(experience, 0), professions),
+            CreateSkill("Mining", "采矿", Integer(player, "miningLevel"), ExperienceAt(experience, 3), professions),
+            CreateSkill("Foraging", "采集", Integer(player, "foragingLevel"), ExperienceAt(experience, 2), professions),
+            CreateSkill("Fishing", "钓鱼", Integer(player, "fishingLevel"), ExperienceAt(experience, 1), professions),
+            CreateSkill("Combat", "战斗", Integer(player, "combatLevel"), ExperienceAt(experience, 4), professions),
+            CreateSkill("Mastery", "精通", save.MasteryLevel, save.MasteryExp, professions, 5, false)
         ]);
 
         var friendshipData = First(player, "friendshipData");
@@ -501,14 +552,18 @@ public sealed class SaveParserService(
         AddCollectionDetails(save, "Shipped", player, "basicShipped");
         AddCollectionDetails(save, "Minerals", player, "mineralsFound");
         AddCollectionDetails(save, "Artifacts", player, "archaeologyFound");
-        AddCollectionDetails(save, "Cooking", player, "cookingRecipes");
+        AddCollectionDetails(save, "Cooking", ReadCookedRecipeKeys(player));
         AddCollectionDetails(save, "Crafting", player, "craftingRecipes");
         AddCollectionDetails(save, "Fish", player, "fishCaught");
     }
 
     private void AddCollectionDetails(SaveInfo save, string collectionKey, XElement player, string dictionaryName)
     {
-        var collected = ReadCollectedKeys(player, dictionaryName);
+        AddCollectionDetails(save, collectionKey, ReadCollectedKeys(player, dictionaryName));
+    }
+
+    private void AddCollectionDetails(SaveInfo save, string collectionKey, IReadOnlySet<string> collected)
+    {
         var items = catalog.GetCollectionItems(collectionKey, collected);
         if (items.Count > 0)
         {
@@ -582,7 +637,8 @@ public sealed class SaveParserService(
                         friendship.RelationshipText
                     }.Where(value => !string.IsNullOrWhiteSpace(value))),
                     friendship.Name,
-                    "\uE77B"))
+                    "\uE77B",
+                    npcId: friendship.NpcId))
                 .ToList()
             : CountSummaryItems("好朋友", save.GoodFriends, TotalGreatFriends, "主要村民关系达到上限", "好感", "\uE77B");
 
@@ -625,7 +681,8 @@ public sealed class SaveParserService(
                 skill.IsMaxLevel,
                 $"{skill.LevelText} · {skill.ExperienceText}",
                 skill.Name,
-                "\uE735"))
+                "\uE735",
+                iconKey: skill.Key))
             .ToList();
 
         save.ProgressDetailItems["Perfection.Waivers"] =
@@ -661,6 +718,7 @@ public sealed class SaveParserService(
                 Name = displayName,
                 Value = $"x{count:N0}",
                 Detail = $"{displayName} 的累计击杀次数。击杀记录来自冒险者公会统计，可用于判断除害目标和杀怪英雄进度",
+                GuideQuery = displayName,
                 Glyph = "\uE7FC",
                 IconKey = name
             });
@@ -669,7 +727,7 @@ public sealed class SaveParserService(
 
     private void AddFishCatchStats(SaveInfo save, XElement player)
     {
-        var fishCaught = First(player, "fishCaught");
+        var fishCaught = FirstDictionary(player, "fishCaught");
         if (fishCaught is null)
         {
             return;
@@ -688,6 +746,7 @@ public sealed class SaveParserService(
                 Name = displayName,
                 Value = $"x{count:N0}",
                 Detail = $"{displayName} 的累计捕获次数。捕获记录会影响鱼类收藏和完美度中的捕获全部鱼类目标",
+                GuideQuery = displayName,
                 Glyph = "\uE7C5",
                 ObjectId = objectId,
                 IconTexture = item?.IconTexture,
@@ -768,15 +827,19 @@ public sealed class SaveParserService(
         string detail,
         string guideQuery,
         string glyph,
-        string? statusText = null)
+        string? statusText = null,
+        string? npcId = null,
+        string? iconKey = null)
         => new()
         {
             ItemId = itemId,
             Name = name,
             Detail = detail,
             IsCollected = isComplete,
+            NpcId = npcId,
             GuideQuery = guideQuery,
             Glyph = glyph,
+            IconKey = iconKey,
             StatusTextOverride = statusText ?? (isComplete ? "已完成" : "未完成")
         };
 
@@ -1098,6 +1161,74 @@ public sealed class SaveParserService(
     private static int ExperienceAt(IReadOnlyList<int> values, int index)
         => index >= 0 && index < values.Count ? values[index] : 0;
 
+    private static SaveSkillInfo CreateSkill(
+        string key,
+        string name,
+        int level,
+        int experience,
+        IReadOnlySet<int> professions,
+        int maxLevel = 10,
+        bool useExperienceProgress = true)
+    {
+        var skill = new SaveSkillInfo
+        {
+            Key = key,
+            Name = name,
+            Level = level,
+            Experience = experience,
+            MaxLevel = maxLevel,
+            UseExperienceProgress = useExperienceProgress
+        };
+
+        for (var slot = 1; slot <= 10; slot++)
+        {
+            skill.LevelSlots.Add(new SaveSkillLevelSlot
+            {
+                Level = slot,
+                IsAvailable = slot <= maxLevel,
+                IsUnlocked = slot <= maxLevel && level >= slot
+            });
+        }
+
+        if (!SkillProfessionDefinitions.TryGetValue(key, out var definitions))
+        {
+            return skill;
+        }
+
+        var professionItems = definitions
+            .Select(definition =>
+            {
+                var isSelected = professions.Contains(definition.Id);
+                return DetailItem(
+                    $"{key}.Profession.{definition.Id}",
+                    definition.Name,
+                    isSelected,
+                    $"{definition.Level}级职业：{definition.Detail}",
+                    definition.Name,
+                    "\uE735",
+                    isSelected ? "已选择" : level >= definition.Level ? "未选择" : $"{definition.Level}级解锁",
+                    iconKey: key);
+            })
+            .ToList();
+
+        skill.ProfessionChoices.AddRange(professionItems);
+        if (professionItems.Count >= 6)
+        {
+            skill.ProfessionBranches.Add(new SaveSkillProfessionBranch
+            {
+                LevelFiveChoice = professionItems[0],
+                LevelTenChoices = { professionItems[2], professionItems[3] }
+            });
+            skill.ProfessionBranches.Add(new SaveSkillProfessionBranch
+            {
+                LevelFiveChoice = professionItems[1],
+                LevelTenChoices = { professionItems[4], professionItems[5] }
+            });
+        }
+
+        return skill;
+    }
+
     private static string SeasonName(string? season)
     {
         return season?.ToLowerInvariant() switch
@@ -1262,20 +1393,54 @@ public sealed class SaveParserService(
     }
 
     private static int CountDictionaryItems(XElement root, string name)
-        => First(root, name)?.Elements().Count(element => element.Name.LocalName == "item") ?? 0;
+        => FirstDictionary(root, name)?.Elements().Count(element => element.Name.LocalName == "item") ?? 0;
 
     private static int CountDictionaryPositiveValues(XElement root, string name)
-        => First(root, name) is { } dictionary
+        => FirstDictionary(root, name) is { } dictionary
             ? ReadStringIntDictionary(dictionary).Count(item => item.Value > 0)
             : 0;
 
+    private static int CountCookedRecipes(XElement player)
+    {
+        var cookedRecipes = CountDictionaryPositiveValues(player, "recipesCooked");
+        var legacyRecipes = CountDictionaryPositiveValues(player, "cookingRecipes");
+        return Math.Max(cookedRecipes, legacyRecipes);
+    }
+
     private static IReadOnlySet<string> ReadCollectedKeys(XElement root, string name)
-        => First(root, name) is { } dictionary
+        => FirstDictionary(root, name) is { } dictionary
             ? ReadStringIntDictionary(dictionary)
                 .Where(item => item.Value > 0)
                 .Select(item => item.Key)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    private static IReadOnlySet<string> ReadCookedRecipeKeys(XElement player)
+    {
+        var cookedRecipes = ReadCollectedKeys(player, "recipesCooked");
+        return cookedRecipes.Count > 0
+            ? cookedRecipes
+            : ReadCollectedKeys(player, "cookingRecipes");
+    }
+
+    private static XElement? FirstDictionary(XElement root, string name)
+    {
+        var direct = First(root, name);
+        if (direct is not null)
+        {
+            return direct;
+        }
+
+        var stats = First(root, "stats");
+        var nested = stats is null ? null : First(stats, name);
+        if (nested is not null)
+        {
+            return nested;
+        }
+
+        return root.Descendants()
+            .FirstOrDefault(element => element.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static Dictionary<string, int> ReadStringIntDictionary(XElement dictionary)
     {
@@ -1293,6 +1458,14 @@ public sealed class SaveParserService(
 
         return result;
     }
+
+    private static HashSet<int> ReadIntSet(XElement root, string name)
+        => First(root, name)?.Elements()
+            .Where(element => element.Name.LocalName.Equals("int", StringComparison.OrdinalIgnoreCase))
+            .Select(element => int.TryParse(element.Value, out var value) ? (int?)value : null)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToHashSet() ?? [];
 
     private static HashSet<string> ReadBuildingTypes(XElement root)
         => root.Descendants()
@@ -1326,4 +1499,6 @@ public sealed class SaveParserService(
     private sealed record PerfectionGoal(string Id, string Name, string Detail, string GuideQuery);
 
     private sealed record MonsterEradicationGoal(string Flag, string Name, string GuideQuery);
+
+    private sealed record SkillProfessionDefinition(int Id, int Level, string Name, string Detail);
 }

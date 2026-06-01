@@ -21,6 +21,7 @@ public sealed class ModsViewModel : ViewModelBase
     private readonly NexusCredentialService _credentials;
     private readonly NexusClient _nexus;
     private readonly NexusFavoriteService _favoritesService;
+    private readonly NexusCoverCacheService _coverCache;
     private readonly PlatformService _platform;
     private readonly DialogService _dialogs;
     private readonly AutomaticScanMonitor _automaticScanMonitor;
@@ -47,6 +48,7 @@ public sealed class ModsViewModel : ViewModelBase
         NexusCredentialService credentials,
         NexusClient nexus,
         NexusFavoriteService favoritesService,
+        NexusCoverCacheService coverCache,
         PlatformService platform,
         DialogService dialogs,
         UiDispatcherService dispatcher)
@@ -63,6 +65,7 @@ public sealed class ModsViewModel : ViewModelBase
         _credentials = credentials;
         _nexus = nexus;
         _favoritesService = favoritesService;
+        _coverCache = coverCache;
         _platform = platform;
         _dialogs = dialogs;
         _automaticScanMonitor = new AutomaticScanMonitor(dispatcher, ScanAutomaticallyAsync);
@@ -85,6 +88,7 @@ public sealed class ModsViewModel : ViewModelBase
         ExportModPackWithFilesCommand = new AsyncRelayCommand(() => ExportModPackAsync(true), HasSelectedModPack);
         ExportModPackMetadataCommand = new AsyncRelayCommand(() => ExportModPackAsync(false), HasSelectedModPack);
         DownloadMissingModPackFilesCommand = new AsyncRelayCommand(DownloadMissingModPackFilesAsync, CanDownloadMissingModPackFiles);
+        InstallMissingDependencyCommand = new AsyncRelayCommand<MissingDependencyAction?>(InstallMissingDependencyAsync, dependency => dependency?.CanDownload == true && CanModify());
         DeleteModPackCommand = new AsyncRelayCommand(DeleteModPackAsync, CanDeleteModPack);
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, CanUseOnlineNow);
         PrepareSelectedUpdateCommand = new AsyncRelayCommand(PrepareSelectedUpdateAsync, CanPrepareSelectedUpdate);
@@ -109,6 +113,7 @@ public sealed class ModsViewModel : ViewModelBase
     public ObservableCollection<ModInfo> Mods { get; } = [];
     public ObservableCollection<ModPackInfo> ModPacks { get; } = [];
     public ObservableCollection<ModPackEntry> ModPackEntries { get; } = [];
+    public ObservableCollection<MissingDependencyAction> MissingDependencies { get; } = [];
     public IRelayCommand<string> FilterCommand { get; }
     public IAsyncRelayCommand EnableCommand { get; }
     public IAsyncRelayCommand DisableCommand { get; }
@@ -129,6 +134,7 @@ public sealed class ModsViewModel : ViewModelBase
     public IAsyncRelayCommand ExportModPackWithFilesCommand { get; }
     public IAsyncRelayCommand ExportModPackMetadataCommand { get; }
     public IAsyncRelayCommand DownloadMissingModPackFilesCommand { get; }
+    public IAsyncRelayCommand<MissingDependencyAction?> InstallMissingDependencyCommand { get; }
     public IAsyncRelayCommand DeleteModPackCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public IAsyncRelayCommand PrepareSelectedUpdateCommand { get; }
@@ -246,11 +252,15 @@ public sealed class ModsViewModel : ViewModelBase
                 OnPropertyChanged(nameof(PlanVisibility));
                 OnPropertyChanged(nameof(FilterAndListVisibility));
                 OnPropertyChanged(nameof(ModPackPanelVisibility));
+                OnPropertyChanged(nameof(MissingDependencyPanelVisibility));
                 InstallPackageCommand.NotifyCanExecuteChanged();
             }
         }
     }
     public Visibility PlanVisibility => PendingPlan is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility MissingDependencyPanelVisibility => MissingDependencies.Count > 0 && PendingPlan is null
+        ? Visibility.Visible
+        : Visibility.Collapsed;
 
     public void Refresh()
     {
@@ -259,6 +269,7 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(FilterAndListVisibility));
         OnPropertyChanged(nameof(ModPackPanelVisibility));
         OnPropertyChanged(nameof(RunningVisibility));
+        OnPropertyChanged(nameof(MissingDependencyPanelVisibility));
         OnPropertyChanged(nameof(InstalledCount));
         OnPropertyChanged(nameof(HealthyCount));
         OnPropertyChanged(nameof(ProblemCount));
@@ -588,6 +599,7 @@ public sealed class ModsViewModel : ViewModelBase
         try
         {
             PendingPlan = await _packages.InspectAsync(packagePath);
+            SetMissingDependencies(PendingPlan.MissingDependencies);
             FeedbackMessage = PendingPlan.Summary;
         }
         catch (Exception exception)
@@ -677,6 +689,7 @@ public sealed class ModsViewModel : ViewModelBase
             await _translations.ApplyAsync(_allMods);
             _state.Mods = _allMods;
             await SyncFavoritesAsync();
+            await _coverCache.ApplyCachedAndQueueAsync(_allMods);
             ApplyFilter(_filter);
             SelectedMod = Mods.FirstOrDefault(mod => string.Equals(mod.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
                 ?? Mods.FirstOrDefault();
@@ -833,7 +846,7 @@ public sealed class ModsViewModel : ViewModelBase
     private async Task InstallPackageAsync()
     {
         if (PendingPlan is not { CanInstall: true } plan
-            || !await _dialogs.ConfirmAsync("执行安装计划", $"将安装或更新 {plan.Items.Count} 个模组。已有版本会自动备份，旧配置会尽量保留。", "开始安装"))
+            || !await _dialogs.ConfirmAsync("执行安装计划", CreateInstallConfirmation(plan), "开始安装"))
         {
             return;
         }
@@ -850,7 +863,10 @@ public sealed class ModsViewModel : ViewModelBase
             }
 
             var result = await _packages.InstallAsync(plan);
-            FeedbackMessage = $"安装完成：成功 {result.InstalledCount}，失败 {result.FailedCount}。";
+            SetMissingDependencies(plan.MissingDependencies);
+            FeedbackMessage = plan.MissingDependencies.Count > 0
+                ? $"安装完成：成功 {result.InstalledCount}，失败 {result.FailedCount}。仍缺少 {plan.MissingDependencies.Count} 个前置。"
+                : $"安装完成：成功 {result.InstalledCount}，失败 {result.FailedCount}。";
             PendingPlan = null;
             IsBusy = false;
             await ScanAsync();
@@ -875,8 +891,55 @@ public sealed class ModsViewModel : ViewModelBase
         }
 
         PendingPlan = null;
+        SetMissingDependencies(Array.Empty<MissingDependencyAction>());
         FeedbackMessage = "已取消安装计划。";
         OnPropertyChanged(nameof(FeedbackMessage));
+    }
+
+    private async Task InstallMissingDependencyAsync(MissingDependencyAction? dependency)
+    {
+        if (dependency?.NexusModId is not { } modId)
+        {
+            FeedbackMessage = "该前置未绑定 Nexus ID，请在下载页手动搜索。";
+            OnPropertyChanged(nameof(FeedbackMessage));
+            return;
+        }
+
+        var installed = await App.Current.Services.Downloads.InstallModByIdAsync(modId, dependency.UniqueId);
+        if (installed)
+        {
+            var nextDependencies = MissingDependencies
+                .Where(value => !value.UniqueId.Equals(dependency.UniqueId, StringComparison.OrdinalIgnoreCase))
+                .Concat(App.Current.Services.Downloads.MissingDependencies)
+                .GroupBy(value => value.UniqueId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            SetMissingDependencies(nextDependencies);
+            OnPropertyChanged(nameof(MissingDependencyPanelVisibility));
+            await ScanAsync();
+        }
+
+        NotifyCommands();
+    }
+
+    private static string CreateInstallConfirmation(ModInstallPlan plan)
+    {
+        var message = $"将安装或更新 {plan.Items.Count} 个模组。已有版本会自动备份，旧配置会尽量保留。";
+        return plan.MissingDependencies.Count == 0
+            ? message
+            : $"{message}{Environment.NewLine}检测到缺少前置：{string.Join("、", plan.MissingDependencies.Select(dependency => dependency.UniqueId))}。仍会安装当前模组，补齐前置前游戏可能无法启动。";
+    }
+
+    private void SetMissingDependencies(IEnumerable<MissingDependencyAction> dependencies)
+    {
+        MissingDependencies.Clear();
+        foreach (var dependency in dependencies)
+        {
+            MissingDependencies.Add(dependency);
+        }
+
+        OnPropertyChanged(nameof(MissingDependencyPanelVisibility));
+        InstallMissingDependencyCommand.NotifyCanExecuteChanged();
     }
 
     private async Task CheckUpdatesAsync()
@@ -1038,6 +1101,7 @@ public sealed class ModsViewModel : ViewModelBase
         ExportModPackWithFilesCommand.NotifyCanExecuteChanged();
         ExportModPackMetadataCommand.NotifyCanExecuteChanged();
         DownloadMissingModPackFilesCommand.NotifyCanExecuteChanged();
+        InstallMissingDependencyCommand.NotifyCanExecuteChanged();
         DeleteModPackCommand.NotifyCanExecuteChanged();
         CheckUpdatesCommand.NotifyCanExecuteChanged();
         PrepareSelectedUpdateCommand.NotifyCanExecuteChanged();

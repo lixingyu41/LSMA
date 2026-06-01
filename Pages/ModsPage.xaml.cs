@@ -3,8 +3,11 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 using Windows.Storage;
+using Windows.System;
 using LSMA.Models;
 using LSMA.ViewModels;
 
@@ -12,6 +15,10 @@ namespace LSMA.Pages;
 
 public sealed partial class ModsPage : Page
 {
+    private const double MinCoverPreviewScale = 0.5;
+    private const double MaxCoverPreviewScale = 6.0;
+    private const double ModsListMinWidth = 360;
+    private const double ModsDetailMinWidth = 360;
     private static readonly Dictionary<string, int> FilterIndexMap = new()
     {
         ["全部"] = 0, ["可更新"] = 1,
@@ -23,6 +30,13 @@ public sealed partial class ModsPage : Page
     private int _selectedFilterIndex = 0;
     private Storyboard? _currentAnimation;
     private bool _filterEventsAttached;
+    private double _modCoverPreviewScale = 1;
+    private bool _modCoverPreviewDragging;
+    private bool _modCoverPreviewDragged;
+    private Point _modCoverPreviewLastPoint;
+    private bool _modsSplitterDragging;
+    private double _modsSplitterStartX;
+    private double _modsListStartWidth;
     private static SolidColorBrush SelectedFilterForeground =>
         (SolidColorBrush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"];
 
@@ -285,5 +299,153 @@ public sealed partial class ModsPage : Page
         {
             mod.IsPointerOver = false;
         }
+    }
+
+    private void ModCover_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: ModInfo mod })
+        {
+            return;
+        }
+
+        _vm.SelectedMod = mod;
+        if (!string.IsNullOrWhiteSpace(mod.CoverImageUri))
+        {
+            ShowModCoverPreview(mod.CoverImageUri);
+        }
+
+        e.Handled = true;
+    }
+
+    private void ShowModCoverPreview(string uri)
+    {
+        ModCoverPreviewImage.Source = new BitmapImage(new Uri(uri));
+        ResetModCoverPreviewTransform();
+        ModCoverPreviewOverlay.Visibility = Visibility.Visible;
+        ModCoverPreviewOverlay.Focus(FocusState.Programmatic);
+    }
+
+    private void HideModCoverPreview()
+    {
+        ModCoverPreviewOverlay.Visibility = Visibility.Collapsed;
+        ModCoverPreviewImage.Source = null;
+        _modCoverPreviewDragging = false;
+        _modCoverPreviewDragged = false;
+    }
+
+    private void ResetModCoverPreviewTransform()
+    {
+        _modCoverPreviewScale = 1;
+        ModCoverPreviewTransform.ScaleX = 1;
+        ModCoverPreviewTransform.ScaleY = 1;
+        ModCoverPreviewTransform.TranslateX = 0;
+        ModCoverPreviewTransform.TranslateY = 0;
+    }
+
+    private void ModCoverPreviewOverlay_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Escape)
+        {
+            HideModCoverPreview();
+            e.Handled = true;
+        }
+    }
+
+    private void ModCoverPreviewOverlay_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        HideModCoverPreview();
+        e.Handled = true;
+    }
+
+    private void ModCoverPreviewImage_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        var delta = e.GetCurrentPoint(ModCoverPreviewImage).Properties.MouseWheelDelta;
+        var factor = delta > 0 ? 1.1 : 1 / 1.1;
+        _modCoverPreviewScale = Math.Clamp(_modCoverPreviewScale * factor, MinCoverPreviewScale, MaxCoverPreviewScale);
+        ModCoverPreviewTransform.ScaleX = _modCoverPreviewScale;
+        ModCoverPreviewTransform.ScaleY = _modCoverPreviewScale;
+        e.Handled = true;
+    }
+
+    private void ModCoverPreviewImage_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        _modCoverPreviewDragging = true;
+        _modCoverPreviewDragged = false;
+        _modCoverPreviewLastPoint = e.GetCurrentPoint(ModCoverPreviewOverlay).Position;
+        ModCoverPreviewImage.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void ModCoverPreviewImage_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_modCoverPreviewDragging)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(ModCoverPreviewOverlay).Position;
+        var dx = point.X - _modCoverPreviewLastPoint.X;
+        var dy = point.Y - _modCoverPreviewLastPoint.Y;
+        if (Math.Abs(dx) > 2 || Math.Abs(dy) > 2)
+        {
+            _modCoverPreviewDragged = true;
+        }
+
+        ModCoverPreviewTransform.TranslateX += dx;
+        ModCoverPreviewTransform.TranslateY += dy;
+        _modCoverPreviewLastPoint = point;
+        e.Handled = true;
+    }
+
+    private void ModCoverPreviewImage_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        _modCoverPreviewDragging = false;
+        ModCoverPreviewImage.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void ModCoverPreviewImage_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (!_modCoverPreviewDragged)
+        {
+            HideModCoverPreview();
+        }
+
+        _modCoverPreviewDragged = false;
+        e.Handled = true;
+    }
+
+    private void ModsSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        _modsSplitterDragging = true;
+        _modsSplitterStartX = e.GetCurrentPoint(ModsSplitGrid).Position.X;
+        _modsListStartWidth = ModsListColumn.ActualWidth;
+        ModsSplitter.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void ModsSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_modsSplitterDragging)
+        {
+            return;
+        }
+
+        var pointerX = e.GetCurrentPoint(ModsSplitGrid).Position.X;
+        var deltaX = pointerX - _modsSplitterStartX;
+        var maxListWidth = Math.Max(
+            ModsListMinWidth,
+            ModsSplitGrid.ActualWidth - ModsSplitter.ActualWidth - ModsDetailMinWidth);
+        var listWidth = Math.Clamp(_modsListStartWidth + deltaX, ModsListMinWidth, maxListWidth);
+        ModsListColumn.Width = new GridLength(listWidth);
+        ModsDetailColumn.Width = new GridLength(1, GridUnitType.Star);
+        e.Handled = true;
+    }
+
+    private void ModsSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        _modsSplitterDragging = false;
+        ModsSplitter.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
     }
 }

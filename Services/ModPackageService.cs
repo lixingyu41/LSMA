@@ -10,10 +10,26 @@ public sealed class ModPackageService(
     GameRunLockService runLock,
     ModScannerService scanner,
     ModBackupService backups,
+    SettingsService settings,
     ExternalArchiveReader externalArchiveReader,
     FileSystemSafeService files,
     LoggingService logging)
 {
+    private static readonly IReadOnlyDictionary<string, long> KnownDependencyNexusIds = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Pathoschild.ContentPatcher"] = 1915,
+        ["Pathoschild.SMAPI"] = 2400,
+        ["spacechase0.SpaceCore"] = 1348,
+        ["spacechase0.JsonAssets"] = 1720,
+        ["spacechase0.GenericModConfigMenu"] = 5098,
+        ["Cherry.ExpandedPreconditionsUtility"] = 6529,
+        ["aedenthorn.ExtraMapLayers"] = 9633,
+        ["ZeroMeters.SAAT.Mod"] = 10747,
+        ["Cherry.ShopTileFramework"] = 5005,
+        ["PeacefulEnd.ContentPatcherAnimations"] = 3853,
+        ["Esca.FarmTypeManager"] = 3231
+    };
+
     public async Task<ModInstallPlan> InspectAsync(string packagePath)
     {
         var plan = new ModInstallPlan { PackagePath = packagePath };
@@ -105,12 +121,16 @@ public sealed class ModPackageService(
                     plan.Items.Add(item);
                 }
 
-                var availableIds = state.Mods
-                    .Where(mod => mod.IsEnabled && mod.Manifest?.UniqueID is not null)
+                var installedModsById = state.Mods
+                    .Where(mod => !mod.IsArchived && mod.Manifest?.UniqueID is not null)
+                    .GroupBy(mod => mod.Manifest!.UniqueID!, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+                var availableIds = installedModsById.Values
+                    .Where(mod => mod.IsEnabled)
                     .Select(mod => mod.Manifest!.UniqueID!)
                     .Concat(plan.Items.Select(item => item.Manifest.UniqueID!))
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var versions = state.Mods.Where(mod => mod.IsEnabled && mod.Manifest?.UniqueID is not null)
+                var versions = installedModsById.Values.Where(mod => mod.IsEnabled)
                     .GroupBy(mod => mod.Manifest!.UniqueID!, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.First().Manifest!.Version, StringComparer.OrdinalIgnoreCase);
                 foreach (var packaged in plan.Items)
@@ -123,20 +143,36 @@ public sealed class ModPackageService(
                     {
                         if (dependency.UniqueID is not null && !availableIds.Contains(dependency.UniqueID))
                         {
-                            item.Blockers.Add($"缺少前置模组：{dependency.UniqueID}");
+                            item.MissingDependencies.Add(CreateMissingDependency(
+                                item,
+                                dependency.UniqueID,
+                                dependency.MinimumVersion,
+                                installedModsById,
+                                $"缺少前置模组：{dependency.UniqueID}"));
                         }
                         else if (dependency.UniqueID is not null
                             && versions.TryGetValue(dependency.UniqueID, out var version)
                             && !VersionHelper.IsAtLeast(version, dependency.MinimumVersion))
                         {
-                            item.Blockers.Add($"前置版本不足：{dependency.UniqueID} 需要 {dependency.MinimumVersion}");
+                            item.MissingDependencies.Add(CreateMissingDependency(
+                                item,
+                                dependency.UniqueID,
+                                dependency.MinimumVersion,
+                                installedModsById,
+                                $"前置版本不足：{dependency.UniqueID} 需要 {dependency.MinimumVersion}",
+                                version));
                         }
                     }
 
                     if (item.Manifest.ContentPackFor?.UniqueID is { Length: > 0 } parentId
                         && !availableIds.Contains(parentId))
                     {
-                        item.Blockers.Add($"内容包需要主模组：{parentId}");
+                        item.MissingDependencies.Add(CreateMissingDependency(
+                            item,
+                            parentId,
+                            item.Manifest.ContentPackFor.MinimumVersion,
+                            installedModsById,
+                            $"内容包需要主模组：{parentId}"));
                     }
 
                     if (!string.IsNullOrWhiteSpace(item.Manifest.MinimumApiVersion))
@@ -156,6 +192,15 @@ public sealed class ModPackageService(
         {
             plan.Blockers.AddRange(item.Blockers.Select(message => $"{item.Name}：{message}"));
             plan.Warnings.AddRange(item.Warnings.Select(message => $"{item.Name}：{message}"));
+            foreach (var missing in item.MissingDependencies)
+            {
+                if (!plan.MissingDependencies.Any(value => value.UniqueId.Equals(missing.UniqueId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    plan.MissingDependencies.Add(missing);
+                }
+
+                plan.Warnings.Add($"{item.Name}：{missing.DetailText}，可以先安装当前模组，补齐前置前游戏可能无法启动。");
+            }
         }
 
         return plan;
@@ -318,6 +363,42 @@ public sealed class ModPackageService(
             ? relativePath.Replace('\\', '/')
             : $"{root.TrimEnd('/')}/{relativePath.Replace('\\', '/')}";
         return archive.Entries.Any(entry => entry.FullName.Equals(expected, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private MissingDependencyAction CreateMissingDependency(
+        ModInstallPlanItem item,
+        string uniqueId,
+        string? minimumVersion,
+        IReadOnlyDictionary<string, ModInfo> installedModsById,
+        string message,
+        string? installedVersion = null)
+    {
+        return new MissingDependencyAction
+        {
+            UniqueId = uniqueId,
+            SourceModName = item.Name,
+            MinimumVersion = minimumVersion,
+            InstalledVersion = installedVersion,
+            NexusModId = ResolveNexusModId(uniqueId, installedModsById),
+            Message = message
+        };
+    }
+
+    private long? ResolveNexusModId(string uniqueId, IReadOnlyDictionary<string, ModInfo> installedModsById)
+    {
+        if (installedModsById.TryGetValue(uniqueId, out var mod) && mod.NexusModId is { } installedId)
+        {
+            return installedId;
+        }
+
+        if (settings.Current.NexusBindings.TryGetValue(uniqueId, out var binding))
+        {
+            return binding;
+        }
+
+        return KnownDependencyNexusIds.TryGetValue(uniqueId, out var knownId)
+            ? knownId
+            : null;
     }
 
     private static async Task ExtractItemAsync(string packagePath, ModInstallPlanItem item, string destination)

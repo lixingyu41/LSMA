@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml;
 
 namespace LSMA.Models;
@@ -79,11 +80,15 @@ public class SaveInfo
     public string DateDisplay => Year > 0 ? $"{Year} 年 {Season} {Day} 日" : "日期未知";
     public string ListDisplay => $"{FarmName}-{FarmerName}-{Year}年{Season}{Day}日";
     public string MoneyDisplay => $"{Money:N0}g";
+    public string CompactMoneyDisplay => CompactMoney(Money);
     public string TotalIncomeDisplay => $"{TotalMoneyEarned:N0}g";
+    public string CompactTotalIncomeDisplay => CompactMoney(TotalMoneyEarned);
     public double AverageMoneyPerDay => TotalDays > 0 ? TotalMoneyEarned / (double)TotalDays : 0;
     public double MoneyPerSeasonEstimate => AverageMoneyPerDay * 28;
     public string AverageMoneyDisplay => $"{AverageMoneyPerDay:N0}g / 天";
+    public string CompactAverageMoneyDisplay => $"{CompactMoneyNumber(AverageMoneyPerDay)}g / 天";
     public string SeasonEstimateDisplay => $"{MoneyPerSeasonEstimate:N0}g / 季";
+    public string CompactSeasonEstimateDisplay => $"{CompactMoneyNumber(MoneyPerSeasonEstimate)}g / 季";
     public string CommunityCenterDisplay => $"{CommunityCenterProgress:0}%";
     public string CollectionDisplay => $"{CollectionProgress:0}%";
     public string UniqueGameIdDisplay => UniqueGameId > 0 ? UniqueGameId.ToString() : "-";
@@ -112,14 +117,14 @@ public class SaveInfo
     [
         Metric("完美度", PerfectionProgressDisplay, "齐先生完美度总进度", "\uE8FB"),
         Metric("游戏时长", PlayTimeDisplay, "实际游玩时长", "\uE823"),
-        Metric("总收入", TotalIncomeDisplay, "游戏开始以来累计获得的金币", "\uE9D2"),
+        Metric("总收入", TotalIncomeDisplay, "游戏开始以来累计获得的金币", "\uE9D2", CompactTotalIncomeDisplay),
         Metric("居住天数", TotalDaysDisplay, "从开局开始累计的居住天数", "\uE787")
     ];
     public IReadOnlyList<SaveMetricInfo> EconomyStats =>
     [
-        Metric("当前金币", MoneyDisplay, "角色当前可直接消费的金币，可用于购买种子、建筑、工具升级和商店物品", "\uE8C7"),
-        Metric("日均收入", AverageMoneyDisplay, "总收入按居住天数折算，用来判断当前农场赚钱效率", "\uE9D2"),
-        Metric("季度估算", SeasonEstimateDisplay, "按当前日均收入估算 28 天收益，用来粗略评估一个季节的经营规模", "\uE9D2"),
+        Metric("当前金币", MoneyDisplay, "角色当前可直接消费的金币，可用于购买种子、建筑、工具升级和商店物品", "\uE8C7", CompactMoneyDisplay),
+        Metric("日均收入", AverageMoneyDisplay, "总收入按居住天数折算，用来判断当前农场赚钱效率", "\uE9D2", CompactAverageMoneyDisplay),
+        Metric("季度估算", SeasonEstimateDisplay, "按当前日均收入估算 28 天收益，用来粗略评估一个季节的经营规模", "\uE9D2", CompactSeasonEstimateDisplay),
         Metric("齐宝石", QiGemsDisplay, "齐宝石可在姜岛齐先生核桃房兑换特殊物品、配方和挑战奖励", "\uE970")
     ];
     public IReadOnlyList<SaveMetricInfo> ProgressStats =>
@@ -147,14 +152,31 @@ public class SaveInfo
         Metric("已出货", ItemsShippedDisplay, "已登记到收藏的出货物品数量，影响收集进度和完美度中的出货项目", "\uE7BF")
     ];
 
-    private static SaveMetricInfo Metric(string name, string value, string detail, string glyph)
+    private static SaveMetricInfo Metric(string name, string value, string detail, string glyph, string? compactValue = null)
         => new()
         {
             Name = name,
             Value = value,
+            CompactValue = string.Equals(value, compactValue, StringComparison.Ordinal)
+                ? string.Empty
+                : compactValue ?? string.Empty,
             Detail = detail,
             Glyph = glyph
         };
+
+    private static string CompactMoney(long amount)
+        => $"{CompactMoneyNumber(amount)}g";
+
+    private static string CompactMoneyNumber(double amount)
+    {
+        var rounded = (long)Math.Round(amount, MidpointRounding.AwayFromZero);
+        var absolute = Math.Abs(rounded);
+        return absolute >= 100_000_000
+            ? $"{Math.Round(rounded / 100_000_000d, MidpointRounding.AwayFromZero):N0}亿"
+            : absolute >= 10_000
+                ? $"{Math.Round(rounded / 10_000d, MidpointRounding.AwayFromZero):N0}万"
+                : $"{rounded:N0}";
+    }
 }
 
 public sealed class SavePlayerInfo : SaveInfo
@@ -182,9 +204,11 @@ public sealed class SaveCollectionItemInfo
     public string Name { get; init; } = string.Empty;
     public string Detail { get; init; } = string.Empty;
     public bool IsCollected { get; init; }
+    public string? NpcId { get; init; }
     public int? ObjectId { get; init; }
     public string? IconTexture { get; init; }
     public int? IconSpriteIndex { get; init; }
+    public string? IconKey { get; init; }
     public int IconWidth { get; init; } = 16;
     public int IconHeight { get; init; } = 16;
     public string? IconUri { get; set; }
@@ -196,16 +220,29 @@ public sealed class SaveCollectionItemInfo
         : StatusTextOverride;
     public string EffectiveSearchQuery => string.IsNullOrWhiteSpace(GuideQuery) ? Name : GuideQuery;
     public double TileOpacity => IsCollected ? 1 : 0.48;
+    public Visibility SelectedVisibility => IsCollected ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DetailVisibility => string.IsNullOrWhiteSpace(Detail) ? Visibility.Collapsed : Visibility.Visible;
     public Visibility IconVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Collapsed : Visibility.Visible;
     public Visibility FallbackGlyphVisibility => string.IsNullOrWhiteSpace(IconUri) ? Visibility.Visible : Visibility.Collapsed;
 }
 
-public sealed class SaveMetricInfo
+public sealed class SaveMetricInfo : ObservableObject
 {
+    private bool _useCompactValue;
+    private string _fullValue = string.Empty;
+
     public string Name { get; init; } = string.Empty;
-    public string Value { get; init; } = string.Empty;
+    public string Value
+    {
+        get => _useCompactValue && CanToggleCompactValue ? CompactValue : _fullValue;
+        init => _fullValue = value;
+    }
+
+    public string CompactValue { get; init; } = string.Empty;
+    public bool CanToggleCompactValue => !string.IsNullOrWhiteSpace(CompactValue);
     public string Detail { get; init; } = string.Empty;
+    public string GuideQuery { get; init; } = string.Empty;
+    public string EffectiveSearchQuery => string.IsNullOrWhiteSpace(GuideQuery) ? Name : GuideQuery;
     public string Glyph { get; init; } = "\uE946";
     public int? ObjectId { get; init; }
     public string? IconTexture { get; init; }
@@ -220,6 +257,17 @@ public sealed class SaveMetricInfo
     public Visibility FallbackGlyphVisibility => string.IsNullOrWhiteSpace(IconUri) && !string.IsNullOrWhiteSpace(Glyph)
         ? Visibility.Visible
         : Visibility.Collapsed;
+
+    public void ToggleCompactValue()
+    {
+        if (!CanToggleCompactValue)
+        {
+            return;
+        }
+
+        _useCompactValue = !_useCompactValue;
+        OnPropertyChanged(nameof(Value));
+    }
 }
 
 public sealed class SaveSkillInfo
@@ -231,6 +279,9 @@ public sealed class SaveSkillInfo
     public int Level { get; init; }
     public int Experience { get; init; }
     public string? IconUri { get; set; }
+    public List<SaveSkillLevelSlot> LevelSlots { get; } = [];
+    public List<SaveCollectionItemInfo> ProfessionChoices { get; } = [];
+    public List<SaveSkillProfessionBranch> ProfessionBranches { get; } = [];
     public int MaxLevel { get; init; } = 10;
     public bool UseExperienceProgress { get; init; } = true;
     public bool IsMaxLevel => Level >= MaxLevel;
@@ -250,6 +301,32 @@ public sealed class SaveSkillInfo
         : IsMaxLevel
         ? $"{Experience:N0} 经验 · 已满级"
         : $"{ExperienceIntoLevel:N0} / {ExperienceForLevel:N0} 经验 · 距下级 {ExperienceRemaining:N0}";
+    public string ProfessionSummary => ProfessionChoices.Count == 0
+        ? string.Empty
+        : ProfessionChoices.Any(choice => choice.IsCollected)
+            ? string.Join(" / ", ProfessionChoices.Where(choice => choice.IsCollected).Select(choice => choice.Name))
+            : "5级 / 10级职业未选择";
+    public Visibility ProfessionSummaryVisibility => string.IsNullOrWhiteSpace(ProfessionSummary) ? Visibility.Collapsed : Visibility.Visible;
+    public IReadOnlyList<SaveSkillLevelSlot> PreLevelFiveSlots => LevelSlots.Where(slot => slot.Level < 5).ToList();
+    public SaveSkillLevelSlot? LevelFiveSlot => LevelSlots.FirstOrDefault(slot => slot.Level == 5);
+    public IReadOnlyList<SaveSkillLevelSlot> PostLevelFiveSlots => LevelSlots.Where(slot => slot.Level is > 5 and < 10).ToList();
+    public SaveSkillLevelSlot? LevelTenSlot => LevelSlots.FirstOrDefault(slot => slot.Level == 10);
+    public Visibility LevelTenVisibility => LevelTenSlot is null ? Visibility.Collapsed : Visibility.Visible;
+}
+
+public sealed class SaveSkillLevelSlot
+{
+    public int Level { get; init; }
+    public bool IsAvailable { get; init; } = true;
+    public bool IsUnlocked { get; init; }
+    public double Opacity => !IsAvailable ? 0 : IsUnlocked ? 1 : 0.32;
+    public double SlotSize => Level is 5 or 10 ? 27 : 18;
+}
+
+public sealed class SaveSkillProfessionBranch
+{
+    public SaveCollectionItemInfo LevelFiveChoice { get; init; } = new();
+    public List<SaveCollectionItemInfo> LevelTenChoices { get; } = [];
 }
 
 public sealed class SaveFriendshipInfo
