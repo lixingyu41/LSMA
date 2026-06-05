@@ -150,9 +150,9 @@ public sealed class DownloadsViewModel : ViewModelBase
         LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync, () => HasMorePages && !IsBusy);
     }
 
-    public ObservableCollection<NexusCategory> OnlineCategories { get; } = [];
-    public ObservableCollection<NexusSortOption> OnlineSortOptions { get; } = [];
-    public ObservableCollection<NexusSortDirectionOption> OnlineSortDirections { get; } = [];
+    public ObservableCollection<NexusCategory> OnlineCategories { get; } = new RangeObservableCollection<NexusCategory>();
+    public ObservableCollection<NexusSortOption> OnlineSortOptions { get; } = new RangeObservableCollection<NexusSortOption>();
+    public ObservableCollection<NexusSortDirectionOption> OnlineSortDirections { get; } = new RangeObservableCollection<NexusSortDirectionOption>();
 
     public NexusCategory? SelectedOnlineCategory
     {
@@ -198,10 +198,10 @@ public sealed class DownloadsViewModel : ViewModelBase
         }
     }
 
-    public ObservableCollection<NexusModInfo> OnlineMods { get; } = [];
-    public ObservableCollection<NexusFileInfo> OnlineFiles { get; } = [];
+    public ObservableCollection<NexusModInfo> OnlineMods { get; } = new RangeObservableCollection<NexusModInfo>();
+    public ObservableCollection<NexusFileInfo> OnlineFiles { get; } = new RangeObservableCollection<NexusFileInfo>();
     public ObservableCollection<DownloadQueueItem> DownloadQueue { get; } = [];
-    public ObservableCollection<MissingDependencyAction> MissingDependencies { get; } = [];
+    public ObservableCollection<MissingDependencyAction> MissingDependencies { get; } = new RangeObservableCollection<MissingDependencyAction>();
 
     public NexusModInfo? SelectedOnlineMod
     {
@@ -299,16 +299,11 @@ public sealed class DownloadsViewModel : ViewModelBase
             _loadedOnlineMods = [mod];
             OnlineQuery = string.Empty;
             HasMorePages = false;
-            OnlineMods.Clear();
-            OnlineMods.Add(mod);
+            ReplaceCollection(OnlineMods, [mod]);
             SelectedOnlineMod = mod;
             QueueNameTranslations([mod]);
 
-            OnlineFiles.Clear();
-            foreach (var file in await _nexus.GetFilesAsync(mod.ModId, key))
-            {
-                OnlineFiles.Add(file);
-            }
+            ReplaceCollection(OnlineFiles, await _nexus.GetFilesAsync(mod.ModId, key));
 
             _onlineFilesLoadedModId = mod.ModId;
             SelectedOnlineFile = SelectLatestFile(OnlineFiles);
@@ -466,11 +461,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        OnlineCategories.Clear();
-        foreach (var category in FixedCategories)
-        {
-            OnlineCategories.Add(category);
-        }
+        ReplaceCollection(OnlineCategories, FixedCategories);
 
         _categoriesLoaded = true;
         SelectedOnlineCategory ??= AllCategories;
@@ -522,18 +513,11 @@ public sealed class DownloadsViewModel : ViewModelBase
 
         if (append)
         {
-            foreach (var item in newMods)
-            {
-                OnlineMods.Add(item);
-            }
+            AddCollectionRange(OnlineMods, newMods);
         }
         else
         {
-            OnlineMods.Clear();
-            foreach (var item in _loadedOnlineMods)
-            {
-                OnlineMods.Add(item);
-            }
+            ReplaceCollection(OnlineMods, _loadedOnlineMods);
         }
 
         if (!append && OnlineMods.Count > 0)
@@ -583,11 +567,7 @@ public sealed class DownloadsViewModel : ViewModelBase
         HasMorePages = _browseHasMorePages;
         _surpriseSeed = _browseSurpriseSeed;
         _activeOnlineQuery = string.Empty;
-        OnlineMods.Clear();
-        foreach (var item in _loadedOnlineMods)
-        {
-            OnlineMods.Add(item);
-        }
+        ReplaceCollection(OnlineMods, _loadedOnlineMods);
 
         SelectedOnlineMod = _browseSelectedModId is { } selectedModId
             ? OnlineMods.FirstOrDefault(mod => mod.ModId == selectedModId) ?? OnlineMods.FirstOrDefault()
@@ -708,11 +688,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             return;
         }
 
-        OnlineFiles.Clear();
-        foreach (var file in files)
-        {
-            OnlineFiles.Add(file);
-        }
+        ReplaceCollection(OnlineFiles, files);
 
         _onlineFilesLoadedModId = mod.ModId;
         SelectedOnlineFile = SelectLatestFile(OnlineFiles);
@@ -743,8 +719,7 @@ public sealed class DownloadsViewModel : ViewModelBase
                 return;
             }
 
-            OnlineFiles.Clear();
-            OnlineFiles.Add(file);
+            ReplaceCollection(OnlineFiles, [file]);
             SelectedOnlineFile = file;
         }
         catch (NexusApiException exception)
@@ -800,8 +775,7 @@ public sealed class DownloadsViewModel : ViewModelBase
             ApplyResultMarkers([mod]);
             await _coverCache.ApplyCachedAndQueueAsync([mod]);
             SelectedOnlineMod = mod;
-            OnlineFiles.Clear();
-            OnlineFiles.Add(file);
+            ReplaceCollection(OnlineFiles, [file]);
             SelectedOnlineFile = file;
             queueItem = CreateQueueItem(mod, file);
         }
@@ -1172,6 +1146,35 @@ public sealed class DownloadsViewModel : ViewModelBase
     }
 
     public string TaskStatus => IsBusy ? ProgressText : $"显示 {OnlineMods.Count} 个模组";
+
+    private static void ReplaceCollection<T>(ObservableCollection<T> destination, IEnumerable<T> source)
+    {
+        if (destination is RangeObservableCollection<T> range)
+        {
+            range.ReplaceWith(source);
+            return;
+        }
+
+        destination.Clear();
+        foreach (var item in source)
+        {
+            destination.Add(item);
+        }
+    }
+
+    private static void AddCollectionRange<T>(ObservableCollection<T> destination, IEnumerable<T> source)
+    {
+        if (destination is RangeObservableCollection<T> range)
+        {
+            range.AddRange(source);
+            return;
+        }
+
+        foreach (var item in source)
+        {
+            destination.Add(item);
+        }
+    }
 
     private void NotifyCommands()
     {

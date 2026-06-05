@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>下载 LSMA</title>
+  <meta name="description" content="下载 LSMA Windows x64 安装包，查看当前版本、安装包大小、SHA256 校验值和发布说明。">
+  <link rel="icon" href="/assets/favicon.ico">
+  <link rel="stylesheet" href="/assets/site.css">
+  <script defer src="/assets/site.js"></script>
+</head>
+<body data-page="download">
+  <header class="site-nav solid">
+    <a class="brand" href="/" aria-label="LSMA 首页">
+      <img src="/assets/lsma-logo.png" alt="" width="36" height="36">
+      <span>LSMA</span>
+    </a>
+    <nav aria-label="主导航">
+      <a href="/">介绍</a>
+      <a href="/#features">功能</a>
+      <a href="/download/" aria-current="page">下载</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="download-hero">
+      <p class="eyebrow">Windows x64</p>
+      <h1>下载 LSMA</h1>
+      <p>当前稳定版由发布清单驱动；LSMA 设置页检查更新时读取同一个 <code>manifest.json</code>。</p>
+    </section>
+
+    <section class="download-layout">
+      <article class="download-card">
+        <div class="download-card-head">
+          <img src="/assets/lsma-logo.png" alt="" width="56" height="56">
+          <div>
+            <h2>LSMA 安装包</h2>
+            <p>适用于 Windows 10 / 11 x64</p>
+          </div>
+        </div>
+        <a
+          id="downloadButton"
+          class="button primary wide"
+          href="https://github.com/lixingyu41/LSMA/releases/latest/download/LSMA-Setup-x64.exe">
+          下载 LSMA-Setup-x64.exe
+        </a>
+        <dl class="release-meta">
+          <div><dt>版本</dt><dd data-field="latestVersion">1.0.0</dd></div>
+          <div><dt>发布日期</dt><dd data-field="releaseDate">2026-06-05</dd></div>
+          <div><dt>安装包大小</dt><dd data-field="sizeBytes">58.5 MiB</dd></div>
+          <div><dt>文件名</dt><dd data-field="fileName">LSMA-Setup-x64.exe</dd></div>
+        </dl>
+      </article>
+
+      <article class="verify-card">
+        <h2>校验与安装</h2>
+        <div class="hash-box" data-field="sha256">843346D14A037B46526862BC314354793895BB7930C5F49D539824FDAA166A99</div>
+        <p>下载后可用 PowerShell 执行 <code>Get-FileHash .\LSMA-Setup-x64.exe -Algorithm SHA256</code>，输出值与上方一致即为当前发布包。</p>
+        <ol>
+          <li>下载 <code>LSMA-Setup-x64.exe</code>。</li>
+          <li>运行安装程序并按提示完成安装。</li>
+          <li>首次打开后在设置页选择 Stardew Valley 游戏目录。</li>
+        </ol>
+      </article>
+    </section>
+
+    <section class="section release-notes" aria-labelledby="notes-title">
+      <p class="eyebrow">Release Notes</p>
+      <h2 id="notes-title">发布说明</h2>
+      <ul id="releaseNotes">
+        <li>新增 LSMA 官网发布清单。</li>
+        <li>设置页“检查更新”读取 lsma.lixingyu.top 下载清单。</li>
+        <li>安装包继续使用 Windows x64 自包含发布形态。</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <span>LSMA</span>
+    <a href="/">介绍</a>
+    <a href="https://github.com/lixingyu41/LSMA">GitHub</a>
+  </footer>
+</body>
+</html>

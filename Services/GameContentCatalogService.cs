@@ -36,6 +36,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
     private readonly Dictionary<int, string> _objectNamesById = [];
     private readonly Dictionary<string, GuideSearchResult> _itemResultsByQualifiedId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<CollectionCatalogItem>> _collectionItems = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<GuideSearchResult, SearchTextCacheEntry> _searchTextCache = [];
 
     public async Task PrepareAsync()
     {
@@ -48,6 +49,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         _objectNamesById.Clear();
         _itemResultsByQualifiedId.Clear();
         _collectionItems.Clear();
+        _searchTextCache.Clear();
         AddWikiGuideResults();
         if (state.GameDirectory is not { } game)
         {
@@ -71,6 +73,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             return [];
         }
 
+        query = query.Trim();
         var looseQuery = LooseSearchText(query);
         return _searchIndex
             .Where(item => SearchMatches(item, query, looseQuery))
@@ -167,12 +170,25 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         return string.Join(" ", values);
     }
 
-    private static bool SearchMatches(GuideSearchResult item, string query, string looseQuery)
+    private bool SearchMatches(GuideSearchResult item, string query, string looseQuery)
     {
-        var text = SearchText(item);
-        return text.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+        var cache = SearchTextFor(item);
+        return cache.Text.Contains(query, StringComparison.CurrentCultureIgnoreCase)
             || (!string.IsNullOrWhiteSpace(looseQuery)
-                && LooseSearchText(text).Contains(looseQuery, StringComparison.CurrentCultureIgnoreCase));
+                && cache.LooseText.Contains(looseQuery, StringComparison.CurrentCultureIgnoreCase));
+    }
+
+    private SearchTextCacheEntry SearchTextFor(GuideSearchResult item)
+    {
+        if (_searchTextCache.TryGetValue(item, out var cache))
+        {
+            return cache;
+        }
+
+        var text = SearchText(item);
+        cache = new SearchTextCacheEntry(text, LooseSearchText(text));
+        _searchTextCache[item] = cache;
+        return cache;
     }
 
     private static int MatchRank(string title, string query, string looseQuery)
@@ -2921,6 +2937,8 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         int IconWidth,
         int IconHeight,
         int SortKey);
+
+    private sealed record SearchTextCacheEntry(string Text, string LooseText);
 
     private sealed record RecipeIngredientDefinition(string Id, string Name, int Stack, int? ObjectId)
     {

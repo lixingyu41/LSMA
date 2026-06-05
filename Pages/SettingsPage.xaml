@@ -40,7 +40,7 @@
                                 <Border.RenderTransform>
                                     <TranslateTransform x:Name="UpdateNoticeTransform" Y="40" />
                                 </Border.RenderTransform>
-                                <TextBlock Text="当前版本暂未启用在线检查" Foreground="{StaticResource AccentBrush}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding UpdateNoticeText}" Foreground="{StaticResource AccentBrush}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             </Border>
                             <Grid VerticalAlignment="Bottom" ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
@@ -55,7 +55,7 @@
                                 <Button
                                     Grid.Column="1"
                                     Content="检查更新"
-                                    Click="CheckUpdates_Click"
+                                    Command="{Binding CheckAppUpdatesCommand}"
                                     Style="{StaticResource TopBarSubtleButtonStyle}"
                                     HorizontalAlignment="Stretch" />
                             </Grid>

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using LSMA.Models;
 using LSMA.Services;
+using LSMA.Utilities;
 using Microsoft.UI.Xaml;
 
 namespace LSMA.ViewModels;
@@ -13,6 +14,7 @@ public sealed class GuideViewModel : ViewModelBase
     private readonly GameIconService _icons;
     private readonly GameContentCatalogService _catalog;
     private string _query = string.Empty;
+    private bool _staticGuideIconsApplied;
 
     public GuideViewModel(
         AppStateService state,
@@ -29,12 +31,12 @@ public sealed class GuideViewModel : ViewModelBase
         Refresh();
     }
 
-    public ObservableCollection<TodaySuggestion> Suggestions { get; } = [];
-    public ObservableCollection<FestivalRecord> Festivals { get; } = [];
-    public ObservableCollection<FishRecord> Fish { get; } = [];
-    public ObservableCollection<CropRecord> Crops { get; } = [];
-    public ObservableCollection<BundleRecord> Bundles { get; } = [];
-    public ObservableCollection<GuideSearchResult> SearchResults { get; } = [];
+    public ObservableCollection<TodaySuggestion> Suggestions { get; } = new RangeObservableCollection<TodaySuggestion>();
+    public ObservableCollection<FestivalRecord> Festivals { get; } = new RangeObservableCollection<FestivalRecord>();
+    public ObservableCollection<FishRecord> Fish { get; } = new RangeObservableCollection<FishRecord>();
+    public ObservableCollection<CropRecord> Crops { get; } = new RangeObservableCollection<CropRecord>();
+    public ObservableCollection<BundleRecord> Bundles { get; } = new RangeObservableCollection<BundleRecord>();
+    public ObservableCollection<GuideSearchResult> SearchResults { get; } = new RangeObservableCollection<GuideSearchResult>();
     public bool IsSearchActive => !string.IsNullOrWhiteSpace(_query);
     public Visibility EmptyVisibility => _state.CurrentSave is null && !IsSearchActive ? Visibility.Visible : Visibility.Collapsed;
     public Visibility SuggestionVisibility => _state.CurrentSave is not null && !IsSearchActive ? Visibility.Visible : Visibility.Collapsed;
@@ -238,45 +240,20 @@ public sealed class GuideViewModel : ViewModelBase
 
     public async Task RefreshAsync()
     {
-        foreach (var fish in _catalog.GetFishToday(_state.CurrentSave))
+        await EnsureStructuredIconsAsync();
+        Refresh();
+        if (IsSearchActive)
         {
-            await _icons.GetObjectIconAsync(fish.ObjectId);
+            SearchNpcGifts();
+            await EnsureSearchResultIconsAsync();
+            Replace(SearchResults, SearchResults.ToList());
+            OnPropertyChanged(nameof(SearchSummary));
         }
-
-        foreach (var crop in _catalog.GetCropsForCurrentSeason(_state.CurrentSave))
-        {
-            await _icons.GetObjectIconAsync(crop.ObjectId);
-        }
-
-        foreach (var bundle in _catalog.GetCommunityBundles(_state.CurrentSave))
-        {
-            await _icons.GetObjectIconAsync(bundle.ObjectId);
-        }
-
-        await SearchAsync(_query);
     }
 
     public void Refresh()
     {
-        foreach (var record in _data.Birthdays)
-        {
-            record.IconUri = _icons.GetPortraitUri(record.NpcId);
-        }
-
-        foreach (var record in _data.Fish)
-        {
-            record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
-        }
-
-        foreach (var record in _data.Crops)
-        {
-            record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
-        }
-
-        foreach (var record in _data.Bundles)
-        {
-            record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
-        }
+        ApplyStaticGuideIcons();
 
         var festivals = _catalog.GetUpcomingFestivals(_state.CurrentSave);
         foreach (var festival in festivals)
@@ -346,6 +323,59 @@ public sealed class GuideViewModel : ViewModelBase
         OnPropertyChanged(nameof(GoalSuggestion));
     }
 
+    private async Task EnsureStructuredIconsAsync()
+    {
+        foreach (var fish in _catalog.GetFishToday(_state.CurrentSave))
+        {
+            await _icons.GetObjectIconAsync(fish.ObjectId);
+        }
+
+        foreach (var crop in _catalog.GetCropsForCurrentSeason(_state.CurrentSave))
+        {
+            await _icons.GetObjectIconAsync(crop.ObjectId);
+        }
+
+        foreach (var bundle in _catalog.GetCommunityBundles(_state.CurrentSave))
+        {
+            await _icons.GetObjectIconAsync(bundle.ObjectId);
+        }
+    }
+
+    private void ApplyStaticGuideIcons()
+    {
+        if (_staticGuideIconsApplied)
+        {
+            return;
+        }
+
+        var allResolved = true;
+        foreach (var record in _data.Birthdays)
+        {
+            record.IconUri = _icons.GetPortraitUri(record.NpcId);
+            allResolved &= record.IconUri is not null;
+        }
+
+        foreach (var record in _data.Fish)
+        {
+            record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
+            allResolved &= record.IconUri is not null;
+        }
+
+        foreach (var record in _data.Crops)
+        {
+            record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
+            allResolved &= record.IconUri is not null;
+        }
+
+        foreach (var record in _data.Bundles)
+        {
+            record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
+            allResolved &= record.IconUri is not null;
+        }
+
+        _staticGuideIconsApplied = _state.IsGameConfigured && allResolved;
+    }
+
     private string? GetSeasonIcon(string season)
     {
         return _icons.GetObjectIconUri(season switch
@@ -360,6 +390,12 @@ public sealed class GuideViewModel : ViewModelBase
 
     private static void Replace<T>(ObservableCollection<T> destination, IEnumerable<T> source)
     {
+        if (destination is RangeObservableCollection<T> range)
+        {
+            range.ReplaceWith(source);
+            return;
+        }
+
         destination.Clear();
         foreach (var item in source)
         {

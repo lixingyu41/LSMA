@@ -52,6 +52,12 @@ public sealed partial class SettingsPage : Page
         {
             SyncAppearanceSelection();
         }
+        else if (e.PropertyName is nameof(SettingsViewModel.UpdateNoticeText))
+        {
+            _updateNoticeTimer.Stop();
+            AnimateUpdateNotice(true);
+            _updateNoticeTimer.Start();
+        }
     }
 
     private void SyncAppearanceSelection()
@@ -90,13 +96,6 @@ public sealed partial class SettingsPage : Page
     {
         await ViewModel.SystemThemeCommand.ExecuteAsync(null);
         SyncAppearanceSelection();
-    }
-
-    private void CheckUpdates_Click(object sender, RoutedEventArgs e)
-    {
-        _updateNoticeTimer.Stop();
-        AnimateUpdateNotice(true);
-        _updateNoticeTimer.Start();
     }
 
     private async void Donate_Click(object sender, RoutedEventArgs e)

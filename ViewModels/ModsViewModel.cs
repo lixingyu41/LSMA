@@ -26,6 +26,8 @@ public sealed class ModsViewModel : ViewModelBase
     private readonly DialogService _dialogs;
     private readonly AutomaticScanMonitor _automaticScanMonitor;
     private List<ModInfo> _allMods = [];
+    private ModSummaryCounts _summaryCounts;
+    private bool _summaryCountsDirty = true;
     private ModInfo? _selectedMod;
     private string _filter = "全部";
     private ModInstallPlan? _pendingPlan;
@@ -112,10 +114,10 @@ public sealed class ModsViewModel : ViewModelBase
         };
     }
 
-    public ObservableCollection<ModInfo> Mods { get; } = [];
-    public ObservableCollection<ModPackInfo> ModPacks { get; } = [];
-    public ObservableCollection<ModPackEntry> ModPackEntries { get; } = [];
-    public ObservableCollection<MissingDependencyAction> MissingDependencies { get; } = [];
+    public ObservableCollection<ModInfo> Mods { get; } = new RangeObservableCollection<ModInfo>();
+    public ObservableCollection<ModPackInfo> ModPacks { get; } = new RangeObservableCollection<ModPackInfo>();
+    public ObservableCollection<ModPackEntry> ModPackEntries { get; } = new RangeObservableCollection<ModPackEntry>();
+    public ObservableCollection<MissingDependencyAction> MissingDependencies { get; } = new RangeObservableCollection<MissingDependencyAction>();
     public IRelayCommand<string> FilterCommand { get; }
     public IAsyncRelayCommand EnableCommand { get; }
     public IAsyncRelayCommand DisableCommand { get; }
@@ -228,15 +230,28 @@ public sealed class ModsViewModel : ViewModelBase
     public string NexusBindingText => SelectedMod?.NexusModId is { } id ? $"Nexus Mod ID：{id}" : "未绑定 Nexus Mod ID";
     public string NexusIdDisplayText => SelectedMod?.NexusModId is { } id ? $"ID：{id}" : "手动匹配ID";
     public Visibility DependencySectionVisibility => SelectedMod?.HasRequiredDependencies == true ? Visibility.Visible : Visibility.Collapsed;
-    public string InstalledCount => _allMods.Count.ToString();
-    public string HealthyCount => _allMods.Count(mod => mod.IsEnabled && mod.Issues.Count == 0).ToString();
-    public string ProblemCount => _allMods.Count(mod => mod.Issues.Count > 0).ToString();
-    public string DisabledCount => _allMods.Count(mod => !mod.IsEnabled && !mod.IsArchived).ToString();
-    public string MissingDependencyCount => _allMods.Count(mod => mod.Issues.Any(issue => issue.Message.Contains("前置", StringComparison.Ordinal))).ToString();
-    public string FavoriteCount => _allMods.Count(mod => mod.IsFavorite).ToString();
-    public string UpdateCount => _allMods.Count(mod => mod.HasUpdate).ToString();
+    public string InstalledCount => SummaryCounts.Installed.ToString();
+    public string HealthyCount => SummaryCounts.Healthy.ToString();
+    public string ProblemCount => SummaryCounts.Problem.ToString();
+    public string DisabledCount => SummaryCounts.Disabled.ToString();
+    public string MissingDependencyCount => SummaryCounts.MissingDependency.ToString();
+    public string FavoriteCount => SummaryCounts.Favorite.ToString();
+    public string UpdateCount => SummaryCounts.Update.ToString();
+    private ModSummaryCounts SummaryCounts
+    {
+        get
+        {
+            if (_summaryCountsDirty)
+            {
+                _summaryCounts = ModSummaryCounts.Create(_allMods);
+                _summaryCountsDirty = false;
+            }
+
+            return _summaryCounts;
+        }
+    }
     public string CurrentFilter => _filter;
-    public bool HasProblems => _allMods.Any(mod => mod.Issues.Count > 0);
+    public bool HasProblems => SummaryCounts.Problem > 0;
     public Visibility FilterAndListVisibility => AvailableVisibility == Visibility.Visible && PlanVisibility == Visibility.Collapsed
         && !_isModPackPanelOpen
         ? Visibility.Visible : Visibility.Collapsed;
@@ -336,11 +351,9 @@ public sealed class ModsViewModel : ViewModelBase
 
     private void SyncModPacks(ModPackCatalog catalog, string? preferredPackId = null)
     {
-        ModPacks.Clear();
-        foreach (var pack in catalog.Packs.OrderByDescending(pack => pack.IsActive).ThenBy(pack => pack.Name, StringComparer.CurrentCultureIgnoreCase))
-        {
-            ModPacks.Add(pack);
-        }
+        ReplaceCollection(ModPacks, catalog.Packs
+            .OrderByDescending(pack => pack.IsActive)
+            .ThenBy(pack => pack.Name, StringComparer.CurrentCultureIgnoreCase));
 
         SelectedModPack = ModPacks.FirstOrDefault(pack => pack.Id == preferredPackId)
             ?? ModPacks.FirstOrDefault(pack => pack.IsActive)
@@ -350,17 +363,21 @@ public sealed class ModsViewModel : ViewModelBase
 
     private void RefreshModPackEntries()
     {
-        ModPackEntries.Clear();
         if (SelectedModPack is null)
         {
+            ReplaceCollection(ModPackEntries, []);
             return;
         }
 
-        foreach (var entry in SelectedModPack.Entries.OrderBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase))
+        var entries = SelectedModPack.Entries
+            .OrderBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        foreach (var entry in entries)
         {
             FillActiveModPackNexusId(entry);
-            ModPackEntries.Add(entry);
         }
+
+        ReplaceCollection(ModPackEntries, entries);
     }
 
     private void FillActiveModPackNexusId(ModPackEntry entry)
@@ -692,6 +709,7 @@ public sealed class ModsViewModel : ViewModelBase
             var selectedPath = SelectedMod?.FolderPath;
             _runLock.Refresh();
             _allMods = _analyzer.Analyze(await _scanner.ScanAsync()).ToList();
+            _summaryCountsDirty = true;
             await _translations.ApplyAsync(_allMods);
             _state.Mods = _allMods;
             await SyncFavoritesAsync();
@@ -769,11 +787,7 @@ public sealed class ModsViewModel : ViewModelBase
             "可更新" => mod.HasUpdate,
             _ => true
         });
-        Mods.Clear();
-        foreach (var mod in items)
-        {
-            Mods.Add(mod);
-        }
+        ReplaceCollection(Mods, items);
 
         OnPropertyChanged(nameof(TaskStatus));
         OnPropertyChanged(nameof(CurrentFilter));
@@ -833,6 +847,8 @@ public sealed class ModsViewModel : ViewModelBase
             {
                 mod.IsFavorite = mod.NexusModId is { } id && favorites.Any(f => f.ModId == id);
             }
+
+            _summaryCountsDirty = true;
         }
         catch
         {
@@ -938,14 +954,25 @@ public sealed class ModsViewModel : ViewModelBase
 
     private void SetMissingDependencies(IEnumerable<MissingDependencyAction> dependencies)
     {
-        MissingDependencies.Clear();
-        foreach (var dependency in dependencies)
-        {
-            MissingDependencies.Add(dependency);
-        }
+        ReplaceCollection(MissingDependencies, dependencies);
 
         OnPropertyChanged(nameof(MissingDependencyPanelVisibility));
         InstallMissingDependencyCommand.NotifyCanExecuteChanged();
+    }
+
+    private static void ReplaceCollection<T>(ObservableCollection<T> destination, IEnumerable<T> source)
+    {
+        if (destination is RangeObservableCollection<T> range)
+        {
+            range.ReplaceWith(source);
+            return;
+        }
+
+        destination.Clear();
+        foreach (var item in source)
+        {
+            destination.Add(item);
+        }
     }
 
     private async Task CheckUpdatesAsync()
@@ -967,9 +994,10 @@ public sealed class ModsViewModel : ViewModelBase
                 mod.RemoteVersion = remote.Version;
             }
 
+            _summaryCountsDirty = true;
             ApplyFilter(_filter);
             OnPropertyChanged(nameof(UpdateCount));
-            FeedbackMessage = $"更新检查完成，发现 {_allMods.Count(mod => mod.HasUpdate)} 个可更新模组。";
+            FeedbackMessage = $"更新检查完成，发现 {SummaryCounts.Update} 个可更新模组。";
             OnPropertyChanged(nameof(FeedbackMessage));
             App.Current.Services.Home.Refresh();
         }
@@ -1228,4 +1256,59 @@ public sealed class ModsViewModel : ViewModelBase
     private bool CanModifySelected() => HasSelected() && !_state.IsGameRunning && SelectedMod is { IsArchived: false };
     private bool CanEnable() => CanModifySelected() && SelectedMod is { IsEnabled: false };
     private bool CanDisable() => CanModifySelected() && SelectedMod is { IsEnabled: true };
+
+    private readonly record struct ModSummaryCounts(
+        int Installed,
+        int Healthy,
+        int Problem,
+        int Disabled,
+        int MissingDependency,
+        int Favorite,
+        int Update)
+    {
+        public static ModSummaryCounts Create(IReadOnlyList<ModInfo> mods)
+        {
+            var healthy = 0;
+            var problem = 0;
+            var disabled = 0;
+            var missingDependency = 0;
+            var favorite = 0;
+            var update = 0;
+
+            foreach (var mod in mods)
+            {
+                if (mod.IsEnabled && mod.Issues.Count == 0)
+                {
+                    healthy++;
+                }
+
+                if (mod.Issues.Count > 0)
+                {
+                    problem++;
+                }
+
+                if (!mod.IsEnabled && !mod.IsArchived)
+                {
+                    disabled++;
+                }
+
+                if (mod.Issues.Any(issue => issue.Message.Contains("前置", StringComparison.Ordinal)))
+                {
+                    missingDependency++;
+                }
+
+                if (mod.IsFavorite)
+                {
+                    favorite++;
+                }
+
+                if (mod.HasUpdate)
+                {
+                    update++;
+                }
+            }
+
+            return new ModSummaryCounts(mods.Count, healthy, problem, disabled, missingDependency, favorite, update);
+        }
+    }
 }

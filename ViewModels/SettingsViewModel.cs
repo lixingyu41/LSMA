@@ -19,6 +19,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private readonly CacheService _cache;
     private readonly AssetCacheService _assetCache;
     private readonly GameIconService _gameIcons;
+    private readonly AppUpdateService _appUpdates;
     private string _nexusKeyInput = string.Empty;
     private string _nexusLoginUserInput = string.Empty;
     private string _nexusLoginPasswordInput = string.Empty;
@@ -32,6 +33,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private double _modBackupRetention = 20;
     private double _saveBackupRetention = 20;
     private string? _nexusConnectionStatus;
+    private string _updateNoticeText = "正在检查更新...";
     private bool _isRefreshing;
 
     public SettingsViewModel(
@@ -45,7 +47,8 @@ public sealed class SettingsViewModel : ViewModelBase
         SmapiLogService diagnostics,
         CacheService cache,
         AssetCacheService assetCache,
-        GameIconService gameIcons)
+        GameIconService gameIcons,
+        AppUpdateService appUpdates)
     {
         _state = state;
         _settings = settings;
@@ -58,6 +61,7 @@ public sealed class SettingsViewModel : ViewModelBase
         _cache = cache;
         _assetCache = assetCache;
         _gameIcons = gameIcons;
+        _appUpdates = appUpdates;
         ChooseDirectoryCommand = new AsyncRelayCommand(ChooseDirectoryAsync, CanInteract);
         OpenGameDirectoryCommand = new AsyncRelayCommand(OpenGameDirectoryAsync, () => _state.IsGameConfigured);
         DarkThemeCommand = new AsyncRelayCommand(() => SelectDisplayThemeAsync(AppTheme.Dark));
@@ -76,6 +80,7 @@ public sealed class SettingsViewModel : ViewModelBase
         SaveNexusKeyCommand = new AsyncRelayCommand(SaveNexusKeyAsync, CanSaveNexus);
         ClearNexusKeyCommand = new AsyncRelayCommand(ClearNexusKeyAsync, () => _credentials.HasCredential && !IsBusy);
         TestNexusConnectionCommand = new AsyncRelayCommand(TestNexusConnectionAsync, () => _credentials.HasCredential && !IsBusy);
+        CheckAppUpdatesCommand = new AsyncRelayCommand(CheckAppUpdatesAsync, CanInteract);
         SaveNexusLoginCommand = new AsyncRelayCommand(SaveNexusLoginAsync, CanSaveNexusLogin);
         ClearNexusLoginCommand = new AsyncRelayCommand(ClearNexusLoginAsync, () => _credentials.HasWebLogin && !IsBusy);
         SaveBackupSettingsCommand = new AsyncRelayCommand(SaveBackupSettingsAsync, CanInteract);
@@ -106,6 +111,7 @@ public sealed class SettingsViewModel : ViewModelBase
     public IAsyncRelayCommand SaveNexusKeyCommand { get; }
     public IAsyncRelayCommand ClearNexusKeyCommand { get; }
     public IAsyncRelayCommand TestNexusConnectionCommand { get; }
+    public IAsyncRelayCommand CheckAppUpdatesCommand { get; }
     public IAsyncRelayCommand SaveNexusLoginCommand { get; }
     public IAsyncRelayCommand ClearNexusLoginCommand { get; }
     public IAsyncRelayCommand SaveBackupSettingsCommand { get; }
@@ -247,9 +253,13 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         get
         {
-            var version = typeof(LSMA.App).Assembly.GetName().Version;
-            return version is null ? "版本 -" : $"版本 {version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
+            return $"版本 {AppUpdateService.GetCurrentVersion()}";
         }
+    }
+    public string UpdateNoticeText
+    {
+        get => _updateNoticeText;
+        private set => SetProperty(ref _updateNoticeText, value);
     }
     public bool IsSmapiSelected => _settings.Current.DefaultLaunchTarget == LaunchTarget.Smapi;
     public bool IsVanillaSelected => _settings.Current.DefaultLaunchTarget == LaunchTarget.Vanilla;
@@ -565,6 +575,47 @@ public sealed class SettingsViewModel : ViewModelBase
         Refresh();
     }
 
+    private async Task CheckAppUpdatesAsync()
+    {
+        IsBusy = true;
+        ProgressText = "正在检查 LSMA 更新...";
+        UpdateNoticeText = "正在检查更新...";
+        NotifyCommands();
+        try
+        {
+            var result = await _appUpdates.CheckAsync();
+            if (result.IsUpdateAvailable)
+            {
+                UpdateNoticeText = $"发现新版本 {result.LatestVersion}";
+                FeedbackMessage = $"发现 LSMA {result.LatestVersion}。";
+                var notes = result.Notes.Count == 0 ? string.Empty : $"{Environment.NewLine}{string.Join(Environment.NewLine, result.Notes.Select(note => "- " + note))}";
+                if (await _dialogs.ConfirmAsync(
+                    "发现新版本",
+                    $"当前版本 {result.CurrentVersion}，最新版本 {result.LatestVersion}。{notes}",
+                    "打开下载页"))
+                {
+                    await _platform.OpenUriAsync(result.DownloadPageUrl);
+                }
+            }
+            else
+            {
+                UpdateNoticeText = $"已是最新 {result.CurrentVersion}";
+                FeedbackMessage = $"当前已是最新版本 {result.CurrentVersion}。";
+            }
+        }
+        catch (Exception exception)
+        {
+            UpdateNoticeText = "检查失败，稍后重试";
+            await _dialogs.ShowMessageAsync("检查更新失败", exception.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            NotifyCommands();
+        }
+    }
+
     private async Task UpdateModMetadataTranslationSettingAsync(bool value)
     {
         try
@@ -638,6 +689,7 @@ public sealed class SettingsViewModel : ViewModelBase
         SaveNexusKeyCommand.NotifyCanExecuteChanged();
         ClearNexusKeyCommand.NotifyCanExecuteChanged();
         TestNexusConnectionCommand.NotifyCanExecuteChanged();
+        CheckAppUpdatesCommand.NotifyCanExecuteChanged();
         SaveNexusLoginCommand.NotifyCanExecuteChanged();
         ClearNexusLoginCommand.NotifyCanExecuteChanged();
         SaveBackupSettingsCommand.NotifyCanExecuteChanged();

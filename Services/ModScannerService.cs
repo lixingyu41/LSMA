@@ -5,12 +5,14 @@ namespace LSMA.Services;
 
 public sealed class ModScannerService(AppStateService state, LoggingService logging)
 {
+    private const int MaxConcurrentReads = 8;
+
     public async Task<List<ModInfo>> ScanAsync()
     {
-        var results = new List<ModInfo>();
+        var targets = new List<ModScanTarget>();
         if (state.GameDirectory is not { } game)
         {
-            return results;
+            return [];
         }
 
         var enabledPath = Path.Combine(game.Path, "Mods");
@@ -20,14 +22,14 @@ public sealed class ModScannerService(AppStateService state, LoggingService logg
             Directory.CreateDirectory(enabledPath);
             foreach (var directory in Directory.EnumerateDirectories(enabledPath))
             {
-                await AddModSafelyAsync(results, directory, true);
+                targets.Add(new ModScanTarget(directory, true, false));
             }
 
             if (Directory.Exists(disabledPath))
             {
                 foreach (var directory in Directory.EnumerateDirectories(disabledPath))
                 {
-                    await AddModSafelyAsync(results, directory, false);
+                    targets.Add(new ModScanTarget(directory, false, false));
                 }
             }
 
@@ -37,9 +39,7 @@ public sealed class ModScannerService(AppStateService state, LoggingService logg
                 {
                     foreach (var directory in Directory.EnumerateDirectories(batch))
                     {
-                        var archived = await ReadModAsync(directory, false);
-                        archived.IsArchived = true;
-                        results.Add(archived);
+                        targets.Add(new ModScanTarget(directory, false, true));
                     }
                 }
             }
@@ -49,6 +49,7 @@ public sealed class ModScannerService(AppStateService state, LoggingService logg
             await logging.ErrorAsync("扫描模组目录失败", exception);
         }
 
+        var results = await ReadModsAsync(targets);
         return results.OrderBy(info => info.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
@@ -57,23 +58,45 @@ public sealed class ModScannerService(AppStateService state, LoggingService logg
         return ReadModAsync(directory, enabled);
     }
 
-    private async Task AddModSafelyAsync(List<ModInfo> results, string directory, bool enabled)
+    private async Task<IReadOnlyList<ModInfo>> ReadModsAsync(IReadOnlyList<ModScanTarget> targets)
+    {
+        using var gate = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 2, MaxConcurrentReads));
+        var tasks = targets.Select(async target =>
+        {
+            await gate.WaitAsync();
+            try
+            {
+                return await ReadModSafelyAsync(target);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        return await Task.WhenAll(tasks);
+    }
+
+    private async Task<ModInfo> ReadModSafelyAsync(ModScanTarget target)
     {
         try
         {
-            results.Add(await ReadModAsync(directory, enabled));
+            var info = await ReadModAsync(target.Directory, target.Enabled);
+            info.IsArchived = target.Archived;
+            return info;
         }
         catch (Exception exception)
         {
             var info = new ModInfo
             {
-                FolderPath = directory,
-                FolderName = Path.GetFileName(directory),
-                IsEnabled = enabled
+                FolderPath = target.Directory,
+                FolderName = Path.GetFileName(target.Directory),
+                IsEnabled = target.Enabled,
+                IsArchived = target.Archived
             };
             info.Issues.Add(new ModIssue { Severity = IssueSeverity.Error, Message = "无法读取模组目录" });
-            results.Add(info);
-            await logging.ErrorAsync($"读取模组目录失败：{directory}", exception);
+            await logging.ErrorAsync($"读取模组目录失败：{target.Directory}", exception);
+            return info;
         }
     }
 
@@ -124,4 +147,6 @@ public sealed class ModScannerService(AppStateService state, LoggingService logg
 
         return info;
     }
+
+    private sealed record ModScanTarget(string Directory, bool Enabled, bool Archived);
 }

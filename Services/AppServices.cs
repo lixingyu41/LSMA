@@ -9,6 +9,7 @@ public sealed class AppServices
     public AppServices()
     {
         Logging = new LoggingService();
+        AppUpdates = new AppUpdateService(Logging);
         Files = new FileSystemSafeService(Logging);
         UiDispatcher = new UiDispatcherService();
         Settings = new SettingsService(Logging);
@@ -53,11 +54,12 @@ public sealed class AppServices
         Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModTranslations, ModBackups, ModTransactions, ModPackages, ModPacks, NexusCredentials, Nexus, NexusFavorites, NexusCovers, Platform, Dialogs, UiDispatcher);
         Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
         Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
-        SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons);
+        SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons, AppUpdates);
         Downloads = new DownloadsViewModel(State, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, ModPackages, Settings, Platform, Dialogs, NexusModNameTranslations, NexusCovers);
     }
 
     public LoggingService Logging { get; }
+    public AppUpdateService AppUpdates { get; }
     public FileSystemSafeService Files { get; }
     public UiDispatcherService UiDispatcher { get; }
     public SettingsService Settings { get; }

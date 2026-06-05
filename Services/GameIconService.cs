@@ -135,6 +135,11 @@ public sealed class GameIconService(
             "InterfaceIcons",
             "Objects",
             $"{Path.GetFileName(texture)}-{spriteIndex}-{width}x{height}.png");
+        if (TryUseCachedPng(output, source, out var cachedOutput))
+        {
+            return _textureIcons[cacheKey] = cachedOutput;
+        }
+
         try
         {
             var size = await GetTextureSizeAsync(source, game.Path);
@@ -337,6 +342,11 @@ public sealed class GameIconService(
 
         foreach (var source in sources.Where(File.Exists))
         {
+            if (TryUseCachedPng(output, source, out var cachedOutput))
+            {
+                return _monsterIcons[normalizedId] = cachedOutput;
+            }
+
             try
             {
                 await textures.ExportPngRegionAsync(
@@ -381,6 +391,11 @@ public sealed class GameIconService(
         }
 
         var output = Path.Combine(outputRoot, "Objects", $"{objectId}.png");
+        if (TryUseCachedPng(output, source, out var cachedOutput))
+        {
+            return _objectIcons[objectId] = cachedOutput;
+        }
+
         try
         {
             await textures.ExportPngRegionAsync(
@@ -420,16 +435,31 @@ public sealed class GameIconService(
         foreach (var (name, x) in skills)
         {
             var output = Path.Combine(outputRoot, "Skills", $"{name}.png");
-            await textures.ExportPngRegionAsync(cursors, output, gamePath, x, 428, 10, 10);
-            _skillIcons[name] = ToUri(output);
+            if (!TryUseCachedPng(output, cursors, out var iconUri))
+            {
+                await textures.ExportPngRegionAsync(cursors, output, gamePath, x, 428, 10, 10);
+                iconUri = ToUri(output);
+            }
+
+            _skillIcons[name] = iconUri;
         }
 
         var fullHeart = Path.Combine(outputRoot, "Social", "HeartFull.png");
         var emptyHeart = Path.Combine(outputRoot, "Social", "HeartEmpty.png");
-        await textures.ExportPngRegionAsync(cursors, fullHeart, gamePath, 211, 428, 7, 6);
-        await textures.ExportPngRegionAsync(cursors, emptyHeart, gamePath, 218, 428, 7, 6);
-        _fullHeartIconUri = ToUri(fullHeart);
-        _emptyHeartIconUri = ToUri(emptyHeart);
+        if (!TryUseCachedPng(fullHeart, cursors, out var fullHeartUri))
+        {
+            await textures.ExportPngRegionAsync(cursors, fullHeart, gamePath, 211, 428, 7, 6);
+            fullHeartUri = ToUri(fullHeart);
+        }
+
+        if (!TryUseCachedPng(emptyHeart, cursors, out var emptyHeartUri))
+        {
+            await textures.ExportPngRegionAsync(cursors, emptyHeart, gamePath, 218, 428, 7, 6);
+            emptyHeartUri = ToUri(emptyHeart);
+        }
+
+        _fullHeartIconUri = fullHeartUri;
+        _emptyHeartIconUri = emptyHeartUri;
     }
 
     private async Task PreparePortraitIconsAsync(string gamePath, string outputRoot)
@@ -452,6 +482,12 @@ public sealed class GameIconService(
             }
 
             var output = Path.Combine(outputRoot, "Portraits", $"{npcId}.png");
+            if (TryUseCachedPng(output, source, out var cachedOutput))
+            {
+                _portraitIcons[npcId] = cachedOutput;
+                continue;
+            }
+
             try
             {
                 await textures.ExportPngRegionAsync(source, output, gamePath, 0, 0, width, height);
@@ -490,10 +526,20 @@ public sealed class GameIconService(
             var blurredPath = Path.Combine(output, "Backgrounds", "Blurred", $"{season}.png");
             try
             {
-                await textures.ExportPngAsync(source, outputPath, gamePath);
-                await textures.ExportBlurredPngAsync(source, blurredPath, gamePath, 7);
-                _seasonBackgrounds[season] = ToUri(outputPath);
-                _blurredSeasonBackgrounds[season] = ToUri(blurredPath);
+                if (!TryUseCachedPng(outputPath, source, out var backgroundUri))
+                {
+                    await textures.ExportPngAsync(source, outputPath, gamePath);
+                    backgroundUri = ToUri(outputPath);
+                }
+
+                if (!TryUseCachedPng(blurredPath, source, out var blurredUri))
+                {
+                    await textures.ExportBlurredPngAsync(source, blurredPath, gamePath, 7);
+                    blurredUri = ToUri(blurredPath);
+                }
+
+                _seasonBackgrounds[season] = backgroundUri;
+                _blurredSeasonBackgrounds[season] = blurredUri;
             }
             catch (Exception exception)
             {
@@ -511,6 +557,12 @@ public sealed class GameIconService(
         }
 
         var output = Path.Combine(outputRoot, "Farmers", $"{gender}.png");
+        if (TryUseCachedPng(output, source, out var cachedOutput))
+        {
+            _farmerPortraits[gender] = cachedOutput;
+            return;
+        }
+
         try
         {
             await textures.ExportPngRegionAsync(source, output, gamePath, 0, 0, 16, 32);
@@ -725,6 +777,25 @@ public sealed class GameIconService(
     {
         var invalid = Path.GetInvalidFileNameChars();
         return string.Concat(value.Select(character => invalid.Contains(character) ? '_' : character));
+    }
+
+    private static bool TryUseCachedPng(string outputPath, string sourcePath, out string uri)
+    {
+        uri = string.Empty;
+        var output = new FileInfo(outputPath);
+        if (!output.Exists)
+        {
+            return false;
+        }
+
+        var source = new FileInfo(sourcePath);
+        if (source.Exists && output.LastWriteTimeUtc < source.LastWriteTimeUtc)
+        {
+            return false;
+        }
+
+        uri = ToUri(outputPath);
+        return true;
     }
 
     private static string ToUri(string path) => new Uri(Path.GetFullPath(path)).AbsoluteUri;

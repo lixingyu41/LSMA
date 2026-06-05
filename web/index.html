@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LSMA - Stardew Mod Assistant</title>
+  <meta name="description" content="LSMA 是面向 Windows 的星露谷物语启动前助手与模组管理器，覆盖模组扫描、更新、备份、存档检查和 Nexus 下载流程。">
+  <link rel="icon" href="/assets/favicon.ico">
+  <link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+  <header class="site-nav">
+    <a class="brand" href="/" aria-label="LSMA 首页">
+      <img src="/assets/lsma-logo.png" alt="" width="36" height="36">
+      <span>LSMA</span>
+    </a>
+    <nav aria-label="主导航">
+      <a href="#features">功能</a>
+      <a href="#workflow">流程</a>
+      <a href="/download/">下载</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-shade"></div>
+      <div class="hero-copy">
+        <p class="eyebrow">Windows 桌面应用</p>
+        <h1>LSMA</h1>
+        <p class="hero-title-sub">L Stardew Mod Assistant</p>
+        <p class="hero-lead">把星露谷物语启动前的模组扫描、更新、存档备份、诊断和 Nexus 下载整理到一个桌面工作台里。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="/download/">下载 Windows x64 版</a>
+          <a class="button secondary" href="#features">查看功能</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section product-intro" aria-labelledby="intro-title">
+      <div>
+        <p class="eyebrow">启动前检查</p>
+        <h2 id="intro-title">围绕真实游戏目录工作的管理器</h2>
+        <p>LSMA 会读取本机 Stardew Valley 与 SMAPI 环境，扫描已安装模组、存档、日志和本地素材缓存，重点处理启动前最容易漏掉的版本、依赖、备份和下载问题。</p>
+      </div>
+      <div class="app-window" aria-label="LSMA 应用界面示意">
+        <div class="window-bar">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="window-body">
+          <aside>
+            <strong>LSMA</strong>
+            <span>模组</span>
+            <span>下载</span>
+            <span>存档</span>
+            <span>设置</span>
+          </aside>
+          <div class="mock-content">
+            <div class="mock-toolbar">
+              <span>已连接游戏</span>
+              <button>检查更新</button>
+            </div>
+            <div class="mock-grid">
+              <div><b>模组健康</b><span>依赖、禁用、重复项</span></div>
+              <div><b>下载队列</b><span>Nexus 文件与自动安装</span></div>
+              <div><b>存档保护</b><span>启动前自动备份</span></div>
+            </div>
+            <div class="mock-log">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features" aria-labelledby="features-title">
+      <p class="eyebrow">核心能力</p>
+      <h2 id="features-title">少点手工目录操作，多点确定性</h2>
+      <div class="feature-grid">
+        <article>
+          <h3>模组体检</h3>
+          <p>扫描 SMAPI 清单、依赖、版本和禁用状态，把可更新、缺依赖、重复模组放到可操作的位置。</p>
+        </article>
+        <article>
+          <h3>Nexus 下载</h3>
+          <p>接入 Nexus API 与网页确认流程，下载后进入 LSMA 的安装计划，减少浏览器和资源管理器之间的切换。</p>
+        </article>
+        <article>
+          <h3>存档保护</h3>
+          <p>在启动和更新前备份存档，支持导入、导出和检查存档进度，避免改模组前缺少回退点。</p>
+        </article>
+        <article>
+          <h3>本地指南</h3>
+          <p>结合游戏数据、图标缓存和存档状态，查询社区中心、配方、矿井、NPC 与收集进度。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section workflow" id="workflow" aria-labelledby="workflow-title">
+      <div>
+        <p class="eyebrow">使用路径</p>
+        <h2 id="workflow-title">从检查到启动保持同一条链路</h2>
+      </div>
+      <div class="steps">
+        <article>
+          <span>01</span>
+          <h3>连接游戏目录</h3>
+          <p>选择 Stardew Valley 安装目录，LSMA 自动识别 SMAPI、原版启动器和本地内容。</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>扫描模组与存档</h3>
+          <p>检查模组状态、读取存档摘要，并把日志诊断结果汇总到桌面应用内。</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>备份后启动</h3>
+          <p>按默认策略启动 SMAPI 或原版游戏，必要时先生成可恢复的存档备份。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section cta-band" aria-labelledby="download-title">
+      <div>
+        <p class="eyebrow">发布版本</p>
+        <h2 id="download-title">下载 LSMA Windows 安装包</h2>
+        <p>下载页提供当前版本、安装包体积、SHA256 校验值和发布说明；应用设置页的“检查更新”读取同一份发布清单。</p>
+      </div>
+      <a class="button primary" href="/download/">进入下载页</a>
+    </section>
+  </main>
+
+  <footer>
+    <span>LSMA</span>
+    <a href="/download/">下载</a>
+    <a href="https://github.com/lixingyu41/LSMA">GitHub</a>
+  </footer>
+</body>
+</html>

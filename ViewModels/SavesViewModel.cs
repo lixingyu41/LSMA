@@ -61,8 +61,8 @@ public sealed class SavesViewModel : ViewModelBase
         };
     }
 
-    public ObservableCollection<SaveInfo> Saves { get; } = [];
-    public ObservableCollection<SaveBackupEntry> BackupEntries { get; } = [];
+    public ObservableCollection<SaveInfo> Saves { get; } = new RangeObservableCollection<SaveInfo>();
+    public ObservableCollection<SaveBackupEntry> BackupEntries { get; } = new RangeObservableCollection<SaveBackupEntry>();
     public IAsyncRelayCommand ImportSaveCommand { get; }
     public IAsyncRelayCommand ExportSaveCommand { get; }
     public IAsyncRelayCommand BackupCommand { get; }
@@ -199,9 +199,10 @@ public sealed class SavesViewModel : ViewModelBase
             var selectedPath = preferredPath ?? SelectedSave?.FolderPath;
             var selectedPlayerKey = SelectedPlayer?.PlayerKey;
             var results = new List<SaveInfo>();
-            foreach (var source in await _locator.LocateAsync())
+            var sources = await _locator.LocateAsync();
+            var parsedSaves = await Task.WhenAll(sources.Select(source => _parser.ParseAsync(source)));
+            foreach (var save in parsedSaves)
             {
-                var save = await _parser.ParseAsync(source);
                 if (save is not null)
                 {
                     await _icons.ApplySaveIconsAsync(save);
@@ -210,11 +211,7 @@ public sealed class SavesViewModel : ViewModelBase
                 }
             }
 
-            Saves.Clear();
-            foreach (var save in results)
-            {
-                Saves.Add(save);
-            }
+            ReplaceCollection(Saves, results);
 
             var nextSave = Saves.FirstOrDefault(save => string.Equals(save.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
                 ?? Saves.FirstOrDefault();
@@ -421,16 +418,28 @@ public sealed class SavesViewModel : ViewModelBase
 
     private void LoadBackupEntries()
     {
-        BackupEntries.Clear();
-        if (SelectedSave is not null)
-        {
-            foreach (var item in _backups.GetBackups(SelectedSave.FolderName))
-            {
-                BackupEntries.Add(item);
-            }
-        }
+        ReplaceCollection(
+            BackupEntries,
+            SelectedSave is null
+                ? []
+                : _backups.GetBackups(SelectedSave.FolderName));
 
         SelectedBackup = BackupEntries.FirstOrDefault();
+    }
+
+    private static void ReplaceCollection<T>(ObservableCollection<T> destination, IEnumerable<T> source)
+    {
+        if (destination is RangeObservableCollection<T> range)
+        {
+            range.ReplaceWith(source);
+            return;
+        }
+
+        destination.Clear();
+        foreach (var item in source)
+        {
+            destination.Add(item);
+        }
     }
 
     private bool CanImport() => _state.IsGameConfigured && !_state.IsGameRunning && !IsBusy;
