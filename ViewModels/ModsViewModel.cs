@@ -36,6 +36,9 @@ public sealed class ModsViewModel : ViewModelBase
     private bool _isEditingNexusBinding;
     private bool _automaticScanningStarted;
     private bool _isModPackPanelOpen;
+    private bool _isCheckingUpdates;
+    private bool _dailyUpdateCheckStarted;
+    private string _updateCheckStatus = string.Empty;
 
     public ModsViewModel(
         AppStateService state,
@@ -262,7 +265,26 @@ public sealed class ModsViewModel : ViewModelBase
     public Visibility SelectedModPackVisibility => SelectedModPack is null ? Visibility.Collapsed : Visibility.Visible;
     public string SelectedModPackTitle => SelectedModPack?.Name ?? "未选择模组包";
     public string SelectedModPackStatus => SelectedModPack?.StatusText ?? "请选择一个模组包";
-    public string TaskStatus => IsBusy ? ProgressText : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
+    public bool IsCheckingUpdates
+    {
+        get => _isCheckingUpdates;
+        private set
+        {
+            if (SetProperty(ref _isCheckingUpdates, value))
+            {
+                OnPropertyChanged(nameof(IsTaskActive));
+                OnPropertyChanged(nameof(TaskStatus));
+                CheckUpdatesCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsTaskActive => IsBusy || IsCheckingUpdates;
+    public string TaskStatus => IsBusy
+        ? ProgressText
+        : IsCheckingUpdates
+            ? _updateCheckStatus
+            : $"当前筛选：{_filter}，显示 {Mods.Count} 个模组";
     public ModInstallPlan? PendingPlan
     {
         get => _pendingPlan;
@@ -297,6 +319,7 @@ public sealed class ModsViewModel : ViewModelBase
         OnPropertyChanged(nameof(DisabledCount));
         OnPropertyChanged(nameof(FavoriteCount));
         OnPropertyChanged(nameof(UpdateCount));
+        OnPropertyChanged(nameof(IsTaskActive));
         OnPropertyChanged(nameof(TaskStatus));
         OnPropertyChanged(nameof(SelectedModPackStatus));
         NotifyCommands();
@@ -307,9 +330,25 @@ public sealed class ModsViewModel : ViewModelBase
         _automaticScanningStarted = true;
         ConfigureAutomaticWatchers();
         await ScanAsync();
+        StartDailyUpdateCheckIfNeeded();
     }
 
     public Task ScanForLaunchAsync() => ScanAsync();
+
+    public void StartDailyUpdateCheckIfNeeded()
+    {
+        if (_dailyUpdateCheckStarted
+            || IsCheckingUpdates
+            || !_state.IsGameConfigured
+            || _allMods.Count == 0
+            || App.Current.Services.Settings.Current.LastModsUpdateCheckAt?.Date == DateTime.Now.Date)
+        {
+            return;
+        }
+
+        _dailyUpdateCheckStarted = true;
+        _ = CheckUpdatesCoreAsync(showErrors: false);
+    }
 
     public async Task RefreshTranslationsAsync()
     {
@@ -709,6 +748,7 @@ public sealed class ModsViewModel : ViewModelBase
             var selectedPath = SelectedMod?.FolderPath;
             _runLock.Refresh();
             _allMods = _analyzer.Analyze(await _scanner.ScanAsync()).ToList();
+            ApplyCachedUpdateResults(_allMods);
             _summaryCountsDirty = true;
             await _translations.ApplyAsync(_allMods);
             _state.Mods = _allMods;
@@ -977,40 +1017,154 @@ public sealed class ModsViewModel : ViewModelBase
 
     private async Task CheckUpdatesAsync()
     {
-        var key = RequireNexusKey();
+        await CheckUpdatesCoreAsync(showErrors: true);
+    }
+
+    private async Task CheckUpdatesCoreAsync(bool showErrors)
+    {
+        if (IsCheckingUpdates || !_state.IsGameConfigured)
+        {
+            return;
+        }
+
+        var key = showErrors ? RequireNexusKey() : _credentials.GetKey();
         if (key is null)
         {
             return;
         }
 
-        IsBusy = true;
-        ProgressText = "正在检查已绑定模组的更新...";
-        Refresh();
-        try
+        var modsToCheck = _allMods
+            .Where(mod => !mod.IsArchived && mod.NexusModId is not null)
+            .ToList();
+        if (modsToCheck.Count == 0)
         {
-            foreach (var mod in _allMods.Where(mod => !mod.IsArchived && mod.NexusModId is not null))
+            if (showErrors)
             {
-                var remote = await _nexus.GetModAsync(mod.NexusModId!.Value, key);
-                mod.RemoteVersion = remote.Version;
+                FeedbackMessage = "没有已绑定 Nexus Mod ID 的模组。";
+                OnPropertyChanged(nameof(FeedbackMessage));
             }
 
+            return;
+        }
+
+        var checkedAt = DateTime.Now;
+        var cache = new Dictionary<string, ModUpdateCacheEntry>(
+            App.Current.Services.Settings.Current.ModUpdateCache,
+            StringComparer.OrdinalIgnoreCase);
+        var checkedCount = 0;
+        IsCheckingUpdates = true;
+        _updateCheckStatus = "正在后台检查已绑定模组的更新...";
+        OnPropertyChanged(nameof(TaskStatus));
+        try
+        {
+            foreach (var mod in modsToCheck)
+            {
+                var remote = await _nexus.GetModAsync(mod.NexusModId!.Value, key);
+                ApplyRemoteUpdate(mod, remote);
+                if (GetUpdateCacheKey(mod) is { } cacheKey)
+                {
+                    cache[cacheKey] = CreateUpdateCacheEntry(mod, checkedAt);
+                }
+
+                checkedCount++;
+                _updateCheckStatus = $"正在后台检查更新：{checkedCount}/{modsToCheck.Count}";
+                OnPropertyChanged(nameof(TaskStatus));
+            }
+
+            await App.Current.Services.Settings.UpdateAsync(settings =>
+            {
+                settings.LastModsUpdateCheckAt = checkedAt;
+                settings.ModUpdateCache = cache;
+            });
+
+            ApplyCachedUpdateResults(_allMods);
             _summaryCountsDirty = true;
             ApplyFilter(_filter);
             OnPropertyChanged(nameof(UpdateCount));
             FeedbackMessage = $"更新检查完成，发现 {SummaryCounts.Update} 个可更新模组。";
             OnPropertyChanged(nameof(FeedbackMessage));
             App.Current.Services.Home.Refresh();
+            NotifyCommands();
         }
         catch (NexusApiException exception)
         {
-            await _dialogs.ShowMessageAsync("更新检查", exception.Message);
+            if (showErrors)
+            {
+                await _dialogs.ShowMessageAsync("更新检查", exception.Message);
+            }
+            else
+            {
+                await App.Current.Services.Logging.ErrorAsync("每日模组更新检查失败", exception);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (showErrors)
+            {
+                await _dialogs.ShowMessageAsync("更新检查", exception.Message);
+            }
+            else
+            {
+                await App.Current.Services.Logging.ErrorAsync("每日模组更新检查失败", exception);
+            }
         }
         finally
         {
-            IsBusy = false;
-            ProgressText = string.Empty;
+            _updateCheckStatus = string.Empty;
+            IsCheckingUpdates = false;
             Refresh();
         }
+    }
+
+    private void ApplyCachedUpdateResults(IEnumerable<ModInfo> mods)
+    {
+        var cache = App.Current.Services.Settings.Current.ModUpdateCache;
+        foreach (var mod in mods)
+        {
+            if (mod.NexusModId is not { } nexusModId
+                || GetUpdateCacheKey(mod) is not { } cacheKey
+                || !cache.TryGetValue(cacheKey, out var entry)
+                || entry.NexusModId != nexusModId)
+            {
+                continue;
+            }
+
+            mod.RemoteVersion = entry.RemoteVersion;
+            mod.RemoteCategoryName = entry.RemoteCategoryName;
+            mod.RemoteUpdatedTimestamp = entry.RemoteUpdatedTimestamp;
+            mod.RemoteDownloads = entry.RemoteDownloads;
+        }
+    }
+
+    private static void ApplyRemoteUpdate(ModInfo mod, NexusModInfo remote)
+    {
+        mod.RemoteVersion = remote.Version;
+        mod.RemoteCategoryName = remote.CategoryName;
+        mod.RemoteUpdatedTimestamp = remote.UpdatedTimestamp > 0 ? remote.UpdatedTimestamp : null;
+        mod.RemoteDownloads = remote.Downloads >= 0 ? remote.Downloads : null;
+    }
+
+    private static ModUpdateCacheEntry CreateUpdateCacheEntry(ModInfo mod, DateTime checkedAt)
+        => new()
+        {
+            NexusModId = mod.NexusModId!.Value,
+            RemoteVersion = mod.RemoteVersion,
+            RemoteCategoryName = mod.RemoteCategoryName,
+            RemoteUpdatedTimestamp = mod.RemoteUpdatedTimestamp,
+            RemoteDownloads = mod.RemoteDownloads,
+            CheckedAt = checkedAt
+        };
+
+    private static string? GetUpdateCacheKey(ModInfo mod)
+    {
+        var uniqueId = mod.Manifest?.UniqueID?.Trim();
+        if (!string.IsNullOrWhiteSpace(uniqueId))
+        {
+            return $"uid:{uniqueId}";
+        }
+
+        var folderName = mod.FolderName.Trim();
+        return string.IsNullOrWhiteSpace(folderName) ? null : $"folder:{folderName}";
     }
 
     private async Task PrepareSelectedUpdateAsync()
@@ -1147,12 +1301,24 @@ public sealed class ModsViewModel : ViewModelBase
             return;
         }
 
+        var previousId = SelectedMod.NexusModId;
         SelectedMod.NexusModId = id;
+        if (previousId != id)
+        {
+            SelectedMod.RemoteVersion = null;
+            SelectedMod.RemoteCategoryName = null;
+            SelectedMod.RemoteUpdatedTimestamp = null;
+            SelectedMod.RemoteDownloads = null;
+            ApplyCachedUpdateResults([SelectedMod]);
+        }
+
         if (SelectedMod.Manifest?.UniqueID is { Length: > 0 } uniqueId)
         {
             await App.Current.Services.Settings.UpdateAsync(settings => settings.NexusBindings[uniqueId] = id);
         }
 
+        _summaryCountsDirty = true;
+        ApplyFilter(_filter);
         FeedbackMessage = "更新来源绑定已保存。";
         _isEditingNexusBinding = false;
         OnPropertyChanged(nameof(FeedbackMessage));
@@ -1242,7 +1408,7 @@ public sealed class ModsViewModel : ViewModelBase
 
     private bool CanModify() => _state.IsGameConfigured && !_state.IsGameRunning && !IsBusy;
     private bool CanInstallPackage() => CanModify() && PendingPlan is { CanInstall: true };
-    private bool CanUseOnlineNow() => !IsBusy;
+    private bool CanUseOnlineNow() => _state.IsGameConfigured && !IsBusy && !IsCheckingUpdates;
     private bool CanPrepareSelectedUpdate() => !IsBusy && SelectedMod is { NexusModId: not null, HasUpdate: true };
     private bool CanUseModPacks() => _state.IsGameConfigured && !IsBusy;
     private bool CanModifyModPacks() => CanModify() && _isModPackPanelOpen;

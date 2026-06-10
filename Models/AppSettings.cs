@@ -30,7 +30,7 @@ public enum LaunchMode
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 8;
+    public int SchemaVersion { get; set; } = 9;
 
     public string? GameDirectory { get; set; }
 
@@ -62,7 +62,28 @@ public sealed class AppSettings
 
     public Dictionary<string, long> NexusBindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public DateTime? LastModsUpdateCheckAt { get; set; }
+
+    public Dictionary<string, ModUpdateCacheEntry> ModUpdateCache { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public double ModsPageListRatio { get; set; }
+
     public int WindowWidth { get; set; }
     public int WindowHeight { get; set; }
     public bool LaunchViaSteam { get; set; }
+}
+
+public sealed class ModUpdateCacheEntry
+{
+    public long NexusModId { get; set; }
+
+    public string? RemoteVersion { get; set; }
+
+    public string? RemoteCategoryName { get; set; }
+
+    public long? RemoteUpdatedTimestamp { get; set; }
+
+    public long? RemoteDownloads { get; set; }
+
+    public DateTime CheckedAt { get; set; }
 }

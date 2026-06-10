@@ -37,6 +37,7 @@ public sealed partial class ModsPage : Page
     private bool _modsSplitterDragging;
     private double _modsSplitterStartX;
     private double _modsListStartWidth;
+    private bool _modsSplitterLayoutApplied;
     private static SolidColorBrush SelectedFilterForeground =>
         (SolidColorBrush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"];
 
@@ -67,13 +68,18 @@ public sealed partial class ModsPage : Page
 
         _vm.PropertyChanged -= OnViewModelPropertyChanged;
         _vm.PropertyChanged += OnViewModelPropertyChanged;
+        ModsSplitGrid.SizeChanged -= ModsSplitGrid_SizeChanged;
+        ModsSplitGrid.SizeChanged += ModsSplitGrid_SizeChanged;
+        ApplySavedModsSplitterRatio();
         UpdateFilterSelection(_vm.CurrentFilter);
         UpdateProblemCountColor();
+        _vm.StartDailyUpdateCheckIfNeeded();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _vm.PropertyChanged -= OnViewModelPropertyChanged;
+        ModsSplitGrid.SizeChanged -= ModsSplitGrid_SizeChanged;
     }
 
     private void OnFilterContainerSizeChanged(object? sender, SizeChangedEventArgs e)
@@ -456,6 +462,62 @@ public sealed partial class ModsPage : Page
     {
         _modsSplitterDragging = false;
         ModsSplitter.ReleasePointerCapture(e.Pointer);
+        SaveModsSplitterRatio();
         e.Handled = true;
+    }
+
+    private void ModsSplitGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplySavedModsSplitterRatio();
+    }
+
+    private void ApplySavedModsSplitterRatio()
+    {
+        if (_modsSplitterLayoutApplied)
+        {
+            return;
+        }
+
+        var ratio = App.Current.Services.Settings.Current.ModsPageListRatio;
+        if (ratio <= 0 || ratio >= 1 || !double.IsFinite(ratio))
+        {
+            return;
+        }
+
+        var availableWidth = ModsSplitGrid.ActualWidth - ModsSplitter.ActualWidth;
+        if (availableWidth <= 0)
+        {
+            return;
+        }
+
+        var maxListWidth = Math.Max(ModsListMinWidth, availableWidth - ModsDetailMinWidth);
+        var listWidth = Math.Clamp(availableWidth * ratio, ModsListMinWidth, maxListWidth);
+        ModsListColumn.Width = new GridLength(listWidth);
+        ModsDetailColumn.Width = new GridLength(1, GridUnitType.Star);
+        _modsSplitterLayoutApplied = true;
+    }
+
+    private async void SaveModsSplitterRatio()
+    {
+        var availableWidth = ModsSplitGrid.ActualWidth - ModsSplitter.ActualWidth;
+        if (availableWidth <= 0)
+        {
+            return;
+        }
+
+        var ratio = Math.Clamp(ModsListColumn.ActualWidth / availableWidth, 0.05, 0.95);
+        if (!double.IsFinite(ratio))
+        {
+            return;
+        }
+
+        try
+        {
+            await App.Current.Services.Settings.UpdateAsync(settings => settings.ModsPageListRatio = ratio);
+        }
+        catch
+        {
+            // Persisting layout is non-critical.
+        }
     }
 }

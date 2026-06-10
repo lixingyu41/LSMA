@@ -23,8 +23,8 @@ public sealed class SettingsService(LoggingService logging)
         try
         {
             Current = await JsonHelper.ReadAsync<AppSettings>(AppPaths.SettingsFile) ?? new AppSettings();
-            var needsSave = Current.SchemaVersion < 8;
-            Current.SchemaVersion = 8;
+            var needsSave = Current.SchemaVersion < 9;
+            Current.SchemaVersion = 9;
             if (Current.NexusBindings is null)
             {
                 Current.NexusBindings = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -35,6 +35,27 @@ public sealed class SettingsService(LoggingService logging)
                 Current.NexusBindings = Current.NexusBindings
                     .GroupBy(binding => binding.Key, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (Current.ModUpdateCache is null)
+            {
+                Current.ModUpdateCache = new Dictionary<string, ModUpdateCacheEntry>(StringComparer.OrdinalIgnoreCase);
+                needsSave = true;
+            }
+            else
+            {
+                Current.ModUpdateCache = Current.ModUpdateCache
+                    .Where(entry => !string.IsNullOrWhiteSpace(entry.Key))
+                    .GroupBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (!double.IsFinite(Current.ModsPageListRatio)
+                || Current.ModsPageListRatio < 0
+                || Current.ModsPageListRatio > 1)
+            {
+                Current.ModsPageListRatio = 0;
+                needsSave = true;
             }
 
             var modRetention = Math.Clamp(Current.ModBackupRetention, 1, 200);

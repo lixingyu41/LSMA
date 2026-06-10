@@ -19,7 +19,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                    <ProgressRing IsActive="{Binding IsBusy}" Width="19" Height="19" />
+                    <ProgressRing IsActive="{Binding IsTaskActive}" Width="19" Height="19" />
                     <TextBlock Text="{Binding TaskStatus}" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding FeedbackMessage}" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
                 </StackPanel>

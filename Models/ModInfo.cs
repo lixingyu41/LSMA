@@ -31,6 +31,7 @@ public sealed class ModInfo : ObservableObject
     private bool _isSelected;
     private bool _isPointerOver;
     private long? _nexusModId;
+    private string? _remoteVersion;
     private string? _coverImageUri;
     private string? _remoteCategoryName;
     private long? _remoteUpdatedTimestamp;
@@ -49,12 +50,24 @@ public sealed class ModInfo : ObservableObject
         {
             if (SetProperty(ref _nexusModId, value))
             {
+                OnPropertyChanged(nameof(HasUpdate));
                 OnPropertyChanged(nameof(UpdateStatus));
                 OnPropertyChanged(nameof(ListNexusIdText));
             }
         }
     }
-    public string? RemoteVersion { get; set; }
+    public string? RemoteVersion
+    {
+        get => _remoteVersion;
+        set
+        {
+            if (SetProperty(ref _remoteVersion, string.IsNullOrWhiteSpace(value) ? null : value.Trim()))
+            {
+                OnPropertyChanged(nameof(HasUpdate));
+                OnPropertyChanged(nameof(UpdateStatus));
+            }
+        }
+    }
     public ModManifest? Manifest { get; set; }
     public string? TranslatedName { get; set; }
     public string? TranslatedDescription { get; set; }
