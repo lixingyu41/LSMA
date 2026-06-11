@@ -184,29 +184,42 @@ public sealed class ModPackService(
     {
         var catalog = await EnsureInitializedAsync();
         EnsureGameNotRunning();
-        var imported = await ReadPackageManifestAsync(packagePath);
-        var target = mergeIntoPackId is null
-            ? CreatePack(string.IsNullOrWhiteSpace(imported.Name) ? NextPackName(catalog, "导入模组包") : UniquePackName(catalog, imported.Name))
-            : RequirePack(catalog, mergeIntoPackId);
-
-        if (mergeIntoPackId is null)
+        var preparedPackagePath = await PrepareImportPackageAsync(packagePath);
+        var cleanupPreparedPackage = !preparedPackagePath.Equals(packagePath, StringComparison.OrdinalIgnoreCase);
+        try
         {
-            catalog.Packs.Add(target);
+            var imported = await ReadPackageManifestAsync(preparedPackagePath);
+            var target = mergeIntoPackId is null
+                ? CreatePack(string.IsNullOrWhiteSpace(imported.Pack.Name) ? NextPackName(catalog, "导入模组包") : UniquePackName(catalog, imported.Pack.Name))
+                : RequirePack(catalog, mergeIntoPackId);
+
+            if (mergeIntoPackId is null)
+            {
+                catalog.Packs.Add(target);
+            }
+
+            using var archive = ZipFile.OpenRead(preparedPackagePath);
+            ValidateArchivePaths(archive);
+            foreach (var incoming in imported.Pack.Entries)
+            {
+                await MergeEntryAsync(catalog, target, incoming, archive, imported.ArchiveRoot);
+            }
+
+            target.UpdatedAt = DateTime.Now;
+            await SaveCatalogAsync(catalog);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                await DownloadMissingAsync(target.Id, apiKey);
+                catalog = await LoadCatalogCoreAsync();
+            }
         }
-
-        using var archive = ZipFile.OpenRead(packagePath);
-        ValidateArchivePaths(archive);
-        foreach (var incoming in imported.Entries)
+        finally
         {
-            await MergeEntryAsync(catalog, target, incoming, archive);
-        }
-
-        target.UpdatedAt = DateTime.Now;
-        await SaveCatalogAsync(catalog);
-        if (!string.IsNullOrWhiteSpace(apiKey))
-        {
-            await DownloadMissingAsync(target.Id, apiKey);
-            catalog = await LoadCatalogCoreAsync();
+            if (cleanupPreparedPackage && File.Exists(preparedPackagePath))
+            {
+                files.EnsureInside(preparedPackagePath, AppPaths.Temp);
+                File.Delete(preparedPackagePath);
+            }
         }
 
         ApplyActiveFlag(catalog);
@@ -336,14 +349,14 @@ public sealed class ModPackService(
         return catalog;
     }
 
-    private async Task MergeEntryAsync(ModPackCatalog catalog, ModPackInfo target, ModPackEntry incoming, ZipArchive archive)
+    private async Task MergeEntryAsync(ModPackCatalog catalog, ModPackInfo target, ModPackEntry incoming, ZipArchive archive, string packageRoot)
     {
         NormalizeEntry(incoming);
         var active = IsActive(catalog, target);
         var targetRoot = active ? GetGameModsRoot() : GetPackModsRoot(target);
         var existing = target.Entries.FirstOrDefault(entry =>
             entry.UniqueId.Equals(incoming.UniqueId, StringComparison.OrdinalIgnoreCase));
-        var hasFiles = PackageContainsEntryFiles(archive, incoming);
+        var hasFiles = PackageContainsEntryFiles(archive, incoming, packageRoot);
         if (existing is not null)
         {
             target.Entries.Remove(existing);
@@ -364,7 +377,7 @@ public sealed class ModPackService(
                 throw new IOException($"目标位置已存在同名模组目录：{incoming.FolderName}。");
             }
 
-            await ExtractEntryFromPackageAsync(archive, incoming, targetRoot);
+            await ExtractEntryFromPackageAsync(archive, incoming, targetRoot, packageRoot);
             incoming.IsMissing = false;
             incoming.MissingReason = null;
         }
@@ -437,7 +450,50 @@ public sealed class ModPackService(
             .FirstOrDefault(file => string.Equals(file.Version, entry.Version, StringComparison.OrdinalIgnoreCase));
     }
 
-    private async Task<ModPackInfo> ReadPackageManifestAsync(string packagePath)
+    private async Task<string> PrepareImportPackageAsync(string packagePath)
+    {
+        if (Directory.Exists(packagePath))
+        {
+            var preparedPackagePath = Path.Combine(AppPaths.Temp, $"modpack_folder_{Guid.NewGuid():N}.zip");
+            Directory.CreateDirectory(AppPaths.Temp);
+            try
+            {
+                await Task.Run(() =>
+                {
+                    if (!File.Exists(Path.Combine(packagePath, PackageManifestName)))
+                    {
+                        throw new InvalidDataException("整合包文件夹缺少 lsma-modpack.json。");
+                    }
+
+                    ZipFile.CreateFromDirectory(
+                        packagePath,
+                        preparedPackagePath,
+                        CompressionLevel.Fastest,
+                        includeBaseDirectory: false);
+                });
+                await logging.InfoAsync($"已读取拖入的整合包文件夹：{packagePath}");
+                return preparedPackagePath;
+            }
+            catch
+            {
+                if (File.Exists(preparedPackagePath))
+                {
+                    File.Delete(preparedPackagePath);
+                }
+
+                throw;
+            }
+        }
+
+        if (!File.Exists(packagePath))
+        {
+            throw new FileNotFoundException("找不到模组包文件。", packagePath);
+        }
+
+        return packagePath;
+    }
+
+    private async Task<ImportedModPackPackage> ReadPackageManifestAsync(string packagePath)
     {
         if (!File.Exists(packagePath))
         {
@@ -447,6 +503,8 @@ public sealed class ModPackService(
         using var archive = ZipFile.OpenRead(packagePath);
         ValidateArchivePaths(archive);
         var entry = archive.GetEntry(PackageManifestName)
+            ?? archive.Entries.FirstOrDefault(item =>
+                Path.GetFileName(item.FullName.Replace('\\', '/')).Equals(PackageManifestName, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidDataException("模组包缺少 lsma-modpack.json。");
         await using var stream = entry.Open();
         var pack = await JsonSerializer.DeserializeAsync<ModPackInfo>(stream, JsonHelper.Options)
@@ -456,7 +514,8 @@ public sealed class ModPackService(
             NormalizeEntry(mod);
         }
 
-        return pack;
+        var archiveRoot = Path.GetDirectoryName(entry.FullName.Replace('\\', '/'))?.Replace('\\', '/') ?? string.Empty;
+        return new ImportedModPackPackage(pack, archiveRoot);
     }
 
     private async Task<PackagedEntry?> FindPackagedEntryAsync(ZipArchive archive, string uniqueId)
@@ -481,9 +540,9 @@ public sealed class ModPackService(
         return null;
     }
 
-    private async Task ExtractEntryFromPackageAsync(ZipArchive archive, ModPackEntry entry, string targetRoot)
+    private async Task ExtractEntryFromPackageAsync(ZipArchive archive, ModPackEntry entry, string targetRoot, string packageRoot)
     {
-        var archiveRoot = $"mods/{entry.FolderName}";
+        var archiveRoot = CombineArchivePath(packageRoot, $"mods/{entry.FolderName}");
         var target = Path.Combine(targetRoot, entry.FolderName);
         await ExtractArchiveRootAsync(archive, archiveRoot, target);
     }
@@ -527,9 +586,9 @@ public sealed class ModPackService(
         }
     }
 
-    private bool PackageContainsEntryFiles(ZipArchive archive, ModPackEntry entry)
+    private bool PackageContainsEntryFiles(ZipArchive archive, ModPackEntry entry, string packageRoot)
     {
-        var prefix = $"mods/{entry.FolderName.TrimEnd('/')}/";
+        var prefix = CombineArchivePath(packageRoot, $"mods/{entry.FolderName.TrimEnd('/')}/");
         return archive.Entries.Any(item =>
             item.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
             && !item.FullName.EndsWith("/", StringComparison.Ordinal));
@@ -908,6 +967,15 @@ public sealed class ModPackService(
         return index <= 0 ? null : normalized[..index];
     }
 
+    private static string CombineArchivePath(string root, string relativePath)
+    {
+        var cleanRoot = root.Trim('/');
+        var cleanRelative = relativePath.TrimStart('/');
+        return string.IsNullOrWhiteSpace(cleanRoot)
+            ? cleanRelative
+            : $"{cleanRoot}/{cleanRelative}";
+    }
+
     private static async Task RollbackSwitchAsync(
         List<(string Source, string Destination)> targetMoved,
         List<(string Source, string Destination)> currentMoved,
@@ -935,6 +1003,8 @@ public sealed class ModPackService(
 
         await Task.CompletedTask;
     }
+
+    private sealed record ImportedModPackPackage(ModPackInfo Pack, string ArchiveRoot);
 
     private sealed record PackagedEntry(string ArchiveRoot, ModPackEntry Entry);
 }

@@ -11,7 +11,12 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootLayout" Background="{ThemeResource AppBackgroundBrush}">
+    <Grid
+        x:Name="RootLayout"
+        Background="{ThemeResource AppBackgroundBrush}"
+        AllowDrop="True"
+        DragOver="RootLayout_DragOver"
+        Drop="RootLayout_Drop">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
             <RowDefinition Height="*" />

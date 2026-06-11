@@ -22,6 +22,8 @@ public sealed class ModInstallPlan
 
 public sealed class ModInstallPlanItem
 {
+    public string PackagePath { get; init; } = string.Empty;
+    public string PreparedPackagePath { get; init; } = string.Empty;
     public string ArchiveRoot { get; init; } = string.Empty;
     public string DestinationFolderName { get; init; } = string.Empty;
     public ModManifest Manifest { get; init; } = new();

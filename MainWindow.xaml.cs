@@ -8,8 +8,10 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Graphics;
+using Windows.Storage;
 using Windows.System;
 using Windows.UI.Core;
 using Windows.UI;
@@ -206,6 +208,34 @@ public sealed partial class MainWindow : Window
         }
 
         _ = ContinueStartupInitializationAsync(startupTask);
+    }
+
+    private void RootLayout_DragOver(object sender, DragEventArgs e)
+    {
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        e.AcceptedOperation = DataPackageOperation.Copy;
+        e.DragUIOverride.Caption = "拖放安装模组 / 存档 / 整合包";
+        e.DragUIOverride.IsCaptionVisible = true;
+    }
+
+    private async void RootLayout_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        var items = await e.DataView.GetStorageItemsAsync();
+        var paths = items
+            .OfType<IStorageItem>()
+            .Select(item => item.Path)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .ToList();
+        await App.Current.Services.DroppedContentInstall.HandleAsync(paths);
     }
 
     private async Task<bool> WaitForStartupAsync(Task startupTask)

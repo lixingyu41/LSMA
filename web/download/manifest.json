@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "product": "LSMA",
   "channel": "stable",
-  "latestVersion": "1.0.2",
+  "latestVersion": "1.0.3",
   "releaseDate": "2026-06-11",
   "downloadPageUrl": "https://lsma.lixingyu.top/download/",
   "downloadUrl": "https://lsma.lixingyu.top/download/LSMA-Setup-x64.exe",
   "fileName": "LSMA-Setup-x64.exe",
   "platform": "Windows x64",
   "minimumWindowsBuild": "10.0.17763",
-  "sizeBytes": 4409756,
-  "sha256": "A4299045B3E89CF395FAB68A3EC9CE58817F6EB2DB3FDF05059BAC8A395F5629",
+  "sizeBytes": 4415645,
+  "sha256": "B2DC2751D911DDDAE3CB90F209D4C3888EB8A715BFD71012DDB00DF63D1F5E80",
   "notes": [
-    "赞赏码更新为新版图片。",
-    "安装器会按需下载运行库包。",
-    "下载页和更新清单同步到 1.0.2。"
+    "支持在任意页面拖放安装。",
+    "支持批量拖入模组压缩包和已解压文件夹。",
+    "拖放时自动识别模组、存档和整合包。"
   ]
 }

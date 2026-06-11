@@ -645,30 +645,94 @@ public sealed class ModsViewModel : ViewModelBase
         }
     }
 
-    public async Task InspectPackageAsync(string packagePath)
+    public async Task<bool> ImportDroppedModPackAsync(string packagePath, bool requireConfirmation)
     {
         if (!CanModify())
         {
-            return;
+            throw new InvalidOperationException("当前不能导入整合包：游戏正在运行或已有任务未完成。");
         }
 
+        if (requireConfirmation
+            && !await _dialogs.ConfirmAsync("导入整合包", "将把拖入内容作为新的整合包导入。确认继续？", "导入"))
+        {
+            return false;
+        }
+
+        IsBusy = true;
+        ProgressText = "正在导入整合包...";
+        Refresh();
+        try
+        {
+            var catalog = await _modPacks.ImportAsync(packagePath, null, _credentials.GetKey());
+            var newestId = catalog.Packs.OrderByDescending(pack => pack.CreatedAt).FirstOrDefault()?.Id;
+            SyncModPacks(catalog, newestId);
+            FeedbackMessage = "整合包已导入。";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            await _dialogs.ShowMessageAsync("整合包导入失败", exception.Message);
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+            ProgressText = string.Empty;
+            Refresh();
+        }
+    }
+
+    public async Task InspectPackageAsync(string packagePath)
+        => await PreparePackagePlanAsync([packagePath], "正在预检压缩包...");
+
+    public async Task<bool> InstallDroppedPackagesAsync(IReadOnlyList<string> packagePaths, bool requireConfirmation)
+    {
+        if (!CanModify())
+        {
+            throw new InvalidOperationException("当前不能安装模组：游戏正在运行或已有任务未完成。");
+        }
+
+        var plan = await PreparePackagePlanAsync(packagePaths, "正在预检拖入的模组...");
+        if (plan is not { CanInstall: true })
+        {
+            return false;
+        }
+
+        if (requireConfirmation
+            && !await _dialogs.ConfirmAsync("执行安装计划", CreateInstallConfirmation(plan), "开始安装"))
+        {
+            return false;
+        }
+
+        return await InstallPackagePlanAsync(plan) is not null;
+    }
+
+    private async Task<ModInstallPlan?> PreparePackagePlanAsync(IReadOnlyList<string> packagePaths, string progressText)
+    {
         if (_allMods.Count == 0)
         {
             await ScanAsync();
         }
 
         IsBusy = true;
-        ProgressText = "正在预检压缩包...";
+        ProgressText = progressText;
         Refresh();
         try
         {
-            PendingPlan = await _packages.InspectAsync(packagePath);
+            if (PendingPlan is { } existing)
+            {
+                await _packages.CleanupPreparedPackageAsync(existing);
+            }
+
+            PendingPlan = await _packages.InspectAsync(packagePaths);
             SetMissingDependencies(PendingPlan.MissingDependencies);
             FeedbackMessage = PendingPlan.Summary;
+            return PendingPlan;
         }
         catch (Exception exception)
         {
             await _dialogs.ShowMessageAsync("预检失败", exception.Message);
+            return null;
         }
         finally
         {
@@ -954,6 +1018,11 @@ public sealed class ModsViewModel : ViewModelBase
             return;
         }
 
+        await InstallPackagePlanAsync(plan);
+    }
+
+    private async Task<ModInstallResult?> InstallPackagePlanAsync(ModInstallPlan plan)
+    {
         IsBusy = true;
         ProgressText = "正在安全安装模组...";
         Refresh();
@@ -973,10 +1042,12 @@ public sealed class ModsViewModel : ViewModelBase
             PendingPlan = null;
             IsBusy = false;
             await ScanAsync();
+            return result;
         }
         catch (Exception exception)
         {
             await _dialogs.ShowMessageAsync("安装未完成", exception.Message);
+            return null;
         }
         finally
         {

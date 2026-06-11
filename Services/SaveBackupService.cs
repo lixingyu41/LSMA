@@ -55,12 +55,8 @@ public sealed class SaveBackupService(
             throw new InvalidOperationException("游戏正在运行，不能导入存档。");
         }
 
-        if (!File.Exists(archivePath))
-        {
-            throw new FileNotFoundException("存档压缩包不存在。", archivePath);
-        }
-
-        if (!string.Equals(Path.GetExtension(archivePath), ".zip", StringComparison.OrdinalIgnoreCase))
+        var preparedArchivePath = await PrepareSaveArchiveAsync(archivePath);
+        if (!string.Equals(Path.GetExtension(preparedArchivePath), ".zip", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException("当前只支持导入 .zip 存档压缩包。");
         }
@@ -79,7 +75,7 @@ public sealed class SaveBackupService(
 
         try
         {
-            await Task.Run(() => ExtractZipArchive(archivePath, extraction));
+            await Task.Run(() => ExtractZipArchive(preparedArchivePath, extraction));
             var candidate = FindSingleSaveDirectory(extraction);
             folderName = candidate.FolderName;
             CopyDirectory(candidate.DirectoryPath, staging);
@@ -169,6 +165,13 @@ public sealed class SaveBackupService(
                 Directory.Delete(staging, true);
             }
 
+            if (!preparedArchivePath.Equals(archivePath, StringComparison.OrdinalIgnoreCase)
+                && File.Exists(preparedArchivePath))
+            {
+                files.EnsureInside(preparedArchivePath, AppPaths.Temp);
+                File.Delete(preparedArchivePath);
+            }
+
             await AppendImportRecordAsync(
                 archivePath,
                 string.IsNullOrWhiteSpace(folderName) ? null : folderName,
@@ -178,6 +181,49 @@ public sealed class SaveBackupService(
                 error,
                 success ? "Succeeded" : rolledBack ? "RolledBack" : "Failed");
         }
+    }
+
+    private async Task<string> PrepareSaveArchiveAsync(string sourcePath)
+    {
+        if (Directory.Exists(sourcePath))
+        {
+            var preparedArchivePath = Path.Combine(AppPaths.Temp, $"save_folder_{Guid.NewGuid():N}.zip");
+            Directory.CreateDirectory(AppPaths.Temp);
+            try
+            {
+                await Task.Run(() =>
+                {
+                    if (!Directory.EnumerateFileSystemEntries(sourcePath).Any())
+                    {
+                        throw new InvalidDataException("存档文件夹为空。");
+                    }
+
+                    ZipFile.CreateFromDirectory(
+                        sourcePath,
+                        preparedArchivePath,
+                        CompressionLevel.Fastest,
+                        includeBaseDirectory: true);
+                });
+                await logging.InfoAsync($"已读取拖入的存档文件夹：{sourcePath}");
+                return preparedArchivePath;
+            }
+            catch
+            {
+                if (File.Exists(preparedArchivePath))
+                {
+                    File.Delete(preparedArchivePath);
+                }
+
+                throw;
+            }
+        }
+
+        if (!File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException("存档压缩包或文件夹不存在。", sourcePath);
+        }
+
+        return sourcePath;
     }
 
     public async Task<int> CreateAllAsync(IEnumerable<SaveInfo> saves)

@@ -20,6 +20,7 @@ public sealed class AppServices
         State = new AppStateService();
         Navigation = new NavigationService();
         Dialogs = new DialogService();
+        DroppedContentInstall = new DroppedContentInstallService(Dialogs, Logging);
         Platform = new PlatformService(Logging);
         GameLocator = new GameLocatorService(State, Settings, Logging);
         GuideCatalog = new GameContentCatalogService(State, Logging);
@@ -67,6 +68,7 @@ public sealed class AppServices
     public AppStateService State { get; }
     public NavigationService Navigation { get; }
     public DialogService Dialogs { get; }
+    public DroppedContentInstallService DroppedContentInstall { get; }
     public PlatformService Platform { get; }
     public GameLocatorService GameLocator { get; }
     public GameContentCatalogService GuideCatalog { get; }

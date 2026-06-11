@@ -329,10 +329,28 @@ public sealed class SavesViewModel : ViewModelBase
         }
 
         var path = await _platform.ChooseSaveArchiveAsync();
-        if (string.IsNullOrWhiteSpace(path)
-            || !await _dialogs.ConfirmAsync("导入存档", "同名存档会先自动备份再替换。确认导入这个 ZIP 存档？", "导入"))
+        if (string.IsNullOrWhiteSpace(path))
         {
             return;
+        }
+
+        await ImportSaveFromPathAsync(path, requireConfirmation: true);
+    }
+
+    public async Task<bool> ImportDroppedSaveAsync(string path, bool requireConfirmation)
+        => await ImportSaveFromPathAsync(path, requireConfirmation);
+
+    private async Task<bool> ImportSaveFromPathAsync(string path, bool requireConfirmation)
+    {
+        if (!_state.IsGameConfigured)
+        {
+            throw new InvalidOperationException("尚未连接游戏目录，不能导入存档。");
+        }
+
+        if (requireConfirmation
+            && !await _dialogs.ConfirmAsync("导入存档", "同名存档会先自动备份再替换。确认导入这个存档？", "导入"))
+        {
+            return false;
         }
 
         SaveImportResult? result = null;
@@ -347,6 +365,8 @@ public sealed class SavesViewModel : ViewModelBase
             await ScanAsync(Path.Combine(AppPaths.SaveSource, result.FolderName));
             App.Current.Services.Home.Refresh();
         }
+
+        return result is not null;
     }
 
     private async Task ExportSaveAsync()

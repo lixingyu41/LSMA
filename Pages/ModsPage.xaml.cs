@@ -6,7 +6,6 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
-using Windows.Storage;
 using Windows.System;
 using LSMA.Models;
 using LSMA.ViewModels;
@@ -228,29 +227,6 @@ public sealed partial class ModsPage : Page
         ProblemCountText.Foreground = _vm.HasProblems
             ? (SolidColorBrush)Application.Current.Resources["DangerBrush"]
             : (SolidColorBrush)Application.Current.Resources["SecondaryTextBrush"];
-    }
-
-    private void Package_DragOver(object sender, DragEventArgs e)
-    {
-        if (e.DataView.Contains(StandardDataFormats.StorageItems))
-        {
-            e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "预检模组压缩包";
-        }
-    }
-
-    private async void Package_Drop(object sender, DragEventArgs e)
-    {
-        if (!e.DataView.Contains(StandardDataFormats.StorageItems))
-        {
-            return;
-        }
-
-        var items = await e.DataView.GetStorageItemsAsync();
-        if (items.FirstOrDefault() is StorageFile file)
-        {
-            await App.Current.Services.Mods.InspectPackageAsync(file.Path);
-        }
     }
 
     private CancellationTokenSource? _hideEditButtonCts;
