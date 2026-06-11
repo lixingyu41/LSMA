@@ -19,6 +19,7 @@
 *.msixbundle
 *.cer
 *.pfx
+/web/download/*.exe
 
 # Local tooling
 .vscode/
