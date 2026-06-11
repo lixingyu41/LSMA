@@ -5,15 +5,15 @@
   "latestVersion": "1.0.2",
   "releaseDate": "2026-06-11",
   "downloadPageUrl": "https://lsma.lixingyu.top/download/",
-  "downloadUrl": "https://github.com/lixingyu41/LSMA/releases/download/v1.0.2/LSMA-Setup-x64.exe",
+  "downloadUrl": "https://lsma.lixingyu.top/download/LSMA-Setup-x64.exe",
   "fileName": "LSMA-Setup-x64.exe",
   "platform": "Windows x64",
   "minimumWindowsBuild": "10.0.17763",
-  "sizeBytes": 61441632,
-  "sha256": "B49D7D3174C63706723C184C46E571744D6566366FCC543703B53B545177DB47",
+  "sizeBytes": 4409756,
+  "sha256": "A4299045B3E89CF395FAB68A3EC9CE58817F6EB2DB3FDF05059BAC8A395F5629",
   "notes": [
     "赞赏码更新为新版图片。",
-    "更新 Windows x64 安装包。",
+    "安装器会按需下载运行库包。",
     "下载页和更新清单同步到 1.0.2。"
   ]
 }

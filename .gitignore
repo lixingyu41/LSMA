@@ -20,6 +20,9 @@
 *.cer
 *.pfx
 /web/download/*.exe
+!/web/download/LSMA-Setup-x64.exe
+/dist/online/
+/dist/online-test/
 
 # Local tooling
 .vscode/
