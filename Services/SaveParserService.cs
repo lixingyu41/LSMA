@@ -332,6 +332,16 @@ public sealed class SaveParserService(
             HairColorG = ColorComponent(player, "hairstyleColor", "G"),
             HairColorB = ColorComponent(player, "hairstyleColor", "B"),
             ShirtIndex = ClothingIndex(player, "shirtItem", "shirt"),
+            ShirtColorR = ClothingColorComponent(player, "shirtItem", "shirtColor", "R", 255),
+            ShirtColorG = ClothingColorComponent(player, "shirtItem", "shirtColor", "G", 255),
+            ShirtColorB = ClothingColorComponent(player, "shirtItem", "shirtColor", "B", 255),
+            PantsIndex = ClothingIndex(player, "pantsItem", "pants"),
+            PantsColorR = ClothingColorComponent(player, "pantsItem", "pantsColor", "R", 46),
+            PantsColorG = ClothingColorComponent(player, "pantsItem", "pantsColor", "G", 85),
+            PantsColorB = ClothingColorComponent(player, "pantsItem", "pantsColor", "B", 183),
+            HatIndex = HatIndex(player),
+            ShoeColorIndex = ShoeColorIndex(player),
+            SkinIndex = Integer(player, "skin"),
             GameVersion = gameVersion,
             Year = year,
             Season = season,
@@ -487,6 +497,16 @@ public sealed class SaveParserService(
         save.HairColorG = player.HairColorG;
         save.HairColorB = player.HairColorB;
         save.ShirtIndex = player.ShirtIndex;
+        save.ShirtColorR = player.ShirtColorR;
+        save.ShirtColorG = player.ShirtColorG;
+        save.ShirtColorB = player.ShirtColorB;
+        save.PantsIndex = player.PantsIndex;
+        save.PantsColorR = player.PantsColorR;
+        save.PantsColorG = player.PantsColorG;
+        save.PantsColorB = player.PantsColorB;
+        save.HatIndex = player.HatIndex;
+        save.ShoeColorIndex = player.ShoeColorIndex;
+        save.SkinIndex = player.SkinIndex;
         save.Money = player.Money;
         save.TotalMoneyEarned = player.TotalMoneyEarned;
         save.PlayTimeMilliseconds = player.PlayTimeMilliseconds;
@@ -1032,6 +1052,9 @@ public sealed class SaveParserService(
         return int.TryParse(Value(scope, name), out var value) ? value : 0;
     }
 
+    private static bool TryInteger(XElement root, string name, out int value)
+        => int.TryParse(Value(root, name), out value);
+
     private static long Long(XElement root, string name)
     {
         return long.TryParse(Value(root, name), out var value) ? value : 0;
@@ -1043,16 +1066,60 @@ public sealed class SaveParserService(
     private static int ClothingIndex(XElement player, string itemName, string legacyName)
     {
         var item = First(player, itemName);
-        if (item is not null)
+        if (item is not null && TryInteger(item, "indexInTileSheet", out var index))
         {
-            var index = Integer(item, "indexInTileSheet");
-            if (index >= 0)
-            {
-                return index;
-            }
+            return index;
         }
 
         return Integer(player, legacyName);
+    }
+
+    private static int ClothingColorComponent(
+        XElement player,
+        string itemName,
+        string legacyColorName,
+        string component,
+        int fallback)
+    {
+        var item = First(player, itemName);
+        var color = item is null ? null : First(item, "clothesColor");
+        if (color is not null && TryInteger(color, component, out var itemValue))
+        {
+            return itemValue;
+        }
+
+        color = First(player, legacyColorName);
+        return color is not null && TryInteger(color, component, out var legacyValue)
+            ? legacyValue
+            : fallback;
+    }
+
+    private static int HatIndex(XElement player)
+    {
+        var hat = First(player, "hat");
+        if (hat is null)
+        {
+            return -1;
+        }
+
+        return TryInteger(hat, "itemId", out var itemId)
+            ? itemId
+            : TryInteger(hat, "which", out var which)
+                ? which
+                : TryInteger(hat, "indexInTileSheet", out var index)
+                    ? index
+                    : -1;
+    }
+
+    private static int ShoeColorIndex(XElement player)
+    {
+        var boots = First(player, "boots");
+        if (boots is not null && TryInteger(boots, "indexInColorSheet", out var colorIndex))
+        {
+            return colorIndex;
+        }
+
+        return TryInteger(player, "shoes", out var legacyIndex) ? legacyIndex : -1;
     }
 
     private static int StatisticsInteger(XElement player, XElement root, string name, int fallback)

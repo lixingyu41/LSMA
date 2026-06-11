@@ -8,7 +8,15 @@ namespace LSMA.ViewModels;
 
 public sealed class GuideViewModel : ViewModelBase
 {
+    public const string SuggestionsSectionKey = "suggestions";
+    public const string SearchSectionKey = "search";
+    public const string CropsSectionKey = "crops";
+    public const string FishSectionKey = "fish";
+    public const string FestivalsSectionKey = "festivals";
+    public const string BundlesSectionKey = "bundles";
+
     private readonly AppStateService _state;
+    private readonly SettingsService _settings;
     private readonly GuideRecommendationService _recommendations;
     private readonly GuideDataService _data;
     private readonly GameIconService _icons;
@@ -18,12 +26,14 @@ public sealed class GuideViewModel : ViewModelBase
 
     public GuideViewModel(
         AppStateService state,
+        SettingsService settings,
         GuideRecommendationService recommendations,
         GuideDataService data,
         GameIconService icons,
         GameContentCatalogService catalog)
     {
         _state = state;
+        _settings = settings;
         _recommendations = recommendations;
         _data = data;
         _icons = icons;
@@ -57,6 +67,89 @@ public sealed class GuideViewModel : ViewModelBase
         : _catalog.GetCommunityBundles(_state.CurrentSave).Count > 0
             ? "优先补齐当前献祭缺项。"
             : "社区中心进度良好，可规划收入与好感目标。";
+    public Visibility SuggestionsContentVisibility => SectionContentVisibility(SuggestionsSectionKey, SuggestionVisibility);
+    public Visibility SearchContentVisibility => SectionContentVisibility(SearchSectionKey, SearchVisibility);
+    public Visibility CropsContentVisibility => SectionContentVisibility(CropsSectionKey, StructuredVisibility);
+    public Visibility FishContentVisibility => SectionContentVisibility(FishSectionKey, StructuredVisibility);
+    public Visibility FestivalsContentVisibility => SectionContentVisibility(FestivalsSectionKey, StructuredVisibility);
+    public Visibility BundlesContentVisibility => SectionContentVisibility(BundlesSectionKey, BundleVisibility);
+    public string SuggestionsToggleGlyph => SectionToggleGlyph(SuggestionsSectionKey);
+    public string SearchToggleGlyph => SectionToggleGlyph(SearchSectionKey);
+    public string CropsToggleGlyph => SectionToggleGlyph(CropsSectionKey);
+    public string FishToggleGlyph => SectionToggleGlyph(FishSectionKey);
+    public string FestivalsToggleGlyph => SectionToggleGlyph(FestivalsSectionKey);
+    public string BundlesToggleGlyph => SectionToggleGlyph(BundlesSectionKey);
+
+    public async Task ToggleSectionAsync(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        key = key.Trim();
+        var collapsed = !IsSectionCollapsed(key);
+        await _settings.UpdateAsync(settings => settings.GuideCollapsedSections[key] = collapsed);
+        NotifySectionStateChanged(key);
+    }
+
+    private Visibility SectionContentVisibility(string key, Visibility sectionVisibility)
+    {
+        return sectionVisibility == Visibility.Visible && !IsSectionCollapsed(key)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private bool IsSectionCollapsed(string key)
+    {
+        return _settings.Current.GuideCollapsedSections.TryGetValue(key, out var collapsed) && collapsed;
+    }
+
+    private string SectionToggleGlyph(string key)
+    {
+        return IsSectionCollapsed(key) ? "\uE70D" : "\uE70E";
+    }
+
+    private void NotifySectionStateChanged(string key)
+    {
+        switch (key)
+        {
+            case SuggestionsSectionKey:
+                OnPropertyChanged(nameof(SuggestionsContentVisibility));
+                OnPropertyChanged(nameof(SuggestionsToggleGlyph));
+                break;
+            case SearchSectionKey:
+                OnPropertyChanged(nameof(SearchContentVisibility));
+                OnPropertyChanged(nameof(SearchToggleGlyph));
+                break;
+            case CropsSectionKey:
+                OnPropertyChanged(nameof(CropsContentVisibility));
+                OnPropertyChanged(nameof(CropsToggleGlyph));
+                break;
+            case FishSectionKey:
+                OnPropertyChanged(nameof(FishContentVisibility));
+                OnPropertyChanged(nameof(FishToggleGlyph));
+                break;
+            case FestivalsSectionKey:
+                OnPropertyChanged(nameof(FestivalsContentVisibility));
+                OnPropertyChanged(nameof(FestivalsToggleGlyph));
+                break;
+            case BundlesSectionKey:
+                OnPropertyChanged(nameof(BundlesContentVisibility));
+                OnPropertyChanged(nameof(BundlesToggleGlyph));
+                break;
+        }
+    }
+
+    private void NotifyAllSectionStatesChanged()
+    {
+        NotifySectionStateChanged(SuggestionsSectionKey);
+        NotifySectionStateChanged(SearchSectionKey);
+        NotifySectionStateChanged(CropsSectionKey);
+        NotifySectionStateChanged(FishSectionKey);
+        NotifySectionStateChanged(FestivalsSectionKey);
+        NotifySectionStateChanged(BundlesSectionKey);
+    }
 
     public async Task SearchAsync(string query)
     {
@@ -277,6 +370,10 @@ public sealed class GuideViewModel : ViewModelBase
         foreach (var bundle in bundles)
         {
             bundle.IconUri = _icons.GetObjectIconUri(bundle.ObjectId);
+            foreach (var item in bundle.Items)
+            {
+                item.IconUri = _icons.GetObjectIconUri(item.ObjectId);
+            }
         }
 
         Replace(Suggestions, _recommendations.Generate(_state.CurrentSave));
@@ -321,6 +418,7 @@ public sealed class GuideViewModel : ViewModelBase
         OnPropertyChanged(nameof(SearchSummary));
         OnPropertyChanged(nameof(SaveContext));
         OnPropertyChanged(nameof(GoalSuggestion));
+        NotifyAllSectionStatesChanged();
     }
 
     private async Task EnsureStructuredIconsAsync()
@@ -338,6 +436,10 @@ public sealed class GuideViewModel : ViewModelBase
         foreach (var bundle in _catalog.GetCommunityBundles(_state.CurrentSave))
         {
             await _icons.GetObjectIconAsync(bundle.ObjectId);
+            foreach (var item in bundle.Items)
+            {
+                await _icons.GetObjectIconAsync(item.ObjectId);
+            }
         }
     }
 
@@ -371,6 +473,11 @@ public sealed class GuideViewModel : ViewModelBase
         {
             record.IconUri = _icons.GetObjectIconUri(record.ObjectId);
             allResolved &= record.IconUri is not null;
+            foreach (var item in record.Items)
+            {
+                item.IconUri = _icons.GetObjectIconUri(item.ObjectId);
+                allResolved &= item.IconUri is not null;
+            }
         }
 
         _staticGuideIconsApplied = _state.IsGameConfigured && allResolved;

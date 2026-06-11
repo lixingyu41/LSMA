@@ -39,6 +39,8 @@ public sealed class ModsViewModel : ViewModelBase
     private bool _isCheckingUpdates;
     private bool _dailyUpdateCheckStarted;
     private string _updateCheckStatus = string.Empty;
+    private int _scanVersion;
+    private CancellationTokenSource? _translationRefreshCancellation;
 
     public ModsViewModel(
         AppStateService state,
@@ -746,14 +748,18 @@ public sealed class ModsViewModel : ViewModelBase
         try
         {
             var selectedPath = SelectedMod?.FolderPath;
+            var scanVersion = ++_scanVersion;
+            var translationToken = ResetTranslationRefresh();
             _runLock.Refresh();
             _allMods = _analyzer.Analyze(await _scanner.ScanAsync()).ToList();
             ApplyCachedUpdateResults(_allMods);
             _summaryCountsDirty = true;
-            await _translations.ApplyAsync(_allMods);
+            await Task.WhenAll(
+                _translations.ApplyCachedAsync(_allMods, translationToken),
+                SyncFavoritesAsync(),
+                _coverCache.ApplyCachedAndQueueAsync(_allMods));
+            _summaryCountsDirty = true;
             _state.Mods = _allMods;
-            await SyncFavoritesAsync();
-            await _coverCache.ApplyCachedAndQueueAsync(_allMods);
             ApplyFilter(_filter);
             SelectedMod = Mods.FirstOrDefault(mod => string.Equals(mod.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase))
                 ?? Mods.FirstOrDefault();
@@ -763,6 +769,11 @@ public sealed class ModsViewModel : ViewModelBase
             }
 
             App.Current.Services.Home.Refresh();
+            _ = ApplyTranslationsInBackgroundAsync(scanVersion, translationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer scan superseded this one.
         }
         catch (Exception exception)
         {
@@ -773,6 +784,35 @@ public sealed class ModsViewModel : ViewModelBase
             IsBusy = false;
             ProgressText = string.Empty;
             Refresh();
+        }
+    }
+
+    private CancellationToken ResetTranslationRefresh()
+    {
+        _translationRefreshCancellation?.Cancel();
+        _translationRefreshCancellation = new CancellationTokenSource();
+        return _translationRefreshCancellation.Token;
+    }
+
+    private async Task ApplyTranslationsInBackgroundAsync(int scanVersion, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _translations.ApplyAsync(_allMods, cancellationToken);
+            if (cancellationToken.IsCancellationRequested || scanVersion != _scanVersion)
+            {
+                return;
+            }
+
+            Refresh();
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer scan superseded this translation pass.
+        }
+        catch (Exception exception)
+        {
+            await App.Current.Services.Logging.ErrorAsync("后台刷新模组翻译失败", exception);
         }
     }
 
@@ -883,9 +923,10 @@ public sealed class ModsViewModel : ViewModelBase
         try
         {
             var favorites = await _favoritesService.LoadAsync();
+            var favoriteIds = favorites.Select(favorite => favorite.ModId).ToHashSet();
             foreach (var mod in _allMods)
             {
-                mod.IsFavorite = mod.NexusModId is { } id && favorites.Any(f => f.ModId == id);
+                mod.IsFavorite = mod.NexusModId is { } id && favoriteIds.Contains(id);
             }
 
             _summaryCountsDirty = true;

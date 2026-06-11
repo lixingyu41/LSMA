@@ -17,8 +17,8 @@
   }
 
   function applyManifest(manifest) {
-    setText("latestVersion", manifest.latestVersion || manifest.version || "1.0.0");
-    setText("releaseDate", manifest.releaseDate || "2026-06-05");
+    setText("latestVersion", manifest.latestVersion || manifest.version || "1.0.1");
+    setText("releaseDate", manifest.releaseDate || "2026-06-11");
     setText("sizeBytes", formatBytes(manifest.sizeBytes));
     setText("fileName", manifest.fileName || "LSMA-Setup-x64.exe");
     setText("sha256", manifest.sha256 || "");

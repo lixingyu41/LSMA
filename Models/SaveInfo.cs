@@ -18,6 +18,16 @@ public class SaveInfo
     public int HairColorG { get; set; }
     public int HairColorB { get; set; }
     public int ShirtIndex { get; set; } = -1;
+    public int ShirtColorR { get; set; } = 255;
+    public int ShirtColorG { get; set; } = 255;
+    public int ShirtColorB { get; set; } = 255;
+    public int PantsIndex { get; set; } = -1;
+    public int PantsColorR { get; set; } = 46;
+    public int PantsColorG { get; set; } = 85;
+    public int PantsColorB { get; set; } = 183;
+    public int HatIndex { get; set; } = -1;
+    public int ShoeColorIndex { get; set; } = -1;
+    public int SkinIndex { get; set; }
     public int Year { get; set; }
     public string Season { get; set; } = "-";
     public int Day { get; set; }

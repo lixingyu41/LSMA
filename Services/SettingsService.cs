@@ -23,8 +23,8 @@ public sealed class SettingsService(LoggingService logging)
         try
         {
             Current = await JsonHelper.ReadAsync<AppSettings>(AppPaths.SettingsFile) ?? new AppSettings();
-            var needsSave = Current.SchemaVersion < 9;
-            Current.SchemaVersion = 9;
+            var needsSave = Current.SchemaVersion < 10;
+            Current.SchemaVersion = 10;
             if (Current.NexusBindings is null)
             {
                 Current.NexusBindings = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -34,6 +34,19 @@ public sealed class SettingsService(LoggingService logging)
             {
                 Current.NexusBindings = Current.NexusBindings
                     .GroupBy(binding => binding.Key, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (Current.GuideCollapsedSections is null)
+            {
+                Current.GuideCollapsedSections = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+                needsSave = true;
+            }
+            else
+            {
+                Current.GuideCollapsedSections = Current.GuideCollapsedSections
+                    .Where(entry => !string.IsNullOrWhiteSpace(entry.Key))
+                    .GroupBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
             }
 

@@ -24,6 +24,8 @@ public sealed partial class DownloadsPage : Page
     private bool _downloadsSplitterDragging;
     private double _downloadsSplitterStartX;
     private double _downloadsListStartWidth;
+    private bool _downloadsSplitterLayoutQueued;
+    private double _pendingDownloadsListWidth;
 
     public DownloadsPage()
     {
@@ -220,6 +222,7 @@ public sealed partial class DownloadsPage : Page
         _downloadsSplitterDragging = true;
         _downloadsSplitterStartX = e.GetCurrentPoint(DownloadsSplitGrid).Position.X;
         _downloadsListStartWidth = DownloadsListColumn.ActualWidth;
+        _pendingDownloadsListWidth = _downloadsListStartWidth;
         DownloadsSplitter.CapturePointer(e.Pointer);
         e.Handled = true;
     }
@@ -237,8 +240,7 @@ public sealed partial class DownloadsPage : Page
             DownloadsListMinWidth,
             DownloadsSplitGrid.ActualWidth - DownloadsSplitter.ActualWidth - DownloadsDetailMinWidth);
         var listWidth = Math.Clamp(_downloadsListStartWidth + deltaX, DownloadsListMinWidth, maxListWidth);
-        DownloadsListColumn.Width = new GridLength(listWidth);
-        DownloadsDetailColumn.Width = new GridLength(1, GridUnitType.Star);
+        QueueDownloadsSplitterLayout(listWidth);
         e.Handled = true;
     }
 
@@ -246,7 +248,34 @@ public sealed partial class DownloadsPage : Page
     {
         _downloadsSplitterDragging = false;
         DownloadsSplitter.ReleasePointerCapture(e.Pointer);
+        if (_pendingDownloadsListWidth > 0)
+        {
+            ApplyDownloadsSplitterLayout(_pendingDownloadsListWidth);
+        }
+
         e.Handled = true;
+    }
+
+    private void QueueDownloadsSplitterLayout(double listWidth)
+    {
+        _pendingDownloadsListWidth = listWidth;
+        if (_downloadsSplitterLayoutQueued)
+        {
+            return;
+        }
+
+        _downloadsSplitterLayoutQueued = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _downloadsSplitterLayoutQueued = false;
+            ApplyDownloadsSplitterLayout(_pendingDownloadsListWidth);
+        });
+    }
+
+    private void ApplyDownloadsSplitterLayout(double listWidth)
+    {
+        DownloadsListColumn.Width = new GridLength(listWidth);
+        DownloadsDetailColumn.Width = new GridLength(1, GridUnitType.Star);
     }
 
     private static T? FindDescendant<T>(DependencyObject parent)

@@ -30,9 +30,48 @@ public sealed class GuideDataService
 
     public IReadOnlyList<BundleRecord> Bundles { get; } =
     [
-        new() { ObjectId = 24, Name = "春季作物收集包", Season = "春季", ItemHint = "防风草、青豆、花椰菜、土豆" },
-        new() { ObjectId = 258, Name = "夏季作物收集包", Season = "夏季", ItemHint = "番茄、辣椒、蓝莓、甜瓜" },
-        new() { ObjectId = 270, Name = "秋季作物收集包", Season = "秋季", ItemHint = "玉米、茄子、南瓜、山药" }
+        new()
+        {
+            ObjectId = 24,
+            Name = "春季作物收集包",
+            Season = "春季",
+            ItemHint = "防风草、青豆、花椰菜、土豆",
+            Items =
+            {
+                new() { ObjectId = 24, Name = "防风草", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 188, Name = "青豆", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 190, Name = "花椰菜", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 192, Name = "土豆", Stack = 1, StatusText = "候选项" }
+            }
+        },
+        new()
+        {
+            ObjectId = 258,
+            Name = "夏季作物收集包",
+            Season = "夏季",
+            ItemHint = "番茄、辣椒、蓝莓、甜瓜",
+            Items =
+            {
+                new() { ObjectId = 256, Name = "番茄", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 260, Name = "辣椒", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 258, Name = "蓝莓", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 254, Name = "甜瓜", Stack = 1, StatusText = "候选项" }
+            }
+        },
+        new()
+        {
+            ObjectId = 270,
+            Name = "秋季作物收集包",
+            Season = "秋季",
+            ItemHint = "玉米、茄子、南瓜、山药",
+            Items =
+            {
+                new() { ObjectId = 270, Name = "玉米", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 272, Name = "茄子", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 276, Name = "南瓜", Stack = 1, StatusText = "候选项" },
+                new() { ObjectId = 280, Name = "山药", Stack = 1, StatusText = "候选项" }
+            }
+        }
     ];
 
     public IReadOnlyList<NpcGiftRecord> NpcGifts => NpcGiftData.All;

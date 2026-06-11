@@ -13,6 +13,23 @@ public sealed class GameIconService(
     LoggingService logging)
 {
     private const int ObjectSheetColumns = 24;
+    private const int FarmerCanvasWidth = 24;
+    private const int FarmerCanvasHeight = 40;
+    private const int FarmerBodyOffsetX = 4;
+    private const int FarmerBodyOffsetY = 8;
+    private static readonly PixelColor[] DefaultSkinColors =
+    [
+        new(0x6B, 0x00, 0x3A),
+        new(0xE0, 0x6B, 0x65),
+        new(0xF9, 0xAE, 0x89)
+    ];
+    private static readonly PixelColor[] DefaultShoeColors =
+    [
+        new(0x3D, 0x11, 0x23),
+        new(0x5B, 0x1F, 0x24),
+        new(0x77, 0x29, 0x1A),
+        new(0xAD, 0x47, 0x1B)
+    ];
     private static readonly int[] ObjectIds =
     [
         24, 143, 150, 258, 270, 276, 282, 400, 414, 498, 698
@@ -587,7 +604,7 @@ public sealed class GameIconService(
             "InterfaceIcons",
             "Saves",
             "Farmers",
-            $"v4-{SaveArtworkKey(save)}-{PlayerArtworkKey(player)}-{gender}-h{player.Hair}-{player.HairColorR:X2}{player.HairColorG:X2}{player.HairColorB:X2}-s{player.ShirtIndex}.png");
+            $"v7-{SaveArtworkKey(save)}-{PlayerArtworkKey(player)}-{gender}-skin{player.SkinIndex}-h{player.Hair}-{player.HairColorR:X2}{player.HairColorG:X2}{player.HairColorB:X2}-s{player.ShirtIndex}-{player.ShirtColorR:X2}{player.ShirtColorG:X2}{player.ShirtColorB:X2}-p{player.PantsIndex}-{player.PantsColorR:X2}{player.PantsColorG:X2}{player.PantsColorB:X2}-hat{player.HatIndex}-shoe{player.ShoeColorIndex}.png");
         if (File.Exists(output))
         {
             return ToUri(output);
@@ -606,11 +623,16 @@ public sealed class GameIconService(
 
         try
         {
-            var portrait = await textures.LoadTextureRegionAsync(baseSource, game.Path, 0, 0, 16, 32);
-            await OverlayPantsAsync(baseSource, game.Path, portrait);
-            await OverlayShirtAsync(game.Path, portrait, player.ShirtIndex);
+            var portrait = CreateTransparent(FarmerCanvasWidth, FarmerCanvasHeight);
+            var body = await textures.LoadTextureRegionAsync(baseSource, game.Path, 0, 0, 16, 32);
+            await RecolorSkinAsync(game.Path, body, player.SkinIndex);
+            Overlay(portrait, body, FarmerBodyOffsetX, FarmerBodyOffsetY);
+            await OverlayPantsAsync(game.Path, portrait, player, gender);
+            await OverlayShoesAsync(baseSource, game.Path, portrait, player.ShoeColorIndex);
+            await OverlayShirtAsync(game.Path, portrait, player);
+            await OverlayArmsAsync(baseSource, game.Path, portrait, player.SkinIndex);
             await OverlayHairAsync(game.Path, portrait, player);
-            await OverlayArmsAsync(baseSource, game.Path, portrait);
+            await OverlayHatAsync(game.Path, portrait, player.HatIndex);
             await textures.WritePngAsync(output, portrait);
             return ToUri(output);
         }
@@ -621,15 +643,42 @@ public sealed class GameIconService(
         }
     }
 
-    private async Task OverlayPantsAsync(string baseSource, string gamePath, XnbTexturePixels portrait)
+    private async Task OverlayPantsAsync(string gamePath, XnbTexturePixels portrait, SaveInfo player, string gender)
     {
-        var layer = await textures.LoadTextureRegionAsync(baseSource, gamePath, 12 * 16, 0, 16, 32);
-        Overlay(portrait, layer);
+        if (player.PantsIndex < 0)
+        {
+            return;
+        }
+
+        var source = Path.Combine(gamePath, "Content", "Characters", "Farmer", "pants.xnb");
+        if (!File.Exists(source))
+        {
+            return;
+        }
+
+        var size = await textures.GetTextureSizeAsync(source, gamePath);
+        const int pantsSetWidth = 192;
+        const int pantsSetHeight = 688;
+        var x = player.PantsIndex % 10 * pantsSetWidth;
+        var y = player.PantsIndex / 10 * pantsSetHeight;
+        if (gender == "Female")
+        {
+            x += 96;
+        }
+
+        if (x < 0 || y < 0 || x + 16 > size.Width || y + 32 > size.Height)
+        {
+            return;
+        }
+
+        var layer = await textures.LoadTextureRegionAsync(source, gamePath, x, y, 16, 32);
+        Tint(layer, player.PantsColorR, player.PantsColorG, player.PantsColorB);
+        Overlay(portrait, layer, FarmerBodyOffsetX, FarmerBodyOffsetY);
     }
 
-    private async Task OverlayShirtAsync(string gamePath, XnbTexturePixels portrait, int shirtIndex)
+    private async Task OverlayShirtAsync(string gamePath, XnbTexturePixels portrait, SaveInfo player)
     {
-        if (shirtIndex < 0)
+        if (player.ShirtIndex < 0)
         {
             return;
         }
@@ -640,14 +689,39 @@ public sealed class GameIconService(
             return;
         }
 
-        var layer = await textures.LoadTextureRegionAsync(
+        const int shirtSheetWidthForIndexing = 128;
+        var x = player.ShirtIndex * 8 % shirtSheetWidthForIndexing;
+        var y = player.ShirtIndex * 8 / shirtSheetWidthForIndexing * 32;
+        var size = await textures.GetTextureSizeAsync(source, gamePath);
+        if (x < 0 || y < 0 || x + 8 > size.Width || y + 8 > size.Height)
+        {
+            return;
+        }
+
+        var baseLayer = await textures.LoadTextureRegionAsync(source, gamePath, x, y, 8, 8);
+        Overlay(portrait, baseLayer, FarmerBodyOffsetX + 4, FarmerBodyOffsetY + 14);
+
+        if (x + shirtSheetWidthForIndexing + 8 > size.Width)
+        {
+            return;
+        }
+
+        var colorLayer = await textures.LoadTextureRegionAsync(
             source,
             gamePath,
-            shirtIndex % 16 * 8,
-            shirtIndex / 16 * 8,
+            x + shirtSheetWidthForIndexing,
+            y,
             8,
             8);
-        Overlay(portrait, layer, 4, 9);
+        Tint(colorLayer, player.ShirtColorR, player.ShirtColorG, player.ShirtColorB);
+        Overlay(portrait, colorLayer, FarmerBodyOffsetX + 4, FarmerBodyOffsetY + 14);
+    }
+
+    private async Task OverlayArmsAsync(string baseSource, string gamePath, XnbTexturePixels portrait, int skinIndex)
+    {
+        var layer = await textures.LoadTextureRegionAsync(baseSource, gamePath, 6 * 16, 0, 16, 32);
+        await RecolorSkinAsync(gamePath, layer, skinIndex);
+        Overlay(portrait, layer, FarmerBodyOffsetX, FarmerBodyOffsetY);
     }
 
     private async Task OverlayHairAsync(string gamePath, XnbTexturePixels portrait, SaveInfo save)
@@ -659,33 +733,157 @@ public sealed class GameIconService(
 
         var hairIndex = save.Hair;
         var fileName = "hairstyles.xnb";
-        if (hairIndex >= 168)
-        {
-            hairIndex -= 168;
-            fileName = "hairstyles2.xnb";
-        }
-
         var source = Path.Combine(gamePath, "Content", "Characters", "Farmer", fileName);
         if (!File.Exists(source))
         {
             return;
         }
 
+        var size = await textures.GetTextureSizeAsync(source, gamePath);
+        var stylesPerSheet = size.Width / 16 * (size.Height / 96);
+        if (hairIndex >= stylesPerSheet)
+        {
+            hairIndex -= stylesPerSheet;
+            fileName = "hairstyles2.xnb";
+            source = Path.Combine(gamePath, "Content", "Characters", "Farmer", fileName);
+            if (!File.Exists(source))
+            {
+                return;
+            }
+
+            size = await textures.GetTextureSizeAsync(source, gamePath);
+            stylesPerSheet = size.Width / 16 * (size.Height / 96);
+        }
+
+        if (hairIndex < 0 || hairIndex >= stylesPerSheet)
+        {
+            return;
+        }
+
+        var columns = Math.Max(1, size.Width / 16);
         var layer = await textures.LoadTextureRegionAsync(
             source,
             gamePath,
-            hairIndex % 8 * 16,
-            hairIndex / 8 * 16,
+            hairIndex % columns * 16,
+            hairIndex / columns * 96,
             16,
-            16);
+            32);
         Tint(layer, save.HairColorR, save.HairColorG, save.HairColorB);
-        Overlay(portrait, layer);
+        Overlay(portrait, layer, FarmerBodyOffsetX, FarmerBodyOffsetY);
     }
 
-    private async Task OverlayArmsAsync(string baseSource, string gamePath, XnbTexturePixels portrait)
+    private async Task OverlayHatAsync(string gamePath, XnbTexturePixels portrait, int hatIndex)
     {
-        var layer = await textures.LoadTextureRegionAsync(baseSource, gamePath, 6 * 16, 0, 16, 32);
-        Overlay(portrait, layer);
+        if (hatIndex < 0)
+        {
+            return;
+        }
+
+        var source = Path.Combine(gamePath, "Content", "Characters", "Farmer", "hats.xnb");
+        if (!File.Exists(source))
+        {
+            return;
+        }
+
+        var size = await textures.GetTextureSizeAsync(source, gamePath);
+        var x = hatIndex * 20 % size.Width;
+        var y = hatIndex * 20 / size.Width * 80;
+        if (x < 0 || y < 0 || x + 20 > size.Width || y + 20 > size.Height)
+        {
+            return;
+        }
+
+        var layer = await textures.LoadTextureRegionAsync(source, gamePath, x, y, 20, 20);
+        Overlay(portrait, layer, FarmerBodyOffsetX - 2, FarmerBodyOffsetY - 2);
+    }
+
+    private async Task RecolorSkinAsync(string gamePath, XnbTexturePixels body, int skinIndex)
+    {
+        var colors = await LoadPaletteRowAsync(gamePath, "skinColors.xnb", skinIndex, 3);
+        if (colors is not null)
+        {
+            ReplacePalette(body, DefaultSkinColors, colors, clearUnmatched: false);
+        }
+    }
+
+    private async Task OverlayShoesAsync(string baseSource, string gamePath, XnbTexturePixels portrait, int shoeColorIndex)
+    {
+        var colors = await LoadPaletteRowAsync(gamePath, "shoeColors.xnb", shoeColorIndex, 4);
+        if (colors is null)
+        {
+            return;
+        }
+
+        var shoes = await textures.LoadTextureRegionAsync(baseSource, gamePath, 0, 0, 16, 32);
+        ReplacePalette(shoes, DefaultShoeColors, colors, clearUnmatched: true);
+        Overlay(portrait, shoes, FarmerBodyOffsetX, FarmerBodyOffsetY);
+    }
+
+    private async Task<PixelColor[]?> LoadPaletteRowAsync(string gamePath, string fileName, int row, int width)
+    {
+        if (row < 0)
+        {
+            return null;
+        }
+
+        var source = Path.Combine(gamePath, "Content", "Characters", "Farmer", fileName);
+        if (!File.Exists(source))
+        {
+            return null;
+        }
+
+        var size = await textures.GetTextureSizeAsync(source, gamePath);
+        if (row >= size.Height || width > size.Width)
+        {
+            return null;
+        }
+
+        var rowPixels = await textures.LoadTextureRegionAsync(source, gamePath, 0, row, width, 1);
+        var colors = new PixelColor[width];
+        for (var index = 0; index < width; index++)
+        {
+            var pixelIndex = index * 4;
+            colors[index] = new PixelColor(
+                rowPixels.Pixels[pixelIndex],
+                rowPixels.Pixels[pixelIndex + 1],
+                rowPixels.Pixels[pixelIndex + 2]);
+        }
+
+        return colors;
+    }
+
+    private static XnbTexturePixels CreateTransparent(int width, int height)
+        => new(width, height, new byte[checked(width * height * 4)]);
+
+    private static void ReplacePalette(
+        XnbTexturePixels texture,
+        IReadOnlyList<PixelColor> source,
+        IReadOnlyList<PixelColor> target,
+        bool clearUnmatched)
+    {
+        for (var index = 0; index < texture.Pixels.Length; index += 4)
+        {
+            if (texture.Pixels[index + 3] == 0)
+            {
+                continue;
+            }
+
+            var matched = false;
+            for (var colorIndex = 0; colorIndex < source.Count && colorIndex < target.Count; colorIndex++)
+            {
+                if (source[colorIndex].Matches(texture.Pixels, index))
+                {
+                    target[colorIndex].WriteTo(texture.Pixels, index);
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (!matched && clearUnmatched)
+            {
+                texture.Pixels[index + 3] = 0;
+            }
+        }
     }
 
     private static void Tint(XnbTexturePixels layer, int red, int green, int blue)
@@ -747,6 +945,21 @@ public sealed class GameIconService(
 
     private static byte Blend(byte source, byte target, double alpha, double inverse)
         => (byte)Math.Clamp((int)Math.Round(source * alpha + target * inverse), 0, 255);
+
+    private readonly record struct PixelColor(byte Red, byte Green, byte Blue)
+    {
+        public bool Matches(byte[] pixels, int index)
+            => pixels[index] == Red
+                && pixels[index + 1] == Green
+                && pixels[index + 2] == Blue;
+
+        public void WriteTo(byte[] pixels, int index)
+        {
+            pixels[index] = Red;
+            pixels[index + 1] = Green;
+            pixels[index + 2] = Blue;
+        }
+    }
 
     private static string FarmerGenderKey(string? gender)
         => string.Equals(gender, "Female", StringComparison.OrdinalIgnoreCase) ? "Female" : "Male";

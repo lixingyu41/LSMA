@@ -513,7 +513,7 @@ public sealed class NexusClient(LoggingService logging)
     }
 
     private static string GetVersion()
-        => typeof(NexusClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+        => typeof(NexusClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.1";
 
     private sealed class GraphQlEnvelope<T>
     {

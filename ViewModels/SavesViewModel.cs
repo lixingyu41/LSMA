@@ -9,6 +9,7 @@ namespace LSMA.ViewModels;
 
 public sealed class SavesViewModel : ViewModelBase
 {
+    private const int MaxConcurrentPostScanUpdates = 4;
     private readonly AppStateService _state;
     private readonly SaveLocatorService _locator;
     private readonly SaveParserService _parser;
@@ -198,18 +199,13 @@ public sealed class SavesViewModel : ViewModelBase
         {
             var selectedPath = preferredPath ?? SelectedSave?.FolderPath;
             var selectedPlayerKey = SelectedPlayer?.PlayerKey;
-            var results = new List<SaveInfo>();
             var sources = await _locator.LocateAsync();
             var parsedSaves = await Task.WhenAll(sources.Select(source => _parser.ParseAsync(source)));
-            foreach (var save in parsedSaves)
-            {
-                if (save is not null)
-                {
-                    await _icons.ApplySaveIconsAsync(save);
-                    save.LatestBackup = _backups.GetLatestBackup(save.FolderName);
-                    results.Add(save);
-                }
-            }
+            var results = parsedSaves
+                .Where(save => save is not null)
+                .Cast<SaveInfo>()
+                .ToList();
+            await ApplyPostScanDataAsync(results);
 
             ReplaceCollection(Saves, results);
 
@@ -231,6 +227,31 @@ public sealed class SavesViewModel : ViewModelBase
             ProgressText = string.Empty;
             Refresh();
         }
+    }
+
+    private async Task ApplyPostScanDataAsync(IReadOnlyList<SaveInfo> saves)
+    {
+        if (saves.Count == 0)
+        {
+            return;
+        }
+
+        using var gate = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, MaxConcurrentPostScanUpdates));
+        var tasks = saves.Select(async save =>
+        {
+            await gate.WaitAsync();
+            try
+            {
+                await _icons.ApplySaveIconsAsync(save);
+                save.LatestBackup = _backups.GetLatestBackup(save.FolderName);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
     }
 
     private async Task ScanAutomaticallyAsync()

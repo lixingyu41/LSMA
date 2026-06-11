@@ -38,6 +38,8 @@ public sealed partial class ModsPage : Page
     private double _modsSplitterStartX;
     private double _modsListStartWidth;
     private bool _modsSplitterLayoutApplied;
+    private bool _modsSplitterLayoutQueued;
+    private double _pendingModsListWidth;
     private static SolidColorBrush SelectedFilterForeground =>
         (SolidColorBrush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"];
 
@@ -193,6 +195,12 @@ public sealed partial class ModsPage : Page
     {
         // Capture current X before Stop (Stop reverts to pre-animation value)
         double fromX = PillTransform.X;
+        if (Math.Abs(fromX - targetX) < 0.5)
+        {
+            PillTransform.X = targetX;
+            return;
+        }
+
         _currentAnimation?.Stop();
         var duration = new Duration(TimeSpan.FromMilliseconds(250));
         var animation = new DoubleAnimation
@@ -436,6 +444,7 @@ public sealed partial class ModsPage : Page
         _modsSplitterDragging = true;
         _modsSplitterStartX = e.GetCurrentPoint(ModsSplitGrid).Position.X;
         _modsListStartWidth = ModsListColumn.ActualWidth;
+        _pendingModsListWidth = _modsListStartWidth;
         ModsSplitter.CapturePointer(e.Pointer);
         e.Handled = true;
     }
@@ -453,8 +462,7 @@ public sealed partial class ModsPage : Page
             ModsListMinWidth,
             ModsSplitGrid.ActualWidth - ModsSplitter.ActualWidth - ModsDetailMinWidth);
         var listWidth = Math.Clamp(_modsListStartWidth + deltaX, ModsListMinWidth, maxListWidth);
-        ModsListColumn.Width = new GridLength(listWidth);
-        ModsDetailColumn.Width = new GridLength(1, GridUnitType.Star);
+        QueueModsSplitterLayout(listWidth);
         e.Handled = true;
     }
 
@@ -462,8 +470,35 @@ public sealed partial class ModsPage : Page
     {
         _modsSplitterDragging = false;
         ModsSplitter.ReleasePointerCapture(e.Pointer);
+        if (_pendingModsListWidth > 0)
+        {
+            ApplyModsSplitterLayout(_pendingModsListWidth);
+        }
+
         SaveModsSplitterRatio();
         e.Handled = true;
+    }
+
+    private void QueueModsSplitterLayout(double listWidth)
+    {
+        _pendingModsListWidth = listWidth;
+        if (_modsSplitterLayoutQueued)
+        {
+            return;
+        }
+
+        _modsSplitterLayoutQueued = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _modsSplitterLayoutQueued = false;
+            ApplyModsSplitterLayout(_pendingModsListWidth);
+        });
+    }
+
+    private void ApplyModsSplitterLayout(double listWidth)
+    {
+        ModsListColumn.Width = new GridLength(listWidth);
+        ModsDetailColumn.Width = new GridLength(1, GridUnitType.Star);
     }
 
     private void ModsSplitGrid_SizeChanged(object sender, SizeChangedEventArgs e)

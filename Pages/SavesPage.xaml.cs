@@ -37,6 +37,10 @@ public sealed partial class SavesPage : Page
         public required TranslateTransform Offset { get; init; }
         public required string FallbackText { get; init; }
         public Storyboard? Animation { get; set; }
+        public ImageSource? SnapshotSource { get; set; }
+        public object? SnapshotDataContext { get; set; }
+        public double SnapshotWidth { get; set; }
+        public double SnapshotHeight { get; set; }
     }
 
     private readonly List<BubbleHost> _bubbleHosts = [];
@@ -83,6 +87,7 @@ public sealed partial class SavesPage : Page
         QueueResponsiveLayoutUpdate();
         QueueTopColumnStretch(_sectionColumnCount);
         QueueBubbleRefresh();
+        InvalidateBubbleSnapshots();
         QueueDetailTopMarginUpdate();
     }
 
@@ -269,14 +274,34 @@ public sealed partial class SavesPage : Page
 
     private static async Task UpdateCardSnapshotAsync(BubbleHost host)
     {
+        var cardWidth = host.Card.ActualWidth;
+        var cardHeight = host.Card.ActualHeight;
+        var dataContext = host.Card.DataContext;
+        if (host.SnapshotSource is not null
+            && ReferenceEquals(host.SnapshotDataContext, dataContext)
+            && Math.Abs(host.SnapshotWidth - cardWidth) < 0.5
+            && Math.Abs(host.SnapshotHeight - cardHeight) < 0.5)
+        {
+            host.CardSnapshot.Source = host.SnapshotSource;
+            return;
+        }
+
         try
         {
             var bitmap = new RenderTargetBitmap();
             await bitmap.RenderAsync(host.Card);
+            host.SnapshotSource = bitmap;
+            host.SnapshotDataContext = dataContext;
+            host.SnapshotWidth = cardWidth;
+            host.SnapshotHeight = cardHeight;
             host.CardSnapshot.Source = bitmap;
         }
         catch
         {
+            host.SnapshotSource = null;
+            host.SnapshotDataContext = null;
+            host.SnapshotWidth = 0;
+            host.SnapshotHeight = 0;
             host.CardSnapshot.Source = null;
         }
     }
@@ -564,10 +589,22 @@ public sealed partial class SavesPage : Page
         SetExpandablePanel(MonsterPanel, MonsterExpandIcon, _isMonsterPanelExpanded, CollapsedCatchPanelHeight);
         SetExpandablePanel(FriendshipPanel, FriendshipExpandIcon, _isFriendshipPanelExpanded, CollapsedFriendshipPanelHeight);
         QueueTopColumnStretch(_sectionColumnCount);
+        InvalidateBubbleSnapshots();
 
         if (_activeBubble is { } active)
         {
             HideBubble(active);
+        }
+    }
+
+    private void InvalidateBubbleSnapshots()
+    {
+        foreach (var host in _bubbleHosts)
+        {
+            host.SnapshotSource = null;
+            host.SnapshotDataContext = null;
+            host.SnapshotWidth = 0;
+            host.SnapshotHeight = 0;
         }
     }
 
@@ -648,6 +685,7 @@ public sealed partial class SavesPage : Page
         }
 
         metric.ToggleCompactValue();
+        InvalidateBubbleSnapshots();
         e.Handled = true;
     }
 

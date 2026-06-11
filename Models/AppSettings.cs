@@ -30,7 +30,7 @@ public enum LaunchMode
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 9;
+    public int SchemaVersion { get; set; } = 10;
 
     public string? GameDirectory { get; set; }
 
@@ -61,6 +61,8 @@ public sealed class AppSettings
     public bool ModMetadataTranslationEnabled { get; set; } = true;
 
     public Dictionary<string, long> NexusBindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, bool> GuideCollapsedSections { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public DateTime? LastModsUpdateCheckAt { get; set; }
 

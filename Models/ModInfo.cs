@@ -32,6 +32,8 @@ public sealed class ModInfo : ObservableObject
     private bool _isPointerOver;
     private long? _nexusModId;
     private string? _remoteVersion;
+    private string? _translatedName;
+    private string? _translatedDescription;
     private string? _coverImageUri;
     private string? _remoteCategoryName;
     private long? _remoteUpdatedTimestamp;
@@ -69,8 +71,30 @@ public sealed class ModInfo : ObservableObject
         }
     }
     public ModManifest? Manifest { get; set; }
-    public string? TranslatedName { get; set; }
-    public string? TranslatedDescription { get; set; }
+    public string? TranslatedName
+    {
+        get => _translatedName;
+        set
+        {
+            if (SetProperty(ref _translatedName, string.IsNullOrWhiteSpace(value) ? null : value.Trim()))
+            {
+                OnPropertyChanged(nameof(DisplayName));
+            }
+        }
+    }
+    public string? TranslatedDescription
+    {
+        get => _translatedDescription;
+        set
+        {
+            if (SetProperty(ref _translatedDescription, string.IsNullOrWhiteSpace(value) ? null : value.Trim()))
+            {
+                OnPropertyChanged(nameof(TranslatedDescriptionText));
+                OnPropertyChanged(nameof(TranslatedDescriptionVisibility));
+                OnPropertyChanged(nameof(DisplayDescription));
+            }
+        }
+    }
     public List<ModIssue> Issues { get; } = [];
     public bool IsSelected
     {

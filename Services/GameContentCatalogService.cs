@@ -11,6 +11,14 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         159, 160, 163, 682, 775, 898, 899, 900, 901, 902
     ];
 
+    private static readonly IReadOnlyDictionary<string, string> LegacyMineFishLocations =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["158"] = "矿井 20 层",
+            ["161"] = "矿井 60 层",
+            ["162"] = "矿井 100 层 / 火山火山口"
+        };
+
     private static readonly IReadOnlyDictionary<string, string[]> CollectionKeyAliases = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["Cheese Cauli."] = ["Cheese Cauliflower"],
@@ -26,6 +34,62 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         ["Vegetable Stew"] = ["Vegetable Medley"],
         ["Vegetable Medley"] = ["Vegetable Stew"]
     };
+
+    private static readonly IReadOnlyList<ArtisanProductionGuide> ArtisanProductionGuides =
+    [
+        new("果酒", "348", "任意水果放入小桶，10000 游戏分钟（约 7 天）后产出果酒。",
+            [new("小桶", "小桶", "加工设备"), new("任意水果", "水果", "原料")]),
+        new("果汁", "350", "任意蔬菜放入小桶，6000 游戏分钟（约 4 天）后产出果汁。",
+            [new("小桶", "小桶", "加工设备"), new("任意蔬菜", "蔬菜", "原料")]),
+        new("啤酒", "346", "小麦放入小桶，1750 游戏分钟（约 1 天）后产出啤酒。",
+            [new("小桶", "小桶", "加工设备"), new("小麦", "小麦", "原料")]),
+        new("淡啤酒", "303", "啤酒花放入小桶，2250 游戏分钟（约 1-2 天）后产出淡啤酒。",
+            [new("小桶", "小桶", "加工设备"), new("啤酒花", "啤酒花", "原料")]),
+        new("绿茶", "614", "茶叶放入小桶，180 游戏分钟（3 小时）后产出绿茶。",
+            [new("小桶", "小桶", "加工设备"), new("茶叶", "茶叶", "原料")]),
+        new("咖啡", "395", "5 个咖啡豆放入小桶，120 游戏分钟（2 小时）后产出咖啡。",
+            [new("小桶", "小桶", "加工设备"), new("咖啡豆 x5", "咖啡豆", "原料")]),
+        new("蜜蜂酒", "459", "蜂蜜放入小桶，600 游戏分钟（10 小时）后产出蜜蜂酒。",
+            [new("小桶", "小桶", "加工设备"), new("蜂蜜", "蜂蜜", "原料")]),
+        new("醋", "419", "未碾米放入小桶，600 游戏分钟（10 小时）后产出醋 x2。",
+            [new("小桶", "小桶", "加工设备"), new("未碾米", "未碾米", "原料")]),
+        new("果酱", "344", "任意水果放入罐头瓶，4000 游戏分钟（约 2-3 天）后产出果酱。",
+            [new("罐头瓶", "罐头瓶", "加工设备"), new("任意水果", "水果", "原料")]),
+        new("腌菜", "342", "任意蔬菜放入罐头瓶，4000 游戏分钟（约 2-3 天）后产出腌菜。",
+            [new("罐头瓶", "罐头瓶", "加工设备"), new("任意蔬菜", "蔬菜", "原料")]),
+        new("鱼籽酱", "445", "鲟鱼鱼籽放入罐头瓶，6000 游戏分钟（约 4 天）后产出鱼籽酱。",
+            [new("罐头瓶", "罐头瓶", "加工设备"), new("鲟鱼鱼籽", "鲟鱼", "原料")]),
+        new("熏鱼", "SmokedFish", "任意鱼类和 1 个煤炭放入熏鱼机，50 游戏分钟后产出熏鱼。",
+            [new("熏鱼机", "熏鱼机", "加工设备"), new("任意鱼类", "任意鱼类", "原料"), new("煤炭", "煤炭", "额外原料")]),
+        new("奶酪", "424", "牛奶放入压酪机，200 游戏分钟（3 小时 20 分钟）后产出奶酪。",
+            [new("压酪机", "压酪机", "加工设备"), new("牛奶", "牛奶", "原料")]),
+        new("山羊奶酪", "426", "山羊奶放入压酪机，200 游戏分钟（3 小时 20 分钟）后产出山羊奶酪。",
+            [new("压酪机", "压酪机", "加工设备"), new("山羊奶", "山羊奶", "原料")]),
+        new("蛋黄酱", "306", "鸡蛋放入蛋黄酱机，180 游戏分钟（3 小时）后产出蛋黄酱。",
+            [new("蛋黄酱机", "蛋黄酱机", "加工设备"), new("鸡蛋", "鸡蛋", "原料")]),
+        new("鸭蛋黄酱", "307", "鸭蛋放入蛋黄酱机，180 游戏分钟（3 小时）后产出鸭蛋黄酱。",
+            [new("蛋黄酱机", "蛋黄酱机", "加工设备"), new("鸭蛋", "鸭蛋", "原料")]),
+        new("虚空蛋黄酱", "308", "虚空蛋放入蛋黄酱机，180 游戏分钟（3 小时）后产出虚空蛋黄酱。",
+            [new("蛋黄酱机", "蛋黄酱机", "加工设备"), new("虚空蛋", "虚空蛋", "原料")]),
+        new("恐龙蛋黄酱", "807", "恐龙蛋放入蛋黄酱机，180 游戏分钟（3 小时）后产出恐龙蛋黄酱。",
+            [new("蛋黄酱机", "蛋黄酱机", "加工设备"), new("恐龙蛋", "恐龙蛋", "原料")]),
+        new("松露油", "432", "松露放入产油机，360 游戏分钟（6 小时）后产出松露油。",
+            [new("产油机", "产油机", "加工设备"), new("松露", "松露", "原料")]),
+        new("油", "247", "玉米放入产油机，1000 游戏分钟（约 16 小时 40 分钟）后产出油。",
+            [new("产油机", "产油机", "加工设备"), new("玉米", "玉米", "原料")]),
+        new("油", "247", "向日葵放入产油机，60 游戏分钟（1 小时）后产出油。",
+            [new("产油机", "产油机", "加工设备"), new("向日葵", "向日葵", "原料")]),
+        new("油", "247", "葵花籽放入产油机，3200 游戏分钟（约 2 天）后产出油。",
+            [new("产油机", "产油机", "加工设备"), new("葵花籽", "葵花籽", "原料")]),
+        new("布料", "428", "动物毛放入织布机，240 游戏分钟（4 小时）后产出布料。",
+            [new("织布机", "织布机", "加工设备"), new("动物毛", "动物毛", "原料")]),
+        new("葡萄干", "Raisins", "5 个葡萄放入烘干机，1 天后产出葡萄干。",
+            [new("烘干机", "烘干机", "加工设备"), new("葡萄 x5", "葡萄", "原料")]),
+        new("果干", "DriedFruit", "5 个同类水果放入烘干机，1 天后产出果干。",
+            [new("烘干机", "烘干机", "加工设备"), new("同类水果 x5", "水果", "原料")]),
+        new("蘑菇干货", "DriedMushrooms", "5 个同类蘑菇放入烘干机，1 天后产出蘑菇干货。",
+            [new("烘干机", "烘干机", "加工设备"), new("同类蘑菇 x5", "蘑菇", "原料")])
+    ];
 
     private readonly List<GuideSearchResult> _searchIndex = [];
     private readonly List<FishRecord> _fish = [];
@@ -450,7 +514,6 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
     {
         return GetRelevantBundleDefinitions(save)
             .Select(bundle => CreateBundleRecord(bundle, save))
-            .Where(record => save is null || !record.IsComplete)
             .OrderBy(record => record.IsComplete)
             .ThenByDescending(record => record.MissingCount)
             .ThenBy(record => record.Name)
@@ -478,9 +541,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
 
     private IEnumerable<CommunityBundleDefinition> GetRelevantBundleDefinitions(SaveInfo? save)
     {
-        return save is null || save.CommunityBundleStates.Count == 0
-            ? _bundleDefinitions
-            : _bundleDefinitions.Where(bundle => save.CommunityBundleStates.ContainsKey(bundle.Id));
+        return _bundleDefinitions;
     }
 
     private void AddCollectionCatalogItem(string collectionKey, CollectionCatalogItem item)
@@ -598,6 +659,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         var cookingRecipes = LoadStringDictionary(contentType, content, "Data\\CookingRecipes");
         var craftingRecipes = LoadStringDictionary(contentType, content, "Data\\CraftingRecipes");
         var locationNames = LoadLocationNames(contentType, content, gameData, localizedText);
+        var fishLocationNames = LoadFishLocationNames(contentType, content, gameData, localizedText, locationNames);
         var characterEvents = LoadCharacterEventSummaries(contentType, content, gamePath, npcStrings, localizedText, locationNames);
 
         var objectType = gameData.GetType("StardewValley.GameData.Objects.ObjectData")
@@ -611,7 +673,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         var itemResultsByQualifiedId = new Dictionary<string, GuideSearchResult>(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, value) in objects)
         {
-            var name = ResolveText(GetString(value, "DisplayName"), localizedText);
+            var name = ResolveObjectDisplayName(GetString(value, "DisplayName"), localizedText);
             if (string.IsNullOrWhiteSpace(name))
             {
                 continue;
@@ -710,6 +772,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             _searchIndex.Add(objectResult);
         }
         AddObjectAliases(objectResultsById);
+        AddArtisanProductionGuides(objectResultsById, itemResultsByQualifiedId);
         foreach (var (reference, result) in LoadAdditionalItemResults(contentType, content, gameData, localizedText))
         {
             catalogItemsByQualifiedId[reference.ItemId] = reference;
@@ -1058,7 +1121,7 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
                 Name = name,
                 Season = TranslateSeasons(fields[6]),
                 Weather = TranslateWeather(fields[7]),
-                Location = fields.Length > 8 ? TranslateLocations(fields[8]) : string.Empty,
+                Location = fishLocationNames.GetValueOrDefault(idText) ?? LegacyFishLocation(idText),
                 Time = TranslateTime(fields[5]),
                 SortStartMinutes = ParseStartMinutes(fields[5]),
                 SalePrice = objectPrices.GetValueOrDefault(id),
@@ -1169,21 +1232,31 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
     private static BundleRecord CreateBundleRecord(CommunityBundleDefinition bundle, SaveInfo? save)
     {
         var states = save?.CommunityBundleStates.GetValueOrDefault(bundle.Id);
-        var completed = states is null
-            ? 0
-            : states.Take(bundle.Items.Count).Count(state => state);
-        var missingItems = save is null ? bundle.Items : GetMissingItems(bundle, save).ToList();
+        var completed = CountCompletedBundleItems(bundle, states);
+        var bundleComplete = save is not null && IsBundleComplete(bundle, save, states);
+        var displayCompleted = Math.Min(bundle.RequiredCount, bundleComplete
+            ? Math.Max(completed, bundle.RequiredCount)
+            : completed);
+        var missingItems = save is null || bundleComplete
+            ? new List<CommunityBundleItemDefinition>()
+            : GetMissingItems(bundle, save).ToList();
         var missingText = FormatMissingItems(missingItems, Math.Max(0, bundle.RequiredCount - completed));
+        var items = bundle.Items
+            .Select((item, index) => CreateBundleItemRecord(item, save, states, index, bundleComplete))
+            .ToList();
 
-        return new BundleRecord
+        var record = new BundleRecord
         {
             ObjectId = missingItems.FirstOrDefault()?.ObjectId ?? bundle.Items.First().ObjectId,
             Name = $"{bundle.RoomName} · {bundle.Name}",
+            GuideQuery = bundle.Name,
             Season = bundle.RoomName,
             ItemHint = missingText,
-            CompletedCount = completed,
+            CompletedCount = displayCompleted,
             RequiredCount = bundle.RequiredCount
         };
+        record.Items.AddRange(items);
+        return record;
     }
 
     private static IReadOnlyList<CommunityBundleItemDefinition> GetMissingItems(
@@ -1192,11 +1265,10 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
     {
         if (!save.CommunityBundleStates.TryGetValue(bundle.Id, out var states))
         {
-            return bundle.Items;
+            return IsBundleComplete(bundle, save, null) ? [] : bundle.Items;
         }
 
-        var completed = states.Take(bundle.Items.Count).Count(state => state);
-        if (completed >= bundle.RequiredCount)
+        if (IsBundleComplete(bundle, save, states))
         {
             return [];
         }
@@ -1224,6 +1296,76 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         return missingCount > 0 && items.Count > missingCount
             ? $"任选 {missingCount} 项：{text}"
             : text;
+    }
+
+    private static int CountCompletedBundleItems(
+        CommunityBundleDefinition bundle,
+        IReadOnlyList<bool>? states)
+    {
+        return states is null
+            ? 0
+            : states.Take(bundle.Items.Count).Count(state => state);
+    }
+
+    private static bool IsBundleComplete(
+        CommunityBundleDefinition bundle,
+        SaveInfo save,
+        IReadOnlyList<bool>? states)
+    {
+        return IsBundleRoomComplete(bundle, save)
+            || CountCompletedBundleItems(bundle, states ?? save.CommunityBundleStates.GetValueOrDefault(bundle.Id)) >= bundle.RequiredCount;
+    }
+
+    private static bool IsCommunityCenterComplete(SaveInfo save)
+    {
+        return save.CommunityCenterProgress >= 100
+            || save.MailFlags.Contains("ccIsComplete");
+    }
+
+    private static bool IsBundleRoomComplete(CommunityBundleDefinition bundle, SaveInfo save)
+    {
+        return BundleRoomMailFlag(bundle.RoomName) is { } flag
+            && (save.MailFlags.Contains(flag) || IsCommunityCenterComplete(save));
+    }
+
+    private static string? BundleRoomMailFlag(string roomName) => roomName switch
+    {
+        "工艺室" => "ccCraftsRoom",
+        "茶水间" => "ccPantry",
+        "鱼缸" => "ccFishTank",
+        "锅炉房" => "ccBoilerRoom",
+        "布告栏" => "ccBulletin",
+        "金库" => "ccVault",
+        _ => null
+    };
+
+    private static BundleItemRecord CreateBundleItemRecord(
+        CommunityBundleItemDefinition item,
+        SaveInfo? save,
+        IReadOnlyList<bool>? states,
+        int index,
+        bool bundleComplete)
+    {
+        var isDonated = states is not null
+            && index < states.Count
+            && states[index];
+
+        return new BundleItemRecord
+        {
+            ObjectId = item.ObjectId,
+            Name = item.Name,
+            Stack = item.Stack,
+            Quality = item.Quality,
+            IsDonated = isDonated && !bundleComplete,
+            IsSatisfiedByBundle = bundleComplete,
+            StatusText = save is null
+                ? "候选项"
+                : bundleComplete
+                    ? "已完成"
+                    : isDonated
+                        ? "已献祭"
+                        : "待献祭"
+        };
     }
 
     private Dictionary<string, IReadOnlyList<FestivalShopItemDefinition>> LoadFestivalShopItems(
@@ -1792,6 +1934,65 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         }
     }
 
+    private void AddArtisanProductionGuides(
+        IReadOnlyDictionary<int, GuideSearchResult> objectResultsById,
+        IReadOnlyDictionary<string, GuideSearchResult> itemResultsByQualifiedId)
+    {
+        foreach (var guide in ArtisanProductionGuides)
+        {
+            var result = FindProductionOutput(guide, objectResultsById, itemResultsByQualifiedId);
+            if (result is null)
+            {
+                continue;
+            }
+
+            AddSectionLineUnique(result, "制作方式", guide.Line);
+            foreach (var action in guide.Actions)
+            {
+                AddSectionAction(result, "制作方式", new GuideSearchAction
+                {
+                    Label = action.Label,
+                    Query = action.Query,
+                    Detail = action.Detail,
+                    ObjectId = FindObjectIdByName(action.Query) ?? FindObjectIdByName(action.Label)
+                });
+            }
+        }
+    }
+
+    private GuideSearchResult? FindProductionOutput(
+        ArtisanProductionGuide guide,
+        IReadOnlyDictionary<int, GuideSearchResult> objectResultsById,
+        IReadOnlyDictionary<string, GuideSearchResult> itemResultsByQualifiedId)
+    {
+        foreach (var itemId in QualifiedObjectItemIds(guide.OutputItemId))
+        {
+            if (itemResultsByQualifiedId.TryGetValue(itemId, out var result))
+            {
+                return result;
+            }
+        }
+
+        var objectId = FindObjectIdByName(guide.OutputName);
+        return objectId is { } id && objectResultsById.TryGetValue(id, out var objectResult)
+            ? objectResult
+            : null;
+    }
+
+    private static IEnumerable<string> QualifiedObjectItemIds(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId))
+        {
+            yield break;
+        }
+
+        yield return itemId;
+        if (!itemId.StartsWith("(O)", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return $"(O){itemId}";
+        }
+    }
+
     private static Dictionary<string, string> MergeLocalizedText(
         params (string Asset, IReadOnlyDictionary<string, string> Values)[] sources)
     {
@@ -1831,6 +2032,183 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         }
 
         return locations;
+    }
+
+    private static IReadOnlyDictionary<string, string> LoadFishLocationNames(
+        Type contentType,
+        IDisposable content,
+        Assembly gameData,
+        IReadOnlyDictionary<string, string> localizedText,
+        IReadOnlyDictionary<string, string> locationNames)
+    {
+        var locationType = gameData.GetType("StardewValley.GameData.Locations.LocationData");
+        if (locationType is null)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (locationId, value) in LoadTypedDictionary(contentType, content, "Data\\Locations", locationType))
+        {
+            foreach (var fish in GetEnumerableObjects(value, "Fish"))
+            {
+                var itemId = NormalizeFishItemId(GetMemberString(fish, "ItemId"));
+                if (itemId is null)
+                {
+                    continue;
+                }
+
+                var display = FormatFishLocationDisplay(
+                    locationId,
+                    value,
+                    GetMemberString(fish, "FishAreaId"),
+                    localizedText,
+                    locationNames);
+                if (string.IsNullOrWhiteSpace(display))
+                {
+                    continue;
+                }
+
+                AddFishLocation(result, itemId, display);
+            }
+        }
+
+        foreach (var (itemId, display) in LegacyMineFishLocations)
+        {
+            if (!result.ContainsKey(itemId))
+            {
+                AddFishLocation(result, itemId, display);
+            }
+        }
+
+        return result.ToDictionary(
+            pair => pair.Key,
+            pair => string.Join(" / ", pair.Value.Take(4)),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? NormalizeFishItemId(string itemId)
+    {
+        var value = itemId.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var match = QualifiedItemType().Match(value);
+        if (match.Success)
+        {
+            if (!match.Groups[1].Value.Equals("O", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            value = match.Groups[2].Value;
+        }
+
+        return int.TryParse(value, out _) ? value : null;
+    }
+
+    private static string FormatFishLocationDisplay(
+        string locationId,
+        object location,
+        string areaId,
+        IReadOnlyDictionary<string, string> localizedText,
+        IReadOnlyDictionary<string, string> locationNames)
+    {
+        if (IsInternalFishLocation(locationId))
+        {
+            return string.Empty;
+        }
+
+        var locationName = TranslateLocationName(locationId, locationNames);
+        if (string.IsNullOrWhiteSpace(locationName) || locationName.Equals("Default", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var areaName = FishAreaDisplayName(location, areaId, localizedText);
+        if (string.IsNullOrWhiteSpace(areaName))
+        {
+            areaName = TranslateFishAreaId(areaId);
+        }
+
+        return string.IsNullOrWhiteSpace(areaName) || areaName.Equals(locationName, StringComparison.OrdinalIgnoreCase)
+            ? locationName
+            : $"{locationName} · {areaName}";
+    }
+
+    private static bool IsInternalFishLocation(string locationId)
+    {
+        return locationId.Equals("Default", StringComparison.OrdinalIgnoreCase)
+            || locationId.Equals("Temp", StringComparison.OrdinalIgnoreCase)
+            || locationId.Equals("fishingGame", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FishAreaDisplayName(
+        object location,
+        string areaId,
+        IReadOnlyDictionary<string, string> localizedText)
+    {
+        if (string.IsNullOrWhiteSpace(areaId)
+            || location.GetType().GetField("FishAreas")?.GetValue(location) is not System.Collections.IEnumerable areas)
+        {
+            return string.Empty;
+        }
+
+        foreach (var area in areas)
+        {
+            var areaType = area!.GetType();
+            var key = areaType.GetProperty("Key")?.GetValue(area)?.ToString();
+            if (!areaId.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = areaType.GetProperty("Value")?.GetValue(area);
+            return value is null
+                ? string.Empty
+                : ResolveText(GetMemberString(value, "DisplayName"), localizedText);
+        }
+
+        return string.Empty;
+    }
+
+    private static void AddFishLocation(
+        IDictionary<string, List<string>> locations,
+        string itemId,
+        string display)
+    {
+        if (!locations.TryGetValue(itemId, out var values))
+        {
+            values = [];
+            locations[itemId] = values;
+        }
+
+        if (!values.Contains(display, StringComparer.OrdinalIgnoreCase))
+        {
+            values.Add(display);
+        }
+    }
+
+    private static string TranslateFishAreaId(string value) => value switch
+    {
+        "River" => "河流",
+        "Lake" => "湖泊",
+        "Ocean" => "海洋",
+        "Freshwater" => "淡水",
+        "Pond" or "Ponds" or "CornerPond" or "MiddlePond" or "BottomPond" or "TopPond" => "池塘",
+        "Fountain" => "喷泉",
+        "Marsh" => "沼泽",
+        "RiverAndLargePond" => "河流与大池塘",
+        _ => string.Empty
+    };
+
+    private static string LegacyFishLocation(string itemId)
+    {
+        return LegacyMineFishLocations.TryGetValue(itemId, out var location)
+            ? location
+            : string.Empty;
     }
 
     private static void AddSectionLine(GuideSearchSection section, string label, string value)
@@ -2338,40 +2716,61 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             return string.Empty;
         }
 
-        if (locationNames is not null && locationNames.TryGetValue(value, out var localized))
+        if (locationNames is not null
+            && locationNames.TryGetValue(value, out var localized)
+            && !string.IsNullOrWhiteSpace(localized)
+            && !localized.Contains('[', StringComparison.Ordinal))
         {
             return localized;
         }
 
-        return value switch
-        {
-            "SeedShop" => "皮埃尔的杂货店",
-            "Saloon" => "星之果实餐吧",
-            "Trailer" => "拖车",
-            "ManorHouse" => "镇长庄园",
-            "AnimalShop" => "玛妮牧场",
-            "ScienceHouse" => "木匠的家",
-            "ElliottHouse" => "艾利欧特小屋",
-            "HaleyHouse" => "艾米丽和海莉的家",
-            "JoshHouse" => "乔治、艾芙琳和亚历克斯的家",
-            "SamHouse" => "山姆的家",
-            "HarveyRoom" => "哈维诊所",
-            "WizardHouse" => "法师塔",
-            "Tent" => "莱纳斯帐篷",
-            "FishShop" => "鱼店",
-            "Blacksmith" => "铁匠铺",
-            "Hospital" => "诊所",
-            "Beach" => "海滩",
-            "Town" => "鹈鹕镇",
-            "Forest" => "煤矿森林",
-            "Mountain" => "山区",
-            "BusStop" => "公交站",
-            "CommunityCenter" => "社区中心",
-            "Desert" => "卡利科沙漠",
-            "bed" => "床",
-            _ => value
-        };
+        return KnownLocationName(value) ?? value;
     }
+
+    private static string? KnownLocationName(string value) => value switch
+    {
+        "Farm" or "Farm_Beach" or "Farm_Forest" or "Farm_FourCorners" or "Farm_Hilltop" or "Farm_Riverland" or "Farm_Wilderness" or "Farm_MeadowlandsFarm" => "农场",
+        "SeedShop" => "皮埃尔的杂货店",
+        "Saloon" => "星之果实餐吧",
+        "Trailer" => "拖车",
+        "ManorHouse" => "镇长庄园",
+        "AnimalShop" => "玛妮牧场",
+        "ScienceHouse" => "木匠的家",
+        "ElliottHouse" => "艾利欧特小屋",
+        "HaleyHouse" => "艾米丽和海莉的家",
+        "JoshHouse" => "乔治、艾芙琳和亚历克斯的家",
+        "SamHouse" => "山姆的家",
+        "HarveyRoom" => "哈维诊所",
+        "WizardHouse" => "法师塔",
+        "Tent" => "莱纳斯帐篷",
+        "FishShop" => "鱼店",
+        "Blacksmith" => "铁匠铺",
+        "Hospital" => "诊所",
+        "Beach" => "海滩",
+        "BeachNightMarket" => "夜市海滩",
+        "Town" => "鹈鹕镇",
+        "Forest" => "煤矿森林",
+        "Mountain" => "山区",
+        "BusStop" => "公交站",
+        "CommunityCenter" => "社区中心",
+        "Desert" => "卡利科沙漠",
+        "Backwoods" => "后山小径",
+        "Sewer" => "下水道",
+        "BugLand" => "突变虫穴",
+        "Woods" => "秘密森林",
+        "WitchSwamp" => "女巫沼泽",
+        "Submarine" => "夜市潜艇",
+        "IslandSouth" => "姜岛南部",
+        "IslandSouthEast" => "姜岛东南部",
+        "IslandSouthEastCave" => "海盗湾",
+        "IslandWest" => "姜岛西部",
+        "IslandNorth" => "姜岛北部",
+        "IslandEast" => "姜岛东部",
+        "Caldera" => "火山火山口",
+        "UndergroundMine" or "Mine" => "矿井",
+        "bed" => "床",
+        _ => null
+    };
 
     private static IEnumerable<RecipeSearchResultDefinition> LoadRecipeSearchResults(
         IReadOnlyDictionary<string, string> recipeData,
@@ -2699,6 +3098,40 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         return strings.TryGetValue(match.Groups[2].Value, out var value) ? value : token;
     }
 
+    private static string ResolveObjectDisplayName(string token, IReadOnlyDictionary<string, string> strings)
+    {
+        var resolved = ResolveText(token, strings);
+        if (!resolved.Equals("Dried", StringComparison.OrdinalIgnoreCase)
+            && !resolved.Equals("Smoked", StringComparison.OrdinalIgnoreCase))
+        {
+            return resolved;
+        }
+
+        var match = LocalizedToken().Match(token);
+        if (!match.Success)
+        {
+            return resolved;
+        }
+
+        const string nameSuffix = "_Name";
+        var nameKey = match.Groups[2].Value;
+        if (!nameKey.EndsWith(nameSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return resolved;
+        }
+
+        var collectionKey = $"{nameKey[..^nameSuffix.Length]}_CollectionsTabName";
+        var fullCollectionKey = $"{match.Groups[1].Value}:{collectionKey}";
+        if (strings.TryGetValue(fullCollectionKey, out var fullValue) && !string.IsNullOrWhiteSpace(fullValue))
+        {
+            return fullValue;
+        }
+
+        return strings.TryGetValue(collectionKey, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : resolved;
+    }
+
     private static string TranslateSeasons(string value)
         => string.Join(" / ", value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(TranslateSeason));
 
@@ -2730,33 +3163,6 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
             && (fish.Weather.Equals(weather, StringComparison.Ordinal)
                 || (fish.Weather == "雨天" && weather == "雷雨"));
     }
-
-    private static string TranslateLocations(string value)
-    {
-        var locations = value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Select(TranslateLocation)
-            .Where(location => !string.IsNullOrWhiteSpace(location))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-        return string.Join(" / ", locations);
-    }
-
-    private static string TranslateLocation(string value) => value.ToLowerInvariant() switch
-    {
-        "ocean" => "海洋",
-        "town" => "小镇河流",
-        "forest" => "森林河流",
-        "mountain" => "山区湖泊",
-        "lake" => "湖泊",
-        "river" => "河流",
-        "mine" or "undergroundmine" => "矿井",
-        "sewer" or "sewers" => "下水道",
-        "desert" => "沙漠",
-        "woods" => "秘密森林",
-        "island" or "islandsouth" or "islandwest" or "islandnorth" => "姜岛",
-        "beachnightmarket" => "夜市潜艇",
-        "submarine" => "潜艇",
-        _ => value
-    };
 
     private static string TranslateTime(string value)
     {
@@ -2945,4 +3351,15 @@ public sealed partial class GameContentCatalogService(AppStateService state, Log
         public string SearchQuery => Name;
         public string DisplayText => $"{Name} x{Stack}";
     }
+
+    private sealed record ArtisanProductionGuide(
+        string OutputName,
+        string OutputItemId,
+        string Line,
+        IReadOnlyList<ArtisanProductionAction> Actions);
+
+    private sealed record ArtisanProductionAction(
+        string Label,
+        string Query,
+        string Detail);
 }

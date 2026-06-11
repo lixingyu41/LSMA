@@ -5,6 +5,9 @@ namespace LSMA.Services;
 public sealed class AppServices
 {
     private bool _settingsInitialized;
+    private GuideViewModel? _guide;
+    private SavesViewModel? _saves;
+    private DownloadsViewModel? _downloads;
 
     public AppServices()
     {
@@ -52,10 +55,7 @@ public sealed class AppServices
 
         Home = new HomeViewModel(State, Settings, GameLocator, GameIcons, Launcher, RunLock, SmapiLogs, LastKnownGood, Platform, Dialogs);
         Mods = new ModsViewModel(State, RunLock, ModScanner, ModAnalyzer, ModTranslations, ModBackups, ModTransactions, ModPackages, ModPacks, NexusCredentials, Nexus, NexusFavorites, NexusCovers, Platform, Dialogs, UiDispatcher);
-        Guide = new GuideViewModel(State, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
-        Saves = new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
         SettingsPage = new SettingsViewModel(State, Settings, GameLocator, Platform, Dialogs, NexusCredentials, Nexus, SmapiLogs, Cache, AssetCache, GameIcons, AppUpdates);
-        Downloads = new DownloadsViewModel(State, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, ModPackages, Settings, Platform, Dialogs, NexusModNameTranslations, NexusCovers);
     }
 
     public LoggingService Logging { get; }
@@ -101,10 +101,10 @@ public sealed class AppServices
     public LastKnownGoodService LastKnownGood { get; }
     public HomeViewModel Home { get; }
     public ModsViewModel Mods { get; }
-    public GuideViewModel Guide { get; }
-    public SavesViewModel Saves { get; }
+    public GuideViewModel Guide => _guide ??= new GuideViewModel(State, Settings, GuideRecommendations, GuideData, GameIcons, GuideCatalog);
+    public SavesViewModel Saves => _saves ??= new SavesViewModel(State, SaveLocator, SaveParser, GameIcons, SaveBackups, Platform, Dialogs, UiDispatcher);
     public SettingsViewModel SettingsPage { get; }
-    public DownloadsViewModel Downloads { get; }
+    public DownloadsViewModel Downloads => _downloads ??= new DownloadsViewModel(State, NexusCredentials, Nexus, NexusFavorites, NexusDownloads, ModPackages, Settings, Platform, Dialogs, NexusModNameTranslations, NexusCovers);
 
     public async Task InitializeAppearanceAsync()
     {
@@ -122,12 +122,16 @@ public sealed class AppServices
     {
         await InitializeAppearanceAsync();
         await GameLocator.DetectAsync();
-        await NpcNames.PrepareAsync(State.GameDirectory?.Path);
-        await GuideCatalog.PrepareAsync();
-        await GameIcons.PrepareAsync();
+
+        var npcNamesTask = NpcNames.PrepareAsync(State.GameDirectory?.Path);
+        var guideCatalogTask = GuideCatalog.PrepareAsync();
+        var modsTask = Mods.StartAutomaticScanningAsync();
+
+        await Task.WhenAll(npcNamesTask, guideCatalogTask);
+        await Task.WhenAll(GameIcons.PrepareAsync(), modsTask);
+
         RunLock.Refresh();
         Home.Refresh();
-        await Mods.StartAutomaticScanningAsync();
     }
 
     public async Task InitializeDeferredAsync()

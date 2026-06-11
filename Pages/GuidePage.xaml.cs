@@ -38,6 +38,14 @@ public sealed partial class GuidePage : Page
         }
     }
 
+    private async void SectionToggle_Click(object sender, RoutedEventArgs args)
+    {
+        if (sender is Button { Tag: string key } && !string.IsNullOrWhiteSpace(key))
+        {
+            await App.Current.Services.Guide.ToggleSectionAsync(key);
+        }
+    }
+
     private void NavigateSearch(string query)
     {
         App.Current.Services.Navigation.Navigate(typeof(GuidePage), query?.Trim() ?? string.Empty);

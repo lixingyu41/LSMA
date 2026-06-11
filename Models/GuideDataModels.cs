@@ -97,20 +97,55 @@ public sealed class BundleRecord : GuideRecord
 {
     public int ObjectId { get; init; }
     public string Name { get; init; } = string.Empty;
+    public string GuideQuery { get; init; } = string.Empty;
     public string ItemHint { get; init; } = string.Empty;
     public string Season { get; init; } = string.Empty;
     public int CompletedCount { get; init; }
     public int RequiredCount { get; init; }
+    public List<BundleItemRecord> Items { get; } = [];
+    public IReadOnlyList<BundleItemRecord> CompletedItems => Items.Where(item => item.IsComplete).ToList();
+    public IReadOnlyList<BundleItemRecord> PendingItems => Items.Where(item => !item.IsComplete).ToList();
     public int MissingCount => Math.Max(0, RequiredCount - CompletedCount);
     public bool IsComplete => RequiredCount > 0 && CompletedCount >= RequiredCount;
     public string? IconUri { get; set; }
-    public string SearchQuery => Name;
+    public string SearchQuery => string.IsNullOrWhiteSpace(GuideQuery) ? Name : GuideQuery;
     public string Detail => IsComplete
         ? "已完成"
         : MissingCount > 0
-            ? $"还差 {MissingCount} 项：{ItemHint}"
+            ? $"还差 {MissingCount} 项"
             : ItemHint;
     public string ProgressText => RequiredCount > 0 ? $"{CompletedCount}/{RequiredCount}" : Season;
+    public Visibility ItemsVisibility => Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility CompletedItemsVisibility => CompletedItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility PendingItemsVisibility => PendingItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+}
+
+public sealed class BundleItemRecord : GuideRecord
+{
+    public int ObjectId { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public int Stack { get; init; } = 1;
+    public int Quality { get; init; }
+    public string StatusText { get; init; } = "待献祭";
+    public bool IsDonated { get; init; }
+    public bool IsSatisfiedByBundle { get; init; }
+    public bool IsComplete => IsDonated || IsSatisfiedByBundle;
+    public string? IconUri { get; set; }
+    public string SearchQuery => Name;
+    public string Detail => Quality > 0
+        ? $"x{Stack} · {QualityName(Quality)}"
+        : $"x{Stack}";
+    public Visibility DonatedStatusVisibility => IsDonated ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility SatisfiedStatusVisibility => !IsDonated && IsSatisfiedByBundle ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility PendingStatusVisibility => IsComplete ? Visibility.Collapsed : Visibility.Visible;
+
+    private static string QualityName(int quality) => quality switch
+    {
+        1 => "银星",
+        2 => "金星",
+        4 => "铱星",
+        _ => $"{quality} 星"
+    };
 }
 
 public sealed class NpcGiftRecord : GuideRecord

@@ -32,6 +32,7 @@ public sealed class ModTranslationService(
             ResetDailyUsage(cache);
             foreach (var mod in mods)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     await ApplyModAsync(mod, cache, cancellationToken);
@@ -46,6 +47,30 @@ public sealed class ModTranslationService(
                     await logging.ErrorAsync("模组元数据翻译失败，本轮停止在线翻译", exception);
                     break;
                 }
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task ApplyCachedAsync(IReadOnlyList<ModInfo> mods, CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!settings.Current.ModMetadataTranslationEnabled)
+            {
+                ClearTranslations(mods);
+                return;
+            }
+
+            var cache = await LoadCacheAsync(cancellationToken);
+            foreach (var mod in mods)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ApplyCachedMod(mod, cache);
             }
         }
         finally
@@ -162,6 +187,28 @@ public sealed class ModTranslationService(
         {
             mod.TranslatedName = null;
             mod.TranslatedDescription = null;
+        }
+    }
+
+    private static void ApplyCachedMod(ModInfo mod, ModTranslationCacheFile cache)
+    {
+        mod.TranslatedName = null;
+        mod.TranslatedDescription = null;
+        if (!cache.Entries.TryGetValue(CacheKey(mod), out var entry))
+        {
+            return;
+        }
+
+        var name = mod.OriginalName.Trim();
+        if (entry.NameHash == HashSource(name))
+        {
+            mod.TranslatedName = entry.TranslatedName;
+        }
+
+        var description = (mod.OriginalDescription ?? string.Empty).Trim();
+        if (entry.DescriptionHash == HashSource(description))
+        {
+            mod.TranslatedDescription = entry.TranslatedDescription;
         }
     }
 
