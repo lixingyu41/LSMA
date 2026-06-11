@@ -1,5 +1,5 @@
 #define MyAppName "LSMA"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "L"
 #define MyAppExeName "LSMA.exe"
 
